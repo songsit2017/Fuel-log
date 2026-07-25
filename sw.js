@@ -26,7 +26,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // Never cache API calls (Anthropic / Overpass / CDN libs) - always go straight to network
-  if (url.hostname.includes('anthropic.com') || url.hostname.includes('overpass-api.de') || url.hostname.includes('cdnjs.cloudflare.com')) {
+  if (url.hostname.includes('anthropic.com') || url.hostname.includes('overpass-api.de') || url.hostname.includes('cdnjs.cloudflare.com') || url.hostname.includes('chnwt.dev')) {
     return;
   }
   if (event.request.method !== 'GET') return;

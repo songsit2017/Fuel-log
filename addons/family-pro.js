@@ -1,8 +1,8 @@
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-  setPersistence, browserLocalPersistence
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signOut, onAuthStateChanged, setPersistence, browserLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
 import {
   getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc,
@@ -83,7 +83,7 @@ function familyView() {
   return `<div class="fl-grid">
     <div class="fl-card full">
       <div class="fl-login">
-        ${user ? `<div class="fl-user"><img src="${esc(user.photoURL || '')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName || user.email)}</b><div class="fl-muted">${esc(user.email)}</div></div></div><button class="fl-btn" id="flSignOut">ออกจากระบบ</button>` : `<div><b>เข้าสู่ระบบ Google</b><div class="fl-muted">เพื่อซิงก์และแชร์รถกับคนในบ้าน</div></div><button class="fl-btn primary" id="flLogin">เข้าสู่ระบบ</button>`}
+        ${user ? `<div class="fl-user"><img src="${esc(user.photoURL || '')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName || user.email)}</b><div class="fl-muted">${esc(user.email)}</div></div></div><button class="fl-btn" id="flSignOut">ออกจากระบบ</button>` : `<div><b>เข้าสู่ระบบ Google</b><div class="fl-muted">เพื่อซิงก์และแชร์รถกับคนในบ้าน</div><div id="flAuthStatus" class="fl-muted" style="margin-top:6px"></div></div><button type="button" class="fl-btn primary" id="flLogin">เข้าสู่ระบบ</button>`}
       </div>
     </div>
     <div class="fl-card"><h3>รถที่เลือก</h3><div class="fl-kpi">${esc(v.name)}</div><div class="fl-muted">${esc(v.id)}</div></div>
@@ -159,8 +159,62 @@ function render() {
   if (tab === 'gallery' && user) loadGallery();
 }
 
+function authErrorText(error) {
+  const code = error?.code || '';
+  if (code === 'auth/unauthorized-domain') return 'โดเมนนี้ยังไม่ได้รับอนุญาต: ไปที่ Firebase > Authentication > Settings > Authorized domains แล้วเพิ่ม songsit2017.github.io';
+  if (code === 'auth/popup-blocked') return 'เบราว์เซอร์บล็อกหน้าต่างเข้าสู่ระบบ กำลังเปลี่ยนไปใช้การเข้าสู่ระบบแบบเปลี่ยนหน้า';
+  if (code === 'auth/popup-closed-by-user') return 'หน้าต่างเข้าสู่ระบบถูกปิดก่อนเสร็จ';
+  if (code === 'auth/operation-not-allowed') return 'ยังไม่ได้เปิด Google Sign-in ใน Firebase Authentication';
+  if (code === 'auth/network-request-failed') return 'เชื่อมต่อ Google ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
+  return error?.message || 'เข้าสู่ระบบไม่สำเร็จ';
+}
+
+function setLoginStatus(message, isError = false) {
+  const status = $('#flAuthStatus');
+  if (status) {
+    status.textContent = message || '';
+    status.classList.toggle('fl-error', !!isError);
+  }
+  const button = $('#flLogin');
+  if (button) {
+    button.disabled = !!message && !isError;
+    button.textContent = message && !isError ? 'กำลังเชื่อมต่อ…' : 'เข้าสู่ระบบ';
+  }
+}
+
+function isStandaloneApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+async function loginGoogle() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  setLoginStatus('กำลังเปิด Google…');
+  try {
+    if (isStandaloneApp()) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    await signInWithPopup(auth, provider);
+    setLoginStatus('');
+  } catch (error) {
+    const fallbackCodes = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'];
+    if (fallbackCodes.includes(error?.code)) {
+      setLoginStatus('กำลังเปลี่ยนไปหน้าล็อกอิน Google…');
+      try {
+        await signInWithRedirect(auth, provider);
+        return;
+      } catch (redirectError) {
+        setLoginStatus(authErrorText(redirectError), true);
+        return;
+      }
+    }
+    setLoginStatus(authErrorText(error), true);
+  }
+}
+
 function bindView() {
-  $('#flLogin')?.addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => alert(e.message)));
+  $('#flLogin')?.addEventListener('click', loginGoogle);
   $('#flSignOut')?.addEventListener('click', () => signOut(auth));
   $('#saveTrip')?.addEventListener('click', saveTrip);
   document.querySelectorAll('[data-deltrip]').forEach((b) => b.onclick = () => {
@@ -478,10 +532,21 @@ function applyOcr() {
   close();
 }
 
+getRedirectResult(auth).catch((error) => {
+  sessionStorage.setItem('fuellog-auth-error', authErrorText(error));
+});
+
 onAuthStateChanged(auth, async (u) => {
   user = u;
   if (u) await ensureUser().catch(() => {});
-  if ($('#familyOverlay')?.classList.contains('open')) render();
+  if ($('#familyOverlay')?.classList.contains('open')) {
+    render();
+    const authError = sessionStorage.getItem('fuellog-auth-error');
+    if (authError) {
+      sessionStorage.removeItem('fuellog-auth-error');
+      setLoginStatus(authError, true);
+    }
+  }
 });
 
 ensureUI();

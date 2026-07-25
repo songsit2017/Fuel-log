@@ -1,1 +1,26 @@
-{"name":"FuelLog Pro v6","short_name":"FuelLog","start_url":"./","display":"standalone","background_color":"#09101d","theme_color":"#09101d","icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}]}
+{
+  "name": "FuelLog Pro v3.3 — Full Function",
+  "short_name": "FuelLog Pro v3.3",
+  "description": "บันทึกการเติมน้ำมัน ค่าใช้จ่าย งานบำรุงรักษา และวิเคราะห์ต้นทุนรถยนต์",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1020",
+  "theme_color": "#111827",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

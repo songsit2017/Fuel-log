@@ -78,13 +78,15 @@ function markActiveTab() {
   document.querySelectorAll('[data-ftab]').forEach((x) => x.classList.toggle('active', x.dataset.ftab === tab));
 }
 
+function googleLogo() {
+  return `<svg class="fl-google-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.74-.07-1.45-.19-2.14H12v4.05h5.38a4.6 4.6 0 0 1-2 3.02v2.62h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z"/><path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.42l-3.24-2.62c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.7A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.79A6.02 6.02 0 0 1 6.08 12c0-.62.11-1.22.31-1.79V7.5H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.5l3.35-2.71Z"/><path fill="#EA4335" d="M12 6.08c1.47 0 2.8.51 3.84 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.5l3.35 2.71C7.18 7.84 9.39 6.08 12 6.08Z"/></svg>`;
+}
+
 function familyView() {
   const v = vehicle();
   return `<div class="fl-grid">
-    <div class="fl-card full">
-      <div class="fl-login">
-        ${user ? `<div class="fl-user"><img src="${esc(user.photoURL || '')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName || user.email)}</b><div class="fl-muted">${esc(user.email)}</div></div></div><button class="fl-btn" id="flSignOut">ออกจากระบบ</button>` : `<div><b>เข้าสู่ระบบ Google</b><div class="fl-muted">เพื่อซิงก์และแชร์รถกับคนในบ้าน</div><div id="flAuthStatus" class="fl-muted" style="margin-top:6px"></div></div><button type="button" class="fl-btn primary" id="flLogin">เข้าสู่ระบบ</button>`}
-      </div>
+    <div class="fl-card full fl-auth-card">
+      ${user ? `<div class="fl-account-panel"><div class="fl-user"><img src="${esc(user.photoURL || '')}" referrerpolicy="no-referrer"><div><div class="fl-account-name">${esc(user.displayName || user.email)}</div><div class="fl-muted">${esc(user.email)}</div><span class="fl-connected-badge">● เชื่อมต่อแล้ว</span></div></div><button class="fl-btn fl-signout-btn" id="flSignOut">ออกจากระบบ</button></div>` : `<div class="fl-auth-intro"><div class="fl-auth-copy"><div class="fl-auth-title">Google Cloud Sync</div><div class="fl-muted">ซิงก์ข้อมูลระหว่างมือถือและแชร์รถกับคนในบ้าน</div></div><button type="button" class="fl-google-btn" id="flLogin">${googleLogo()}<span>เข้าสู่ระบบด้วย Google</span></button><div id="flAuthStatus" class="fl-auth-status" role="status" aria-live="polite"></div><div class="fl-auth-benefits"><span>✓ ข้อมูลจำกัดสิทธิ์ตามสมาชิก</span><span>✓ รูปเก็บใน Firebase Storage</span><span>✓ จำบัญชีบนอุปกรณ์นี้</span></div></div>`}
     </div>
     <div class="fl-card"><h3>รถที่เลือก</h3><div class="fl-kpi">${esc(v.name)}</div><div class="fl-muted">${esc(v.id)}</div></div>
     <div class="fl-card"><h3>สิทธิ์ของคุณ</h3><div id="cloudState" class="fl-kpi">—</div><div class="fl-muted">อัปเดตแบบเรียลไทม์</div></div>
@@ -174,11 +176,16 @@ function setLoginStatus(message, isError = false) {
   if (status) {
     status.textContent = message || '';
     status.classList.toggle('fl-error', !!isError);
+    status.classList.toggle('show', !!message);
   }
   const button = $('#flLogin');
   if (button) {
-    button.disabled = !!message && !isError;
-    button.textContent = message && !isError ? 'กำลังเชื่อมต่อ…' : 'เข้าสู่ระบบ';
+    const loading = !!message && !isError;
+    button.disabled = loading;
+    button.classList.toggle('loading', loading);
+    button.innerHTML = loading
+      ? `<span class="fl-login-spinner" aria-hidden="true"></span><span>${esc(message || 'กำลังเชื่อมต่อ…')}</span>`
+      : `${googleLogo()}<span>เข้าสู่ระบบด้วย Google</span>`;
   }
 }
 

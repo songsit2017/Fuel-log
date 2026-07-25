@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuellog-pro-v4.3.1-google-auth-hotfix-20260726";
+const CACHE_NAME = "fuellog-pro-v4.3.2-google-login-ui-fix-20260726";
 const ASSETS = [
   "./",
   "./index.html",

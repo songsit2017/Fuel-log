@@ -1,8 +1,11 @@
-const CACHE_NAME = 'fuel-log-v2';
+const CACHE_NAME = 'fuellog-pro-v3-20260726';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './app.css',
+  './app.js',
+  './legacy.html',
   './icon-192.png',
   './icon-512.png',
 ];

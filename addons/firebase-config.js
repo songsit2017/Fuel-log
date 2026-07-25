@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyBkhbAr9HLXzUDvqFfiy9yPKP5DFKRawwI",
+  apiKey: "AIzaSyBkbhAr9HLXzUDvqFfiy9yPKP5DFKRawvI",
   authDomain: "fuellog-pro-f2a12.firebaseapp.com",
   projectId: "fuellog-pro-f2a12",
   storageBucket: "fuellog-pro-f2a12.firebasestorage.app",

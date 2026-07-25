@@ -1,15 +1,75 @@
-import { firebaseConfig } from './firebase-config.js';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, onSnapshot, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js';
+// FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
+// can never disable navigation, forms, theme switching, or local records.
+const FIREBASE_SDK_VERSION = '12.13.0';
+let app = null, auth = null, db = null, storage = null;
+let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+    signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
+    doc, setDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
+    ref, uploadBytes, getDownloadURL;
+let firebaseReadyPromise = null;
+let firebaseLoadError = null;
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app), db = getFirestore(app), storage = getStorage(app);
-setPersistence(auth, browserLocalPersistence).catch(console.warn);
+async function initFirebase(){
+  if(firebaseReadyPromise) return firebaseReadyPromise;
+  firebaseReadyPromise = (async()=>{
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+    const [{firebaseConfig}, appMod, authMod, fireMod, storageMod] = await Promise.all([
+      import('./firebase-config.js?v=5.0.1'),
+      import(`${base}/firebase-app.js`),
+      import(`${base}/firebase-auth.js`),
+      import(`${base}/firebase-firestore.js`),
+      import(`${base}/firebase-storage.js`)
+    ]);
+
+    app = appMod.initializeApp(firebaseConfig);
+    auth = authMod.getAuth(app);
+    db = fireMod.getFirestore(app);
+    storage = storageMod.getStorage(app);
+
+    ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+      signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
+    ({doc, setDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
+    ({ref, uploadBytes, getDownloadURL} = storageMod);
+
+    await setPersistence(auth, browserLocalPersistence).catch(console.warn);
+    getRedirectResult(auth).catch(console.warn);
+    onAuthStateChanged(auth, async u=>{
+      user = u;
+      if(u) await ensureUser().catch(console.warn);
+      if($('#panelDialog')?.open && $('#panelDialog').dataset.panel==='family') renderPanel('family');
+    });
+    firebaseLoadError = null;
+    return true;
+  })().catch(err=>{
+    firebaseLoadError = err;
+    console.error('FuelLog Firebase load failed:', err);
+    return false;
+  });
+  return firebaseReadyPromise;
+}
+
+async function requireFirebase(){
+  const ok = await initFirebase();
+  if(!ok) throw new Error(`โหลด Firebase ไม่สำเร็จ: ${firebaseLoadError?.message || 'กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่'}`);
+}
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'fuellog-v5-data';
+const memoryStore = new Map();
+const store = (()=>{
+  try{
+    const testKey = '__fuellog_storage_test__';
+    window.store.setItem(testKey,'1');
+    window.localStorage.removeItem(testKey);
+    return window.localStorage;
+  }catch{
+    return {
+      getItem:key=>memoryStore.has(key)?memoryStore.get(key):null,
+      setItem:(key,value)=>memoryStore.set(key,String(value)),
+      removeItem:key=>memoryStore.delete(key)
+    };
+  }
+})();
 const uid = () => crypto.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const today = () => new Date().toISOString().slice(0,10);
 const fmt = (n,d=0) => new Intl.NumberFormat('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Number(n)||0);
@@ -21,15 +81,15 @@ let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], curr
 let user = null, vehicleUnsub = null, nearbyCache = null;
 
 function seed(){
-  const oldVehicles = JSON.parse(localStorage.getItem('fuel-vehicles')||'null');
-  const oldEntries = JSON.parse(localStorage.getItem('fuel-entries')||'[]');
-  const oldCosts = JSON.parse(localStorage.getItem('fuel-costs')||'[]');
-  const oldReminders = JSON.parse(localStorage.getItem('fuel-reminders')||'[]');
+  const oldVehicles = JSON.parse(store.getItem('fuel-vehicles')||'null');
+  const oldEntries = JSON.parse(store.getItem('fuel-entries')||'[]');
+  const oldCosts = JSON.parse(store.getItem('fuel-costs')||'[]');
+  const oldReminders = JSON.parse(store.getItem('fuel-reminders')||'[]');
   const vehicles = oldVehicles?.length ? oldVehicles : [{id:uid(),name:'รถของฉัน'}];
-  return {vehicles, entries:oldEntries.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), expenses:oldCosts.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id,amount:Number(x.amount||x.total||0)})), reminders:oldReminders.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), trips:[], currentVehicleId:localStorage.getItem('current-vehicle-id')||vehicles[0].id, theme:'dark'};
+  return {vehicles, entries:oldEntries.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), expenses:oldCosts.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id,amount:Number(x.amount||x.total||0)})), reminders:oldReminders.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), trips:[], currentVehicleId:store.getItem('current-vehicle-id')||vehicles[0].id, theme:'dark'};
 }
-function load(){ try{ state = JSON.parse(localStorage.getItem(KEY)) || seed(); }catch{ state=seed(); } if(!state.vehicles?.length)state=seed(); state.entries ||= [];state.expenses ||= [];state.reminders ||= [];state.trips ||= [];state.currentVehicleId ||= state.vehicles[0].id; save(); }
-function save(){ localStorage.setItem(KEY,JSON.stringify(state)); }
+function load(){ try{ state = JSON.parse(store.getItem(KEY)) || seed(); }catch{ state=seed(); } if(!state.vehicles?.length)state=seed(); state.entries ||= [];state.expenses ||= [];state.reminders ||= [];state.trips ||= [];state.currentVehicleId ||= state.vehicles[0].id; save(); }
+function save(){ store.setItem(KEY,JSON.stringify(state)); }
 const vehicle = () => state.vehicles.find(v=>v.id===state.currentVehicleId) || state.vehicles[0];
 const entries = () => state.entries.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>new Date(a.date)-new Date(b.date)||(+a.odometer)-(+b.odometer));
 const expenses = () => state.expenses.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -82,18 +142,18 @@ function reportsPanel(){const m=metrics(),exp=expenses().reduce((s,x)=>s+(+x.amo
 function backupPanel(){return `<div class="card"><h2>สำรองข้อมูล</h2><p class="muted">ข้อมูลใช้งานร่วมกันซิงก์ผ่าน Firebase ส่วนไฟล์สำรองใช้สำหรับเก็บฉุกเฉิน</p><div class="panel-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="importBtn">นำเข้า JSON / Fuelio</button><input hidden type="file" id="importFile" accept=".json,.csv,.fuelio,.zip"></div></div>`;}
 function vehiclesPanel(){return `<div class="card"><div id="vehicleManage">${state.vehicles.map(v=>`<div class="list-row"><input data-rename-vehicle="${v.id}" value="${esc(v.name)}"><button class="secondary" data-delete-vehicle="${v.id}">ลบ</button></div>`).join('')}</div><button class="primary" id="addVehicleBtn">＋ เพิ่มรถ</button></div>`;}
 
-async function login(){const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});try{await signInWithPopup(auth,p);}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))await signInWithRedirect(auth,p);else $('#authMessage').textContent=e.message;}}
-async function ensureUser(){if(!user)throw new Error('กรุณาเข้าสู่ระบบ');await setDoc(doc(db,'users',user.uid),{email:user.email,emailLower:user.email.toLowerCase(),displayName:user.displayName||'',photoURL:user.photoURL||'',updatedAt:serverTimestamp()},{merge:true});}
+async function login(){await requireFirebase();const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});try{await signInWithPopup(auth,p);}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))await signInWithRedirect(auth,p);else $('#authMessage').textContent=e.message;}}
+async function ensureUser(){await requireFirebase();if(!user)throw new Error('กรุณาเข้าสู่ระบบ');await setDoc(doc(db,'users',user.uid),{email:user.email,emailLower:user.email.toLowerCase(),displayName:user.displayName||'',photoURL:user.photoURL||'',updatedAt:serverTimestamp()},{merge:true});}
 async function ensureCloudVehicle(){await ensureUser();const vr=doc(db,'vehicles',state.currentVehicleId),s=await getDoc(vr);if(!s.exists())await setDoc(vr,{name:vehicle().name,ownerUid:user.uid,members:{[user.uid]:{role:'owner',email:user.email,displayName:user.displayName||''}},createdAt:serverTimestamp()});return getDoc(vr);}
 async function syncVehicle(){await ensureCloudVehicle();const batch=writeBatch(db);for(const [name,arr] of [['entries',entries()],['expenses',expenses()],['reminders',reminders()],['trips',trips()]])for(const item of arr)batch.set(doc(db,'vehicles',state.currentVehicleId,name,item.id),{...item,updatedBy:user.uid,updatedAt:serverTimestamp()},{merge:true});await batch.commit();toast('ซิงก์แล้ว');}
 async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const x=d.data();map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
 async function loadMembers(){const box=$('#membersBody');if(!box||!user)return;const s=await getDoc(doc(db,'vehicles',state.currentVehicleId));if(!s.exists()){box.innerHTML='รถคันนี้ยังไม่ขึ้น Cloud';return;}const d=s.data();box.innerHTML=Object.values(d.members||{}).map(m=>`<div class="list-row"><div><b>${esc(m.displayName||m.email)}</b><small>${esc(m.email||'')}</small></div><b>${esc(m.role)}</b></div>`).join('');}
 async function invite(){try{const email=$('#inviteEmail').value.trim().toLowerCase(),role=$('#inviteRole').value,s=await ensureCloudVehicle();if(s.data().ownerUid!==user.uid)throw new Error('เฉพาะ Owner สร้างคำเชิญได้');const code=Math.random().toString(36).slice(2,10).toUpperCase();await setDoc(doc(db,'invites',code),{vehicleId:state.currentVehicleId,vehicleName:vehicle().name,emailLower:email,role,ownerUid:user.uid,expiresAt:Date.now()+7*864e5,createdAt:serverTimestamp()});$('#inviteResult').innerHTML=`รหัสเชิญ: <b>${code}</b> (7 วัน)`;}catch(e){alert(e.message)}}
 async function join(){try{await ensureUser();const code=$('#joinCode').value.trim().toUpperCase(),ir=doc(db,'invites',code),is=await getDoc(ir);if(!is.exists())throw new Error('ไม่พบรหัส');const inv=is.data();if(inv.expiresAt<Date.now())throw new Error('รหัสหมดอายุ');if(inv.emailLower&&inv.emailLower!==user.email.toLowerCase())throw new Error('รหัสนี้ไม่ใช่ของบัญชีนี้');const vr=doc(db,'vehicles',inv.vehicleId),vs=await getDoc(vr),vd=vs.data(),members={...(vd.members||{}),[user.uid]:{role:inv.role,email:user.email,displayName:user.displayName||''}};await setDoc(vr,{members,lastJoinCode:code},{merge:true});if(!state.vehicles.some(v=>v.id===inv.vehicleId))state.vehicles.push({id:inv.vehicleId,name:inv.vehicleName||vd.name});state.currentVehicleId=inv.vehicleId;save();renderAll();toast('เข้าร่วมสำเร็จ');}catch(e){alert(e.message)}}
-async function loadGallery(){const box=$('#galleryBody');if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
+async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
-function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',()=>signOut(auth));$('#syncBtn')?.addEventListener('click',syncVehicle);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});if(user)loadMembers();}
+function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicle);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){const rows=[['type','vehicleId','date','odometer','liters','amount','category','title','station','note']];state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.total,'','',x.station||'',x.note||'']));state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','',x.amount,x.category||'',x.title||'','',x.note||'']));download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');}
@@ -102,7 +162,23 @@ function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].s
 
 function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){$('#stationInput').value=st.dataset.station;}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshNearby').onclick=autoNearby;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.body.classList.toggle('light',state.theme==='light');save();};}
 
-getRedirectResult(auth).catch(console.warn);
-onAuthStateChanged(auth,async u=>{user=u;if(u)await ensureUser().catch(console.warn);if($('#panelDialog').open&&$('#panelDialog').dataset.panel==='family')renderPanel('family');});
+function boot(){
+  try{
+    load();
+    document.body.classList.toggle('light',state.theme==='light');
+    bind();
+    renderAll();
+    renderNav('home');
+    document.documentElement.dataset.appReady = 'true';
+  }catch(err){
+    console.error('FuelLog boot failed:', err);
+    const t = document.querySelector('#toast');
+    if(t){t.textContent = `เปิดแอปไม่สำเร็จ: ${err.message}`;t.classList.add('show');}
+  }
+  // Cloud initialization is deliberately non-blocking.
+  initFirebase();
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5.0.1').catch(console.warn);
+}
 
-load();document.body.classList.toggle('light',state.theme==='light');bind();renderAll();renderNav('home');if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});
+else boot();

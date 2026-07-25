@@ -18,3 +18,10 @@ Firebase Login เป็นบัญชีหลักระบบเดีย�
 ## ข้อมูลเดิม
 แอปจะย้ายข้อมูลจาก localStorage เดิม (`fuel-vehicles`, `fuel-entries`, `fuel-costs`, `fuel-reminders`) อัตโนมัติเมื่อเปิดครั้งแรก
 รองรับนำเข้า JSON และไฟล์ `.fuelio/.zip` แบบ CSV/JSON ทั่วไป
+
+
+## v5.0.1 UI Hotfix
+- แอปและปุ่มทั้งหมดเริ่มทำงานจากไฟล์ในเครื่องก่อน ไม่รอ Firebase CDN
+- Firebase โหลดแบบ lazy เฉพาะฟังก์ชัน Cloud/Login
+- Service Worker ใช้ network-first สำหรับ index/app/css/config เพื่อไม่ค้างไฟล์เก่า
+- อัปเดต Firebase Web SDK เป็น 12.13.0

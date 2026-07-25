@@ -1,1 +1,32 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FuelLog Diagnostics</title><style>body{font-family:sans-serif;background:#101217;color:#eee;padding:20px}.ok{color:#4fc39b}.bad{color:#ef6b6b}pre{white-space:pre-wrap}</style><h1>FuelLog v5 Diagnostics</h1><div id="out"></div><script type="module">const files=['index.html','styles.css','app.js','firebase-config.js','manifest.json','sw.js'];const out=document.querySelector('#out');for(const f of files){try{const r=await fetch('./'+f+'?t='+Date.now(),{cache:'no-store'});out.innerHTML+=`<p class="${r.ok?'ok':'bad'}">${r.ok?'✓':'✗'} ${f} — ${r.status}</p>`}catch(e){out.innerHTML+=`<p class="bad">✗ ${f} — ${e.message}</p>`}}try{const {firebaseConfig}=await import('./firebase-config.js?t='+Date.now());out.innerHTML+=`<p class="ok">✓ Firebase project: ${firebaseConfig.projectId}</p><p>API key ending: ${firebaseConfig.apiKey.slice(-6)}</p>`}catch(e){out.innerHTML+=`<pre class="bad">${e.stack}</pre>`}</script>
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FuelLog Diagnostics</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#101217;color:#eee;padding:20px;line-height:1.5}.ok{color:#4fc39b}.bad{color:#ef6b6b}pre{white-space:pre-wrap;background:#171a20;padding:12px;border-radius:12px}
+</style>
+<h1>FuelLog v5.0.1 Diagnostics</h1>
+<div id="out"></div>
+<script type="module">
+const files=['index.html','styles.css','app.js','firebase-config.js','manifest.json','sw.js'];
+const out=document.querySelector('#out');
+let appSource='';
+for(const f of files){
+  try{
+    const r=await fetch('./'+f+'?t='+Date.now(),{cache:'no-store'});
+    const text=await r.text();
+    if(f==='app.js') appSource=text;
+    out.innerHTML+=`<p class="${r.ok?'ok':'bad'}">${r.ok?'✓':'✗'} ${f} — ${r.status}</p>`;
+  }catch(e){out.innerHTML+=`<p class="bad">✗ ${f} — ${e.message}</p>`}
+}
+try{
+  new Function(appSource);
+  out.innerHTML+='<p class="ok">✓ app.js syntax ผ่าน</p>';
+}catch(e){
+  out.innerHTML+=`<pre class="bad">✗ app.js syntax error\n${e.stack}</pre>`;
+}
+try{
+  const {firebaseConfig}=await import('./firebase-config.js?t='+Date.now());
+  out.innerHTML+=`<p class="ok">✓ Firebase project: ${firebaseConfig.projectId}</p><p>API key ending: ${firebaseConfig.apiKey.slice(-6)}</p>`;
+}catch(e){out.innerHTML+=`<pre class="bad">${e.stack}</pre>`}
+</script>

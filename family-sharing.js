@@ -3,7 +3,9 @@
   'use strict';
   const cfg = window.FUELLOG_FIREBASE_CONFIG || {};
   const configured = !!(cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId);
-  let auth = null, db = null, storage = null, user = null, roleByVehicle = new Map();
+  const cloudinaryCfg = window.FUELLOG_CLOUDINARY_CONFIG || {};
+  const cloudinaryConfigured = !!(cloudinaryCfg.cloudName && cloudinaryCfg.uploadPreset);
+  let auth = null, db = null, user = null, roleByVehicle = new Map();
   let unsubscribers = [], applyingRemote = false, syncTimer = null, photoSyncTimer = null;
 
   const E = (id) => document.getElementById(id);
@@ -17,20 +19,33 @@
   const clean = (obj) => JSON.parse(JSON.stringify(obj, (k,v) => v === undefined ? null : v));
 
   const photoKinds = [
-    {kind:'receipt', flag:'hasReceiptPhoto', pathField:'receiptStoragePath', urlField:'receiptPhotoUrl', sizeField:'receiptPhotoSize'},
-    {kind:'odo', flag:'hasOdoPhoto', pathField:'odoStoragePath', urlField:'odoPhotoUrl', sizeField:'odoPhotoSize'}
+    {kind:'receipt', flag:'hasReceiptPhoto', pathField:'receiptCloudinaryId', urlField:'receiptPhotoUrl', sizeField:'receiptPhotoSize'},
+    {kind:'odo', flag:'hasOdoPhoto', pathField:'odoCloudinaryId', urlField:'odoPhotoUrl', sizeField:'odoPhotoSize'}
   ];
   const photoKey = (entryId, kind) => `${entryId}-${kind}`;
-  const storagePath = (vehicleId, entryId, kind) => `vehicles/${vehicleId}/entries/${entryId}/${kind}.jpg`;
+
+  async function uploadCloudinaryImage(vehicleId, entryId, kind, blob){
+    if(!cloudinaryConfigured) throw new Error('ยังไม่ได้ตั้งค่า Cloudinary');
+    const form = new FormData();
+    form.append('file', blob, `${kind}.jpg`);
+    form.append('upload_preset', cloudinaryCfg.uploadPreset);
+    form.append('folder', `${cloudinaryCfg.folder || 'fuellog'}/${vehicleId}/${entryId}`);
+    form.append('tags', `fuellog,vehicle_${vehicleId},entry_${entryId},${kind}`);
+    const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudinaryCfg.cloudName)}/image/upload`;
+    const res = await fetch(endpoint, {method:'POST', body:form});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.secure_url) throw new Error(data.error?.message || `Cloudinary HTTP ${res.status}`);
+    return data;
+  }
 
   async function uploadEntryPhotos(vehicleId, entry){
-    if(!storage || !user || !canEdit()) return;
+    if(!user || !canEdit() || !cloudinaryConfigured) return;
     const docRef = db.collection('vehicles').doc(vehicleId).collection('entries').doc(String(entry.id));
     const patch = {};
     for(const p of photoKinds){
       if(entry[p.flag] === false){
-        const oldPath = entry[p.pathField] || storagePath(vehicleId, entry.id, p.kind);
-        try{ await storage.ref(oldPath).delete(); }catch(e){ if(e.code !== 'storage/object-not-found') console.warn('photo delete',e); }
+        // Static GitHub Pages cannot securely call Cloudinary Destroy API because it requires an API secret.
+        // Remove the shared URL from Firestore; the old Cloudinary asset may remain as an orphan.
         patch[p.pathField] = firebase.firestore.FieldValue.delete();
         patch[p.urlField] = firebase.firestore.FieldValue.delete();
         patch[p.sizeField] = firebase.firestore.FieldValue.delete();
@@ -38,14 +53,12 @@
       }
       if(!entry[p.flag]) continue;
       const blob = await getPhotoBlob(photoKey(entry.id,p.kind)).catch(()=>null);
-      if(!blob) continue; // remote image may still be downloading on this device
-      if(entry[p.sizeField] === blob.size && entry[p.pathField]) continue;
-      const path = storagePath(vehicleId, entry.id, p.kind);
-      const snap = await storage.ref(path).put(blob,{contentType:blob.type||'image/jpeg',customMetadata:{vehicleId,entryId:String(entry.id),kind:p.kind,uploadedBy:user.uid}});
-      const url = await snap.ref.getDownloadURL();
-      patch[p.pathField] = path;
-      patch[p.urlField] = url;
-      patch[p.sizeField] = blob.size;
+      if(!blob) continue;
+      if(entry[p.sizeField] === blob.size && entry[p.urlField]) continue;
+      const uploaded = await uploadCloudinaryImage(vehicleId, entry.id, p.kind, blob);
+      patch[p.pathField] = uploaded.public_id || '';
+      patch[p.urlField] = uploaded.secure_url;
+      patch[p.sizeField] = uploaded.bytes || blob.size;
       patch.photoUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
     }
     if(Object.keys(patch).length) await docRef.set(patch,{merge:true});
@@ -53,7 +66,7 @@
 
   async function syncCurrentVehiclePhotos(){
     const v=selectedVehicle();
-    if(!v?.cloudId || !user || !canEdit() || !storage) return;
+    if(!v?.cloudId || !user || !canEdit() || !cloudinaryConfigured) return;
     const list = entries.filter(x=>x.vehicleId===v.id);
     for(const entry of list){
       try{ await uploadEntryPhotos(v.cloudId,entry); }
@@ -67,7 +80,7 @@
   }
 
   async function hydrateRemotePhotos(list){
-    if(!storage) return;
+    if(!cloudinaryConfigured) return;
     for(const entry of list){
       for(const p of photoKinds){
         if(!entry[p.flag]) continue;
@@ -76,7 +89,6 @@
         if(local) continue;
         try{
           let url=entry[p.urlField];
-          if(!url && entry[p.pathField]) url=await storage.ref(entry[p.pathField]).getDownloadURL();
           if(!url) continue;
           const res=await fetch(url);
           if(!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -125,17 +137,18 @@
 
   function updateUI(){
     const mini = E('familyMiniStatus');
-    if(mini) mini.textContent = !configured ? 'ยังไม่ได้ตั้งค่า Firebase' : user ? `เชื่อมต่อ Cloud: ${user.email}` : 'ยังไม่ได้เข้าสู่ระบบ Family Sharing';
+    if(mini) mini.textContent = !configured ? 'ยังไม่ได้ตั้งค่า Firebase' : !cloudinaryConfigured ? 'Firebase พร้อมแล้ว • ยังไม่ได้ตั้งค่า Cloudinary' : user ? `เชื่อมต่อ Cloud: ${user.email}` : 'ยังไม่ได้เข้าสู่ระบบ Family Sharing';
     if(!E('familyOverlay')) return;
-    E('familyConfigWarning').style.display = configured ? 'none' : 'block';
-    E('familyConfigWarning').innerHTML = 'ยังไม่ได้ใส่ค่า Firebase Config กรุณาทำตามไฟล์ <b>FIREBASE-SETUP-TH.md</b> แล้วแก้ไฟล์ <b>firebase-config.js</b>';
+    const missing=[]; if(!configured) missing.push('Firebase'); if(!cloudinaryConfigured) missing.push('Cloudinary');
+    E('familyConfigWarning').style.display = missing.length ? 'block' : 'none';
+    E('familyConfigWarning').innerHTML = missing.length ? `ยังไม่ได้ตั้งค่า <b>${missing.join(' และ ')}</b> กรุณาทำตามไฟล์ <b>FIREBASE-CLOUDINARY-SETUP-TH.md</b>` : '';
     E('familyLogin').style.display = user ? 'none' : '';
     E('familyLogout').style.display = user ? '' : 'none';
     E('familyCloudTools').style.display = user ? '' : 'none';
     E('familyUser').innerHTML = user ? `<b>${escFS(user.displayName || user.email)}</b><br>${escFS(user.email || '')}` : 'ยังไม่ได้เข้าสู่ระบบ';
     const v = selectedVehicle();
     if(user && v){
-      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b><br><span style="font-size:11px;color:var(--muted)">📷 รูปบิลและรูปเรือนไมล์แชร์ผ่าน Firebase Storage</span>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
+      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b><br><span style="font-size:11px;color:var(--muted)">📷 รูปบิลและรูปเรือนไมล์แชร์ผ่าน Cloudinary</span>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
       E('publishVehicle').style.display = isCloudVehicle(v) ? 'none' : '';
       E('syncVehicleNow').style.display = isCloudVehicle(v) && canEdit() ? '' : 'none';
       E('ownerShareBox').style.display = isCloudVehicle(v) && canManage() ? '' : 'none';
@@ -285,7 +298,7 @@
     if(!configured || !window.firebase){ updateUI(); return; }
     try{
       if(!firebase.apps.length) firebase.initializeApp(cfg);
-      auth=firebase.auth(); db=firebase.firestore(); storage=firebase.storage();
+      auth=firebase.auth(); db=firebase.firestore();
       try{ await db.enablePersistence({synchronizeTabs:true}); }catch(e){ console.info('Firestore persistence:',e.code); }
       auth.onAuthStateChanged(async u=>{ user=u; updateUI(); if(u) await loadCloudVehicles(); else {roleByVehicle.clear();clearSubscriptions();} });
     }catch(e){ console.error(e); E('familyConfigWarning').style.display='block';E('familyConfigWarning').textContent='Firebase เริ่มทำงานไม่สำเร็จ: '+e.message; }

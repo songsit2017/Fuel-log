@@ -1,4 +1,4 @@
-const CACHE='fuellog-v5-family-drive-1';
+const CACHE='fuellog-v5-family-drive-2-hotfix';
 const ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./firebase-config.js','./drive-family-config.js','./family-sharing.js'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

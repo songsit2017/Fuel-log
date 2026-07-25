@@ -2119,27 +2119,33 @@ function renderProRange(){
  $('proRange').innerHTML=`หลังเติมเต็มถังล่าสุดวิ่งประมาณ <b>${fmt(used,0)} กม.</b> · คาดว่าเหลือ <b>${fmt(remaining,1)} ลิตร</b> · วิ่งต่อได้ประมาณ <b class="${range<60?'range-bad':range<120?'range-warn':'range-good'}">${fmt(range,0)} กม.</b><br><span class="pro-note">เป็นค่าประมาณจากประวัติ ไม่ใช่มาตรวัดน้ำมันจริง</span>`;
 }
 function proExcel(){
- const m=proMetrics(); let rows=[['ประเภท','วันที่','เลขไมล์','รายการ/ปั๊ม','จำนวนลิตร','จำนวนเงิน','หมายเหตุ']];
- m.es.forEach(e=>rows.push(['เติมน้ำมัน',e.date,e.odometer,e.station,e.liters,e.total,e.note||'']));m.cs.forEach(c=>rows.push([c.category,c.date,c.odometer,c.title,'',c.amount,c.note||'']));
- const html='<html><head><meta charset="UTF-8">
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
-<script src="firebase-config.js" defer></script>
-<script src="drive-family-config.js" defer></script>
-</head><body><table>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('')+'</table>
-<script src="family-sharing.js" defer></script>
-</body></html>'; const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;a.click();URL.revokeObjectURL(a.href);
+ const m=proMetrics();
+ const rows=[['ประเภท','วันที่','เลขไมล์','รายการ/ปั๊ม','จำนวนลิตร','จำนวนเงิน','หมายเหตุ']];
+ m.es.forEach(e=>rows.push(['เติมน้ำมัน',e.date,e.odometer,e.station,e.liters,e.total,e.note||'']));
+ m.cs.forEach(c=>rows.push([c.category,c.date,c.odometer,c.title,'',c.amount,c.note||'']));
+ const table=rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('');
+ const html='<html><head><meta charset="UTF-8"></head><body><table>'+table+'</table></body></html>';
+ const blob=new Blob(['\\ufeff'+html],{type:'application/vnd.ms-excel'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;
+ a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-function printPro(){ renderPro(); const w=window.open('','_blank'); const name=(vehicles.find(v=>v.id===currentVehicleId)||{}).name||'รถ'; w.document.write(`<html><head><meta charset="UTF-8"><title>FuelLog Report</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{font-size:22px}table{width:100%;border-collapse:collapse}td,th{padding:7px;border-bottom:1px solid #ddd;text-align:left}.box{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}</style>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
-<script src="firebase-config.js" defer></script>
-<script src="drive-family-config.js" defer></script>
-</head><body><h1>FuelLog Pro — ${esc(name)}</h1><p>สร้างเมื่อ ${new Date().toLocaleString('th-TH')}</p><div class="box">${$('proSummary').innerHTML}</div><h2>เปรียบเทียบปั๊ม</h2>${$('proStations').innerHTML}<h2>ค่าใช้จ่ายแยกหมวด</h2>${$('proCategories').innerHTML}
-<script src="family-sharing.js" defer></script>
-</body></html>`); w.document.close(); setTimeout(()=>w.print(),300);
+function printPro(){
+ renderPro();
+ const w=window.open('','_blank');
+ if(!w){ alert('เบราว์เซอร์บล็อกหน้าต่างรายงาน กรุณาอนุญาต Pop-up แล้วลองใหม่'); return; }
+ const name=(vehicles.find(v=>v.id===currentVehicleId)||{}).name||'รถ';
+ const report='<!doctype html><html><head><meta charset="UTF-8"><title>FuelLog Report</title>'+
+ '<style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{font-size:22px}table{width:100%;border-collapse:collapse}td,th{padding:7px;border-bottom:1px solid #ddd;text-align:left}.box{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}</style></head><body>'+
+ '<h1>FuelLog Pro — '+esc(name)+'</h1><p>สร้างเมื่อ '+new Date().toLocaleString('th-TH')+'</p>'+
+ '<div class="box">'+$('proSummary').innerHTML+'</div><h2>เปรียบเทียบปั๊ม</h2>'+$('proStations').innerHTML+
+ '<h2>ค่าใช้จ่ายแยกหมวด</h2>'+$('proCategories').innerHTML+'</body></html>';
+ w.document.open();
+ w.document.write(report);
+ w.document.close();
+ setTimeout(()=>w.print(),300);
 }
 $('proDashboardBtn').onclick=()=>{renderPro();$('proOverlay').style.display='flex'};$('closePro').onclick=()=>$('proOverlay').style.display='none';$('proOverlay').onclick=e=>{if(e.target===$('proOverlay'))$('proOverlay').style.display='none'};$('proTankCapacity').oninput=()=>{localStorage.setItem(proVehicleKey(),JSON.stringify({tankCapacity:Number($('proTankCapacity').value)||0}));renderProRange()};$('exportExcelBtn').onclick=proExcel;$('printReportBtn').onclick=printPro;
 

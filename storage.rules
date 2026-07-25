@@ -1,13 +1,38 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn(){ return request.auth != null; }
-    function vehicleDoc(vehicleId){ return firestore.get(/databases/(default)/documents/vehicles/$(vehicleId)); }
-    function role(vehicleId){ return vehicleDoc(vehicleId).data.ownerUid == request.auth.uid ? 'owner' : vehicleDoc(vehicleId).data.members[request.auth.uid].role; }
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function vehicle(vehicleId) {
+      return firestore.get(/databases/(default)/documents/vehicles/$(vehicleId));
+    }
+
+    function role(vehicleId) {
+      return !signedIn()
+        ? null
+        : vehicle(vehicleId).data.ownerUid == request.auth.uid
+          ? 'owner'
+          : vehicle(vehicleId).data.members[request.auth.uid].role;
+    }
+
+    function isAllowedFile() {
+      return request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('(image/.*|application/pdf)');
+    }
+
     match /vehicles/{vehicleId}/{allPaths=**} {
-      allow read: if signedIn() && role(vehicleId) in ['owner','editor','viewer'];
-      allow create,update: if signedIn() && role(vehicleId) in ['owner','editor'] && request.resource.size < 10 * 1024 * 1024 && request.resource.contentType.matches('(image/.*|application/pdf)');
-      allow delete: if signedIn() && role(vehicleId) in ['owner','editor'];
+      allow read: if role(vehicleId) in ['owner', 'editor', 'viewer'];
+
+      allow create, update: if role(vehicleId) in ['owner', 'editor']
+        && isAllowedFile();
+
+      // Owner ลบได้ทั้งหมด; Editor ลบได้เฉพาะไฟล์ที่ตัวเองอัปโหลด
+      allow delete: if role(vehicleId) == 'owner'
+        || (role(vehicleId) == 'editor'
+          && resource.metadata.ownerUid == request.auth.uid);
     }
   }
 }

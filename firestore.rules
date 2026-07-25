@@ -1,26 +1,112 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn(){ return request.auth != null; }
-    function vehicleDoc(vehicleId){ return get(/databases/$(database)/documents/vehicles/$(vehicleId)); }
-    function isMember(vehicleId){ return signedIn() && (vehicleDoc(vehicleId).data.ownerUid == request.auth.uid || vehicleDoc(vehicleId).data.members[request.auth.uid].role in ['owner','editor','viewer']); }
-    function canEdit(vehicleId){ return signedIn() && (vehicleDoc(vehicleId).data.ownerUid == request.auth.uid || vehicleDoc(vehicleId).data.members[request.auth.uid].role in ['owner','editor']); }
-    function isOwner(vehicleId){ return signedIn() && vehicleDoc(vehicleId).data.ownerUid == request.auth.uid; }
-    match /users/{uid}{ allow read,write: if signedIn() && request.auth.uid == uid; }
-    match /vehicles/{vehicleId}{
-      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow read: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.members[request.auth.uid].role in ['owner','editor','viewer']);
-      allow update,delete: if isOwner(vehicleId);
-      match /{collection}/{docId}{
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function vehiclePath(vehicleId) {
+      return /databases/$(database)/documents/vehicles/$(vehicleId);
+    }
+
+    function vehicleExists(vehicleId) {
+      return exists(vehiclePath(vehicleId));
+    }
+
+    function vehicle(vehicleId) {
+      return get(vehiclePath(vehicleId));
+    }
+
+    function role(vehicleId) {
+      return !signedIn() || !vehicleExists(vehicleId)
+        ? null
+        : vehicle(vehicleId).data.ownerUid == request.auth.uid
+          ? 'owner'
+          : vehicle(vehicleId).data.members[request.auth.uid].role;
+    }
+
+    function isMember(vehicleId) {
+      return role(vehicleId) in ['owner', 'editor', 'viewer'];
+    }
+
+    function canEdit(vehicleId) {
+      return role(vehicleId) in ['owner', 'editor'];
+    }
+
+    function isOwner(vehicleId) {
+      return role(vehicleId) == 'owner';
+    }
+
+    function invitePath(vehicleId, uid) {
+      return /databases/$(database)/documents/invites/$(vehicleId + '_' + uid);
+    }
+
+    function canAcceptInvite(vehicleId) {
+      let invite = get(invitePath(vehicleId, request.auth.uid));
+      return signedIn()
+        && exists(invitePath(vehicleId, request.auth.uid))
+        && invite.data.vehicleId == vehicleId
+        && invite.data.targetUid == request.auth.uid
+        && invite.data.expiresAt > request.time
+        && invite.data.role in ['editor', 'viewer']
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updatedAt'])
+        && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid].role == invite.data.role;
+    }
+
+    match /users/{uid} {
+      allow create, read, update, delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // รายชื่อผู้ใช้สำหรับค้นหา Gmail ตอนเชิญสมาชิก
+    // เปิดอ่านเฉพาะผู้ที่ล็อกอิน และผู้ใช้แก้ได้เฉพาะโปรไฟล์ของตนเอง
+    match /directory/{uid} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email;
+    }
+
+    match /vehicles/{vehicleId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.members[request.auth.uid].role == 'owner';
+
+      allow read: if signedIn()
+        && (resource.data.ownerUid == request.auth.uid
+          || resource.data.members[request.auth.uid].role in ['owner', 'editor', 'viewer']);
+
+      // Owner จัดการรถและสมาชิกได้ ส่วนผู้รับคำเชิญเพิ่มสิทธิ์ของตัวเองได้เพียงครั้งเดียว
+      allow update: if isOwner(vehicleId) || canAcceptInvite(vehicleId);
+      allow delete: if isOwner(vehicleId);
+
+      match /{collection}/{docId} {
         allow read: if isMember(vehicleId);
-        allow create,update: if canEdit(vehicleId);
+        allow create, update: if canEdit(vehicleId);
         allow delete: if canEdit(vehicleId);
       }
     }
-    match /invites/{code}{
-      allow create: if signedIn();
-      allow read: if signedIn();
-      allow delete: if signedIn();
+
+    match /invites/{inviteId} {
+      allow create: if signedIn()
+        && request.resource.data.vehicleId is string
+        && request.resource.data.targetUid is string
+        && request.resource.data.role in ['editor', 'viewer']
+        && request.resource.data.createdBy == request.auth.uid
+        && isOwner(request.resource.data.vehicleId)
+        && inviteId == request.resource.data.vehicleId + '_' + request.resource.data.targetUid;
+
+      allow read: if signedIn()
+        && (resource.data.targetUid == request.auth.uid
+          || resource.data.createdBy == request.auth.uid);
+
+      allow delete: if signedIn()
+        && (resource.data.targetUid == request.auth.uid
+          || resource.data.createdBy == request.auth.uid);
+
       allow update: if false;
     }
   }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>FuelLog Pro v3.2 — Full Function+</title>
+<title>FuelLog Pro v3.3 — Professional Suite</title>
 <meta name="theme-color" content="#14171C" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -156,6 +156,12 @@
   .reminder-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.reminder-item:last-child{border-bottom:0}.reminder-status{font-size:10px;border-radius:20px;padding:3px 7px;background:var(--surface2)}.reminder-status.due{color:#ffd18a;background:rgba(242,169,59,.12)}.reminder-status.overdue{color:#ff9b8a;background:rgba(224,101,79,.14)}.reminder-status.ok{color:#75d4b5;background:rgba(61,174,140,.12)}
   .mini-btn{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:9px;padding:7px 9px;font-size:11.5px;cursor:pointer}.danger-text{color:var(--red)}
   body.light{--bg:#F4F5F7;--surface:#FFFFFF;--surface2:#F0F2F5;--text:#1B1E23;--muted:#69707D;--line:#DDE1E7}
+
+  /* FuelLog Pro v3.3 advanced suite */
+  .pro-btn{background:linear-gradient(135deg,var(--amber),#ffd27a);color:#161616;border:0;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer}
+  .pro-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.pro-card{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px}.pro-label{font-size:10.5px;color:var(--muted);margin-bottom:5px}.pro-value{font-size:19px;font-weight:800}.pro-wide{grid-column:1/-1}.pro-section{margin:16px 0 8px;font-size:12px;font-weight:800}.pro-table{width:100%;border-collapse:collapse;font-size:11.5px}.pro-table th,.pro-table td{padding:8px 5px;border-bottom:1px solid var(--line);text-align:left}.pro-table th{color:var(--muted);font-weight:600}.bar-row{display:grid;grid-template-columns:90px 1fr 70px;gap:8px;align-items:center;margin:7px 0;font-size:11px}.bar-track{height:8px;background:var(--line);border-radius:99px;overflow:hidden}.bar-fill{height:100%;background:var(--teal);border-radius:99px}.health-ring{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;margin:auto;background:conic-gradient(var(--teal) calc(var(--score)*1%),var(--line) 0)}.health-ring:after{content:attr(data-score);width:68px;height:68px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-size:21px;font-weight:800}.pro-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.pro-note{font-size:11px;color:var(--muted);line-height:1.55}.range-good{color:var(--teal)}.range-warn{color:var(--amber)}.range-bad{color:var(--red)}
+
+.quick-cost{flex:0 0 auto;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:999px;padding:7px 10px;font-size:12px;cursor:pointer;white-space:nowrap}.quick-cost:active{transform:scale(.97)}
 </style>
 </head>
 <body>
@@ -170,7 +176,7 @@
   <div class="brand">
     <div class="brand-icon">⛽</div>
     <div>
-      <div class="brand-title">FuelLog Pro <span class="full-badge">FULL</span></div>
+      <div class="brand-title">FuelLog Pro <span class="full-badge">PRO</span></div>
       <div class="brand-sub" id="countLabel">0 รายการบันทึก</div>
     </div>
   </div>
@@ -241,7 +247,7 @@
 
 
 <div class="tool-card" id="insightCard">
-  <div class="tool-head"><div><div class="tool-title">✨ วิเคราะห์อัตโนมัติ</div><div class="tool-note">คำนวณจากข้อมูลของรถที่เลือก</div></div><button class="mini-btn" id="remindersBtn">🔧 เตือนบำรุง</button></div>
+  <div class="tool-head"><div><div class="tool-title">✨ วิเคราะห์อัตโนมัติ</div><div class="tool-note">คำนวณจากข้อมูลของรถที่เลือก</div></div><div style="display:flex;gap:6px"><button class="pro-btn" id="proDashboardBtn">PRO</button><button class="mini-btn" id="remindersBtn">🔧 เตือนบำรุง</button></div></div>
   <div class="insight-grid" id="insightGrid"></div>
 </div>
 <div class="tool-card">
@@ -350,17 +356,53 @@
       <div class="field" style="grid-column:1 / -1;">
         <label>หมวดหมู่</label>
         <select id="c_category" style="width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;color:var(--text);font-size:13.5px;">
-          <option value="บริการ">บริการ</option>
-          <option value="บำรุงรักษา">บำรุงรักษา</option>
-          <option value="ทะเบียน">ทะเบียน</option>
-          <option value="ที่จอดรถ">ที่จอดรถ</option>
-          <option value="ล้างรถ">ล้างรถ</option>
-          <option value="ทางด่วน">ทางด่วน</option>
-          <option value="ตั๋ว/ค่าปรับ">ตั๋ว/ค่าปรับ</option>
-          <option value="ปรับแต่ง">ปรับแต่ง</option>
-          <option value="การประกันภัย">การประกันภัย</option>
-          <option value="อื่นๆ">อื่นๆ</option>
+          <optgroup label="🔧 บำรุงรักษาตามระยะ">
+            <option value="น้ำมันเครื่อง">น้ำมันเครื่อง / ไส้กรองน้ำมันเครื่อง</option>
+            <option value="ของเหลวและไส้กรอง">ของเหลวและไส้กรอง</option>
+            <option value="ระบบเบรก">ระบบเบรก</option>
+            <option value="ยางและล้อ">ยางและล้อ</option>
+            <option value="ช่วงล่างและพวงมาลัย">ช่วงล่างและพวงมาลัย</option>
+            <option value="แบตเตอรี่และไฟฟ้า">แบตเตอรี่และระบบไฟฟ้า</option>
+            <option value="เครื่องยนต์">เครื่องยนต์</option>
+            <option value="เกียร์และระบบส่งกำลัง">เกียร์และระบบส่งกำลัง</option>
+            <option value="ระบบหล่อเย็น">ระบบหล่อเย็น</option>
+            <option value="แอร์รถยนต์">แอร์รถยนต์</option>
+            <option value="ไฮบริด/EV">ระบบไฮบริด / EV</option>
+            <option value="ตรวจเช็กระยะ">ตรวจเช็กระยะ / ค่าแรงศูนย์</option>
+          </optgroup>
+          <optgroup label="🛠 ซ่อมและอุบัติเหตุ">
+            <option value="ซ่อมทั่วไป">ซ่อมทั่วไป</option>
+            <option value="ตัวถังและสี">ตัวถังและสี</option>
+            <option value="กระจกและอุปกรณ์ภายนอก">กระจกและอุปกรณ์ภายนอก</option>
+            <option value="อุบัติเหตุ">อุบัติเหตุ / ค่าเสียหาย</option>
+            <option value="ลากรถ/ฉุกเฉิน">ลากรถ / ช่วยเหลือฉุกเฉิน</option>
+          </optgroup>
+          <optgroup label="📄 ค่าใช้จ่ายประจำปี">
+            <option value="ประกันภัย">ประกันภัย</option>
+            <option value="พ.ร.บ.">พ.ร.บ.</option>
+            <option value="ภาษีและทะเบียน">ภาษีรถ / ทะเบียน</option>
+            <option value="ตรวจสภาพรถ">ตรวจสภาพรถ / ตรอ.</option>
+            <option value="ค่างวดรถ">ค่างวดรถ / ดอกเบี้ย</option>
+          </optgroup>
+          <optgroup label="🚗 การใช้งานประจำวัน">
+            <option value="ทางด่วน">ทางด่วน</option>
+            <option value="ที่จอดรถ">ที่จอดรถ</option>
+            <option value="ล้างรถ/ดูแลรถ">ล้างรถ / เคลือบสี / ดูแลรถ</option>
+            <option value="ค่าปรับ">ค่าปรับ / ใบสั่ง</option>
+            <option value="อุปกรณ์และตกแต่ง">อุปกรณ์ / ตกแต่งรถ</option>
+            <option value="บริการอื่น">บริการอื่นๆ</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </optgroup>
         </select>
+        <div id="costQuickTemplates" style="display:flex;gap:6px;overflow-x:auto;padding-top:8px;scrollbar-width:none;">
+          <button type="button" class="quick-cost" data-cat="น้ำมันเครื่อง" data-title="เปลี่ยนน้ำมันเครื่อง">🛢 น้ำมันเครื่อง</button>
+          <button type="button" class="quick-cost" data-cat="ยางและล้อ" data-title="เปลี่ยนยาง">🛞 ยาง</button>
+          <button type="button" class="quick-cost" data-cat="ระบบเบรก" data-title="เปลี่ยนผ้าเบรก">🛑 ผ้าเบรก</button>
+          <button type="button" class="quick-cost" data-cat="แบตเตอรี่และไฟฟ้า" data-title="เปลี่ยนแบตเตอรี่ 12V">🔋 แบตเตอรี่</button>
+          <button type="button" class="quick-cost" data-cat="แอร์รถยนต์" data-title="ล้างแอร์ / เปลี่ยนกรองแอร์">❄️ แอร์</button>
+          <button type="button" class="quick-cost" data-cat="ประกันภัย" data-title="ต่อประกันภัยรถยนต์">🛡 ประกัน</button>
+          <button type="button" class="quick-cost" data-cat="ภาษีและทะเบียน" data-title="ต่อภาษีรถยนต์">📄 ภาษี</button>
+        </div>
       </div>
       <div class="field" style="grid-column:1 / -1;"><label>รายการ</label><input type="text" id="c_title" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง"></div>
       <div class="field"><label>วันที่</label><input type="date" id="c_date"></div>
@@ -382,6 +424,21 @@
  <div id="reminderListBox"></div><div style="height:1px;background:var(--line);margin:14px 0"></div>
  <div class="form-grid"><div class="field" style="grid-column:1/-1"><label>รายการ</label><input id="r_title" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง"></div><div class="field"><label>ครบกำหนดเลขไมล์</label><input type="number" id="r_odo" placeholder="เช่น 170000"></div><div class="field"><label>ครบกำหนดวันที่</label><input type="date" id="r_date"></div><div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><input id="r_note" placeholder="เช่น ทุก 10,000 กม."></div></div>
  <div class="save-row"><button class="save-btn" id="saveReminderBtn">เพิ่มรายการเตือน</button></div>
+</div></div>
+
+
+<!-- Pro analytics modal -->
+<div class="modal-overlay" id="proOverlay" style="display:none;"><div class="modal" style="max-width:720px">
+ <div class="modal-head"><div><div class="modal-title">FuelLog Pro Analytics</div><div class="tool-note">ภาพรวมเชิงลึกของรถที่เลือก</div></div><button class="close-btn" id="closePro">✕</button></div>
+ <div class="pro-grid" id="proSummary"></div>
+ <div class="pro-section">สุขภาพรถและการแจ้งเตือน</div><div id="proHealth"></div>
+ <div class="pro-section">แนวโน้มค่าใช้จ่าย 12 เดือน</div><div id="proTimeline"></div>
+ <div class="pro-section">เปรียบเทียบปั๊มน้ำมัน</div><div id="proStations"></div>
+ <div class="pro-section">ค่าใช้จ่ายแยกหมวด</div><div id="proCategories"></div>
+ <div class="pro-section">ประมาณระยะทางที่วิ่งได้</div>
+ <div class="field"><label>ความจุถังของรถคันนี้ (ลิตร)</label><input type="number" id="proTankCapacity" min="1" step="0.1" placeholder="เช่น 43"></div>
+ <div id="proRange" class="pro-note" style="margin-top:8px"></div>
+ <div class="pro-actions"><button class="action-btn" id="exportExcelBtn">📊 ส่งออก Excel</button><button class="action-btn" id="printReportBtn">🖨️ พิมพ์ / PDF</button></div>
 </div></div>
 
 <!-- Settings modal -->
@@ -997,7 +1054,7 @@ $('formOverlay').addEventListener('click', (e)=>{ if(e.target.id==='formOverlay'
 function openAddCost(){
   editingCostId = null;
   $('costFormTitle').textContent = 'เพิ่มค่าใช้จ่าย';
-  $('c_category').value = 'บริการ';
+  $('c_category').value = 'น้ำมันเครื่อง';
   $('c_title').value = ''; $('c_date').value = new Date().toISOString().slice(0,10);
   $('c_odo').value=''; $('c_amount').value=''; $('c_note').value='';
   $('costDelBtn').style.display='none';
@@ -1008,12 +1065,16 @@ function openEditCost(id){
   if(!c) return;
   editingCostId = id;
   $('costFormTitle').textContent = 'แก้ไขค่าใช้จ่าย';
-  $('c_category').value = c.category || 'บริการ';
+  $('c_category').value = c.category || 'อื่นๆ';
   $('c_title').value = c.title || ''; $('c_date').value = c.date;
   $('c_odo').value = c.odometer || ''; $('c_amount').value = c.amount; $('c_note').value = c.note || '';
   $('costDelBtn').style.display='flex';
   $('costFormOverlay').style.display='flex';
 }
+document.querySelectorAll('.quick-cost').forEach(btn=>btn.addEventListener('click',()=>{
+  $('c_category').value=btn.dataset.cat;
+  if(!$('c_title').value.trim()) $('c_title').value=btn.dataset.title;
+}));
 $('closeCostForm').addEventListener('click', ()=> $('costFormOverlay').style.display='none');
 $('costFormOverlay').addEventListener('click', (e)=>{ if(e.target.id==='costFormOverlay') $('costFormOverlay').style.display='none'; });
 $('costSaveBtn').addEventListener('click', ()=>{
@@ -1952,6 +2013,65 @@ $('bannerConnectBtn').addEventListener('click', ()=>{
   $('settingsOverlay').style.display='flex';
   updateDriveUI();
 });
+
+
+
+// ---------- Pro analytics suite ----------
+function proVehicleKey(){ return 'fuel-pro-'+currentVehicleId; }
+function proDate(x){ return new Date((x.date||'1970-01-01')+'T12:00:00'); }
+function proMoney(n){ return '฿'+fmt(n||0,0); }
+function proMetrics(){
+ const es=currentEntries().slice().sort((a,b)=>proDate(a)-proDate(b));
+ const cs=currentCosts().slice().sort((a,b)=>proDate(a)-proDate(b));
+ const st=computeStats().filter(x=>Number.isFinite(x.kml)&&x.kml>0);
+ const fuel=es.reduce((a,e)=>a+(Number(e.total)||0),0), other=cs.reduce((a,c)=>a+(Number(c.amount)||0),0);
+ const liters=es.reduce((a,e)=>a+(Number(e.liters)||0),0);
+ const distance=st.reduce((a,x)=>a+(Number(x.distance)||0),0);
+ const avg=st.length?st.reduce((a,x)=>a+x.kml,0)/st.length:0;
+ const cpk=distance?(fuel+other)/distance:0;
+ const now=new Date(), y=now.getFullYear();
+ const yearFuel=es.filter(e=>proDate(e).getFullYear()===y).reduce((a,e)=>a+(Number(e.total)||0),0);
+ const yearOther=cs.filter(e=>proDate(e).getFullYear()===y).reduce((a,e)=>a+(Number(e.amount)||0),0);
+ return {es,cs,st,fuel,other,liters,distance,avg,cpk,yearFuel,yearOther};
+}
+function monthBuckets(m){
+ const out=[]; const now=new Date();
+ for(let i=m-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);out.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleDateString('th-TH',{month:'short',year:'2-digit'}),fuel:0,other:0});}
+ const map=new Map(out.map(x=>[x.key,x])); currentEntries().forEach(e=>{const b=map.get(String(e.date||'').slice(0,7));if(b)b.fuel+=Number(e.total)||0}); currentCosts().forEach(c=>{const b=map.get(String(c.date||'').slice(0,7));if(b)b.other+=Number(c.amount)||0}); return out;
+}
+function proReminderScore(){
+ const rs=reminders.filter(r=>r.vehicleId===currentVehicleId); let score=100, overdue=0,due=0;
+ rs.forEach(r=>{const x=reminderState(r);if(x.cls==='overdue'){score-=18;overdue++}else if(x.cls==='due'){score-=8;due++}});
+ const st=computeStats().filter(x=>x.kml&&isFinite(x.kml)); if(st.length>=6){const a=st.slice(-3).reduce((s,x)=>s+x.kml,0)/3,b=st.slice(-6,-3).reduce((s,x)=>s+x.kml,0)/3;if(a<b*.9)score-=12}
+ return {score:Math.max(0,Math.round(score)),overdue,due,total:rs.length};
+}
+function renderPro(){
+ const m=proMetrics(), h=proReminderScore();
+ $('proSummary').innerHTML=`<div class="pro-card"><div class="pro-label">ค่าใช้จ่ายทั้งหมด</div><div class="pro-value">${proMoney(m.fuel+m.other)}</div></div><div class="pro-card"><div class="pro-label">ต้นทุนจริงต่อกม.</div><div class="pro-value">${m.cpk?proMoney(m.cpk):'—'}</div></div><div class="pro-card"><div class="pro-label">ปีนี้</div><div class="pro-value">${proMoney(m.yearFuel+m.yearOther)}</div></div><div class="pro-card"><div class="pro-label">อัตราสิ้นเปลืองเฉลี่ย</div><div class="pro-value">${m.avg?fmt(m.avg,1)+' กม./ลิตร':'—'}</div></div><div class="pro-card"><div class="pro-label">น้ำมันสะสม</div><div class="pro-value">${fmt(m.liters,1)} ลิตร</div></div><div class="pro-card"><div class="pro-label">ระยะทางคำนวณได้</div><div class="pro-value">${fmt(m.distance,0)} กม.</div></div>`;
+ $('proHealth').innerHTML=`<div class="pro-grid"><div class="pro-card"><div class="health-ring" style="--score:${h.score}" data-score="${h.score}"></div><div style="text-align:center;margin-top:7px;font-size:11px;color:var(--muted)">Health Score / 100</div></div><div class="pro-card"><div class="pro-label">สถานะงานบำรุง</div><div style="font-size:13px;line-height:1.9"><span class="range-bad">เลยกำหนด ${h.overdue}</span><br><span class="range-warn">ใกล้กำหนด ${h.due}</span><br><span class="range-good">ติดตามทั้งหมด ${h.total}</span></div></div></div>`;
+ const months=monthBuckets(12), max=Math.max(1,...months.map(x=>x.fuel+x.other));
+ $('proTimeline').innerHTML=months.map(x=>`<div class="bar-row"><span>${x.label}</span><div class="bar-track"><div class="bar-fill" style="width:${((x.fuel+x.other)/max*100).toFixed(1)}%"></div></div><b style="text-align:right">${proMoney(x.fuel+x.other)}</b></div>`).join('');
+ const station={}; m.st.forEach(x=>{const e=x.entry||x;const n=(e.station||'ไม่ระบุ').trim()||'ไม่ระบุ';(station[n]||(station[n]={sum:0,n:0,spend:0}));station[n].sum+=x.kml;station[n].n++;station[n].spend+=Number(e.total)||0});
+ const ss=Object.entries(station).map(([name,v])=>({name,avg:v.sum/v.n,n:v.n,spend:v.spend})).filter(x=>x.n).sort((a,b)=>b.avg-a.avg).slice(0,10);
+ $('proStations').innerHTML=ss.length?`<table class="pro-table"><thead><tr><th>ปั๊ม</th><th>ครั้ง</th><th>กม./ลิตร</th><th>ยอดเติม</th></tr></thead><tbody>${ss.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.n}</td><td>${fmt(x.avg,1)}</td><td>${proMoney(x.spend)}</td></tr>`).join('')}</tbody></table>`:'<div class="pro-note">ต้องมีรายการเต็มถังอย่างน้อย 2 ครั้งเพื่อเปรียบเทียบ</div>';
+ const cats={น้ำมัน:m.fuel}; m.cs.forEach(c=>{const k=c.category||'อื่นๆ';cats[k]=(cats[k]||0)+(Number(c.amount)||0)}); const ca=Object.entries(cats).sort((a,b)=>b[1]-a[1]), cm=Math.max(1,...ca.map(x=>x[1]));
+ $('proCategories').innerHTML=ca.map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><div class="bar-track"><div class="bar-fill" style="width:${(v/cm*100).toFixed(1)}%"></div></div><b style="text-align:right">${proMoney(v)}</b></div>`).join('');
+ const settings=JSON.parse(localStorage.getItem(proVehicleKey())||'{}'); $('proTankCapacity').value=settings.tankCapacity||''; renderProRange();
+}
+function renderProRange(){
+ const cap=Number($('proTankCapacity').value)||0, m=proMetrics(); if(!cap||!m.avg){$('proRange').innerHTML='ใส่ความจุถังและต้องมีข้อมูลอัตราสิ้นเปลืองก่อน ระบบจึงจะประมาณระยะทางได้';return}
+ const es=m.es; const lastFull=[...es].reverse().find(e=>e.fullTank!==false&&e.full!==false); if(!lastFull){$('proRange').innerHTML='ยังไม่พบรายการเติมเต็มถัง';return}
+ const latest=latestOdo(), used=Math.max(0,latest-(Number(lastFull.odometer)||latest)), estimatedUsed=used/m.avg, remaining=Math.max(0,cap-estimatedUsed), range=remaining*m.avg;
+ $('proRange').innerHTML=`หลังเติมเต็มถังล่าสุดวิ่งประมาณ <b>${fmt(used,0)} กม.</b> · คาดว่าเหลือ <b>${fmt(remaining,1)} ลิตร</b> · วิ่งต่อได้ประมาณ <b class="${range<60?'range-bad':range<120?'range-warn':'range-good'}">${fmt(range,0)} กม.</b><br><span class="pro-note">เป็นค่าประมาณจากประวัติ ไม่ใช่มาตรวัดน้ำมันจริง</span>`;
+}
+function proExcel(){
+ const m=proMetrics(); let rows=[['ประเภท','วันที่','เลขไมล์','รายการ/ปั๊ม','จำนวนลิตร','จำนวนเงิน','หมายเหตุ']];
+ m.es.forEach(e=>rows.push(['เติมน้ำมัน',e.date,e.odometer,e.station,e.liters,e.total,e.note||'']));m.cs.forEach(c=>rows.push([c.category,c.date,c.odometer,c.title,'',c.amount,c.note||'']));
+ const html='<html><head><meta charset="UTF-8"></head><body><table>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('')+'</table></body></html>'; const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;a.click();URL.revokeObjectURL(a.href);
+}
+function printPro(){ renderPro(); const w=window.open('','_blank'); const name=(vehicles.find(v=>v.id===currentVehicleId)||{}).name||'รถ'; w.document.write(`<html><head><meta charset="UTF-8"><title>FuelLog Report</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{font-size:22px}table{width:100%;border-collapse:collapse}td,th{padding:7px;border-bottom:1px solid #ddd;text-align:left}.box{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}</style></head><body><h1>FuelLog Pro — ${esc(name)}</h1><p>สร้างเมื่อ ${new Date().toLocaleString('th-TH')}</p><div class="box">${$('proSummary').innerHTML}</div><h2>เปรียบเทียบปั๊ม</h2>${$('proStations').innerHTML}<h2>ค่าใช้จ่ายแยกหมวด</h2>${$('proCategories').innerHTML}</body></html>`); w.document.close(); setTimeout(()=>w.print(),300);
+}
+$('proDashboardBtn').onclick=()=>{renderPro();$('proOverlay').style.display='flex'};$('closePro').onclick=()=>$('proOverlay').style.display='none';$('proOverlay').onclick=e=>{if(e.target===$('proOverlay'))$('proOverlay').style.display='none'};$('proTankCapacity').oninput=()=>{localStorage.setItem(proVehicleKey(),JSON.stringify({tankCapacity:Number($('proTankCapacity').value)||0}));renderProRange()};$('exportExcelBtn').onclick=proExcel;$('printReportBtn').onclick=printPro;
 
 // Service worker registration
 if('serviceWorker' in navigator){

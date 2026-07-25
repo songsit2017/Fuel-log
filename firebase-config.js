@@ -1,6 +1,4 @@
-// FuelLog Pro Family Sharing — Firebase Web App config
-// Firebase web config is not a password. Access is protected by Authentication + Firestore Rules.
-window.FUELLOG_FIREBASE_CONFIG = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBkhbAr9HLXzUDvqFfiy9yPKP5DFKRavwI",
   authDomain: "fuellog-pro-f2a12.firebaseapp.com",
   projectId: "fuellog-pro-f2a12",

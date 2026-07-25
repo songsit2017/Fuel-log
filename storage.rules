@@ -1,13 +1,13 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function vehicle(vid){ return firestore.get(/databases/(default)/documents/vehicles/$(vid)); }
-    function member(vid){ return request.auth != null && vehicle(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
-    function edit(vid){ return request.auth != null && vehicle(vid).data.members[request.auth.uid].role in ['owner','editor']; }
+    function vdoc(vid) { return firestore.get(/databases/(default)/documents/vehicles/$(vid)); }
+    function member(vid) { return request.auth != null && vdoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
+    function editor(vid) { return request.auth != null && vdoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
     match /vehicles/{vid}/{allPaths=**} {
       allow read: if member(vid);
-      allow create,update: if edit(vid) && request.resource.size < 8 * 1024 * 1024;
-      allow delete: if edit(vid);
+      allow create, update: if editor(vid) && request.resource.size < 8 * 1024 * 1024 && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+      allow delete: if editor(vid);
     }
   }
 }

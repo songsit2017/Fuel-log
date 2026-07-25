@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>FuelLog Pro — Full Function</title>
+<title>สมุดเติมน้ำมัน</title>
 <meta name="theme-color" content="#14171C" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -123,30 +123,6 @@
 
   .cost-item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
   .cost-cat-badge{font-size:10px;background:var(--surface2);color:var(--muted);border-radius:6px;padding:2px 6px;display:inline-block;margin-top:3px;}
-
-  /* FuelLog Pro v3.1 visual upgrade — functional core remains the original app */
-  :root{--bg:#0b1020;--surface:#121a2c;--surface2:#182238;--text:#f7f8fb;--muted:#9aa6bd;--line:#26324a;--amber:#f5ad42;--teal:#4fd1a1;--red:#ef6a72;--shadow:0 16px 45px #0004;}
-  html{background:var(--bg)}
-  body{background:radial-gradient(circle at 72% -8%,rgba(245,173,66,.16),transparent 31%),var(--bg);min-height:100vh;}
-  .header{max-width:900px;margin:0 auto;padding:24px 18px 18px;border-bottom:0;}
-  .brand{margin-bottom:16px}.brand-icon{width:42px;height:42px;border-radius:14px;box-shadow:0 10px 28px rgba(245,173,66,.22)}
-  .brand-title{font-size:21px}.full-badge{font-size:8px;vertical-align:middle;background:var(--teal);color:#071510;border-radius:99px;padding:3px 6px;margin-left:4px;letter-spacing:.08em}
-  .settings-link{position:fixed!important;top:max(14px,env(safe-area-inset-top));right:16px;z-index:45!important;background:rgba(18,26,44,.88)!important;backdrop-filter:blur(14px);border:1px solid var(--line)!important;border-radius:14px!important;width:44px!important;height:44px!important;box-shadow:var(--shadow)}
-  .odo-card{border-radius:24px;padding:22px;background:linear-gradient(135deg,rgba(245,173,66,.22),var(--surface));border-color:rgba(245,173,66,.32);box-shadow:var(--shadow)}
-  .odo-value{font-size:38px}.stat-grid{gap:11px}.stat-card{border-radius:19px;padding:16px;background:rgba(18,26,44,.94);box-shadow:0 8px 28px rgba(0,0,0,.12)}
-  .chart-wrap,.home-station-card,.actions-row,.list,.view-tabs{max-width:864px;margin-left:auto!important;margin-right:auto!important}
-  .chart-wrap,.home-station-card{border-radius:19px!important;background:rgba(18,26,44,.94)!important;box-shadow:0 8px 28px rgba(0,0,0,.12)}
-  .view-tabs{position:sticky;top:8px;z-index:15;background:rgba(11,16,32,.82);backdrop-filter:blur(16px);padding:8px 18px!important;border-radius:18px}
-  .view-tab{border-radius:14px!important;padding:11px!important}.view-tab.active{box-shadow:0 8px 20px rgba(79,209,161,.18)}
-  .action-btn{border-radius:13px!important;padding:11px 13px!important}.action-btn.primary,.save-btn{background:var(--amber)!important;color:#17120b!important;box-shadow:0 8px 22px rgba(245,173,66,.18)}
-  .entry-item,.cost-item{border-radius:17px!important;background:rgba(18,26,44,.95)!important;padding:15px!important;box-shadow:0 8px 24px rgba(0,0,0,.1)}
-  .vehicle-chip{border-radius:99px!important}.vehicle-chip.active{box-shadow:0 7px 18px rgba(245,173,66,.2)}
-  .modal-overlay{backdrop-filter:blur(7px)}.modal{border-radius:24px 24px 0 0!important;background:var(--surface)!important;box-shadow:0 -20px 60px rgba(0,0,0,.45)}
-  .field input,.field select{border-radius:12px!important;padding:11px!important}.photo-slot{border-radius:16px!important}.scan-btn{border-radius:15px!important}
-  .fab{background:var(--amber)!important;color:#17120b!important;box-shadow:0 18px 42px rgba(245,173,66,.34)!important}
-  #backupBanner{position:sticky;top:0;z-index:40;backdrop-filter:blur(15px);background:rgba(58,47,26,.92)!important}
-  @media(min-width:720px){.modal{border-radius:24px!important;margin:auto;max-height:88vh}.modal-overlay{align-items:center!important}.settings-link{right:calc((100vw - 900px)/2 + 18px)}}
-
 </style>
 </head>
 <body>
@@ -161,7 +137,7 @@
   <div class="brand">
     <div class="brand-icon">⛽</div>
     <div>
-      <div class="brand-title">FuelLog Pro <span class="full-badge">FULL</span></div>
+      <div class="brand-title">สมุดเติมน้ำมัน</div>
       <div class="brand-sub" id="countLabel">0 รายการบันทึก</div>
     </div>
   </div>

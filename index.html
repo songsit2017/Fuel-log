@@ -167,6 +167,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
 </head>
 <body>
@@ -2124,6 +2125,7 @@ function proExcel(){
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
 </head><body><table>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('')+'</table>
 <script src="family-sharing.js" defer></script>
@@ -2133,6 +2135,7 @@ function printPro(){ renderPro(); const w=window.open('','_blank'); const name=(
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
 </head><body><h1>FuelLog Pro — ${esc(name)}</h1><p>สร้างเมื่อ ${new Date().toLocaleString('th-TH')}</p><div class="box">${$('proSummary').innerHTML}</div><h2>เปรียบเทียบปั๊ม</h2>${$('proStations').innerHTML}<h2>ค่าใช้จ่ายแยกหมวด</h2>${$('proCategories').innerHTML}
 <script src="family-sharing.js" defer></script>

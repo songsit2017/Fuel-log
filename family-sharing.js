@@ -3,8 +3,8 @@
   'use strict';
   const cfg = window.FUELLOG_FIREBASE_CONFIG || {};
   const configured = !!(cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId);
-  let auth = null, db = null, user = null, roleByVehicle = new Map();
-  let unsubscribers = [], applyingRemote = false, syncTimer = null;
+  let auth = null, db = null, storage = null, user = null, roleByVehicle = new Map();
+  let unsubscribers = [], applyingRemote = false, syncTimer = null, photoSyncTimer = null;
 
   const E = (id) => document.getElementById(id);
   const escFS = (v='') => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,6 +15,76 @@
   const canEdit = () => ['owner','editor'].includes(role());
   const canManage = () => role() === 'owner';
   const clean = (obj) => JSON.parse(JSON.stringify(obj, (k,v) => v === undefined ? null : v));
+
+  const photoKinds = [
+    {kind:'receipt', flag:'hasReceiptPhoto', pathField:'receiptStoragePath', urlField:'receiptPhotoUrl', sizeField:'receiptPhotoSize'},
+    {kind:'odo', flag:'hasOdoPhoto', pathField:'odoStoragePath', urlField:'odoPhotoUrl', sizeField:'odoPhotoSize'}
+  ];
+  const photoKey = (entryId, kind) => `${entryId}-${kind}`;
+  const storagePath = (vehicleId, entryId, kind) => `vehicles/${vehicleId}/entries/${entryId}/${kind}.jpg`;
+
+  async function uploadEntryPhotos(vehicleId, entry){
+    if(!storage || !user || !canEdit()) return;
+    const docRef = db.collection('vehicles').doc(vehicleId).collection('entries').doc(String(entry.id));
+    const patch = {};
+    for(const p of photoKinds){
+      if(entry[p.flag] === false){
+        const oldPath = entry[p.pathField] || storagePath(vehicleId, entry.id, p.kind);
+        try{ await storage.ref(oldPath).delete(); }catch(e){ if(e.code !== 'storage/object-not-found') console.warn('photo delete',e); }
+        patch[p.pathField] = firebase.firestore.FieldValue.delete();
+        patch[p.urlField] = firebase.firestore.FieldValue.delete();
+        patch[p.sizeField] = firebase.firestore.FieldValue.delete();
+        continue;
+      }
+      if(!entry[p.flag]) continue;
+      const blob = await getPhotoBlob(photoKey(entry.id,p.kind)).catch(()=>null);
+      if(!blob) continue; // remote image may still be downloading on this device
+      if(entry[p.sizeField] === blob.size && entry[p.pathField]) continue;
+      const path = storagePath(vehicleId, entry.id, p.kind);
+      const snap = await storage.ref(path).put(blob,{contentType:blob.type||'image/jpeg',customMetadata:{vehicleId,entryId:String(entry.id),kind:p.kind,uploadedBy:user.uid}});
+      const url = await snap.ref.getDownloadURL();
+      patch[p.pathField] = path;
+      patch[p.urlField] = url;
+      patch[p.sizeField] = blob.size;
+      patch.photoUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+    if(Object.keys(patch).length) await docRef.set(patch,{merge:true});
+  }
+
+  async function syncCurrentVehiclePhotos(){
+    const v=selectedVehicle();
+    if(!v?.cloudId || !user || !canEdit() || !storage) return;
+    const list = entries.filter(x=>x.vehicleId===v.id);
+    for(const entry of list){
+      try{ await uploadEntryPhotos(v.cloudId,entry); }
+      catch(e){ console.warn('photo upload failed',entry.id,e); }
+    }
+  }
+
+  function schedulePhotoSync(){
+    clearTimeout(photoSyncTimer);
+    photoSyncTimer=setTimeout(()=>syncCurrentVehiclePhotos(),1400);
+  }
+
+  async function hydrateRemotePhotos(list){
+    if(!storage) return;
+    for(const entry of list){
+      for(const p of photoKinds){
+        if(!entry[p.flag]) continue;
+        const key=photoKey(entry.id,p.kind);
+        const local=await getPhotoBlob(key).catch(()=>null);
+        if(local) continue;
+        try{
+          let url=entry[p.urlField];
+          if(!url && entry[p.pathField]) url=await storage.ref(entry[p.pathField]).getDownloadURL();
+          if(!url) continue;
+          const res=await fetch(url);
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          await savePhotoBlob(key,await res.blob());
+        }catch(e){ console.warn('photo download failed',entry.id,p.kind,e); }
+      }
+    }
+  }
 
   function injectUI(){
     const overlay = document.createElement('div');
@@ -65,7 +135,7 @@
     E('familyUser').innerHTML = user ? `<b>${escFS(user.displayName || user.email)}</b><br>${escFS(user.email || '')}` : 'ยังไม่ได้เข้าสู่ระบบ';
     const v = selectedVehicle();
     if(user && v){
-      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
+      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b><br><span style="font-size:11px;color:var(--muted)">📷 รูปบิลและรูปเรือนไมล์แชร์ผ่าน Firebase Storage</span>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
       E('publishVehicle').style.display = isCloudVehicle(v) ? 'none' : '';
       E('syncVehicleNow').style.display = isCloudVehicle(v) && canEdit() ? '' : 'none';
       E('ownerShareBox').style.display = isCloudVehicle(v) && canManage() ? '' : 'none';
@@ -148,7 +218,8 @@
         syncCollection(v.cloudId,'reminders',reminders.filter(x=>x.vehicleId===v.id || !x.vehicleId).map(x=>({...x,vehicleId:v.id})))
       ]);
       await db.collection('vehicles').doc(v.cloudId).set({name:v.name,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      if(manual) toastFS('ซิงก์ข้อมูลแล้ว');
+      await syncCurrentVehiclePhotos();
+      if(manual) toastFS('ซิงก์ข้อมูลและรูปภาพแล้ว');
     }catch(e){ console.error(e); if(manual) alert('ซิงก์ไม่สำเร็จ: '+e.message); }
   }
 
@@ -161,7 +232,7 @@
     const apply = async(name,snap)=>{
       applyingRemote=true;
       const docs=snap.docs.map(d=>({...d.data(),id:d.id,vehicleId:v.id}));
-      if(name==='entries'){ entries=entries.filter(x=>x.vehicleId!==v.id).concat(docs); localStorage.setItem('fuel-entries',JSON.stringify(entries)); }
+      if(name==='entries'){ entries=entries.filter(x=>x.vehicleId!==v.id).concat(docs); localStorage.setItem('fuel-entries',JSON.stringify(entries)); await hydrateRemotePhotos(docs); }
       if(name==='costs'){ costs=costs.filter(x=>x.vehicleId!==v.id).concat(docs); localStorage.setItem('fuel-costs',JSON.stringify(costs)); }
       if(name==='reminders'){ reminders=reminders.filter(x=>x.vehicleId!==v.id).concat(docs); localStorage.setItem('fuel-reminders',JSON.stringify(reminders)); }
       render(); patchVehicleChips(); applyingRemote=false;
@@ -204,6 +275,8 @@
     const oldVehicles=window.persistVehicles || persistVehicles; persistVehicles = function(){ oldVehicles.apply(this,arguments); scheduleSync(); };
     const oldRem=window.persistReminders || persistReminders; persistReminders = function(){ oldRem.apply(this,arguments); scheduleSync(); };
     const oldRender=window.render || render; render = function(){ oldRender.apply(this,arguments); patchVehicleChips(); updateUI(); };
+    const oldSavePhoto=window.savePhotoBlob || savePhotoBlob; savePhotoBlob = async function(){ const r=await oldSavePhoto.apply(this,arguments); schedulePhotoSync(); return r; };
+    const oldDeletePhoto=window.deletePhotoBlob || deletePhotoBlob; deletePhotoBlob = async function(){ const r=await oldDeletePhoto.apply(this,arguments); schedulePhotoSync(); return r; };
     document.addEventListener('click',e=>{ if(e.target.closest('.vehicle-chip')) setTimeout(subscribeCurrentCloudVehicle,0); });
   }
 
@@ -212,7 +285,7 @@
     if(!configured || !window.firebase){ updateUI(); return; }
     try{
       if(!firebase.apps.length) firebase.initializeApp(cfg);
-      auth=firebase.auth(); db=firebase.firestore();
+      auth=firebase.auth(); db=firebase.firestore(); storage=firebase.storage();
       try{ await db.enablePersistence({synchronizeTabs:true}); }catch(e){ console.info('Firestore persistence:',e.code); }
       auth.onAuthStateChanged(async u=>{ user=u; updateUI(); if(u) await loadCloudVehicles(); else {roleByVehicle.clear();clearSubscriptions();} });
     }catch(e){ console.error(e); E('familyConfigWarning').style.display='block';E('familyConfigWarning').textContent='Firebase เริ่มทำงานไม่สำเร็จ: '+e.message; }

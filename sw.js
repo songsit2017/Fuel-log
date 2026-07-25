@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuellog-pro-v3.9-minimal-family-rc-20260726";
+const CACHE_NAME = "fuellog-pro-v4.0-minimal-family-ocr-20260726";
 const ASSETS = [
   "./",
   "./index.html",
@@ -25,7 +25,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  const externalHosts = ["anthropic.com","overpass-api.de","overpass.kumi.systems","cdnjs.cloudflare.com","bangchak.co.th","accounts.google.com","googleapis.com","gstatic.com"];
+  const externalHosts = ["anthropic.com","overpass-api.de","overpass.kumi.systems","cdnjs.cloudflare.com","bangchak.co.th","accounts.google.com","googleapis.com","gstatic.com","cdn.jsdelivr.net"];
   if (externalHosts.some(host => url.hostname.includes(host))) return;
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then(response => {

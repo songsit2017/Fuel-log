@@ -1,0 +1,16 @@
+/* FuelLog Pro v3.8 — minimal, non-destructive theme override */
+:root{--radius-xl:24px;--radius-lg:18px;--radius-md:14px}
+body{background:linear-gradient(180deg,#0a1020 0,#0d1426 55%,#0a0f1c 100%)!important}
+body.light{background:#f5f6f8!important}
+.app,.container{max-width:760px!important;margin:auto}
+.card,.panel,.chart-card,.summary-card,[class*="card"]{border-radius:var(--radius-lg)!important;box-shadow:none!important}
+button,.action-btn,.mini-btn,input,select,textarea{border-radius:var(--radius-md)!important}
+.action-btn.primary,.tab-btn.active,.vehicle-chip.active{box-shadow:none!important}
+.header,.topbar{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+#familyFab{position:fixed;right:18px;bottom:92px;z-index:80;width:48px;height:48px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:#18233a;color:#fff;font-size:21px;box-shadow:0 14px 35px rgba(0,0,0,.3)}
+.fl-overlay{position:fixed;inset:0;background:rgba(3,7,18,.72);backdrop-filter:blur(8px);z-index:9999;display:none;align-items:flex-end;justify-content:center}
+.fl-overlay.open{display:flex}.fl-sheet{width:min(760px,100%);max-height:92vh;overflow:auto;background:#101827;color:#eaf0ff;border-radius:26px 26px 0 0;border:1px solid #26324a;padding:18px 18px 28px}.light .fl-sheet{background:#fff;color:#182033;border-color:#e2e6ef}
+.fl-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.fl-head h2{margin:0;font-size:20px}.fl-close{border:0;background:transparent;color:inherit;font-size:24px}
+.fl-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}.fl-tabs button{padding:10px;border:1px solid #2b3955;background:transparent;color:inherit}.fl-tabs button.active{background:#f5ad42;color:#141414;border-color:#f5ad42}
+.fl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fl-card{border:1px solid #283651;background:#141f33;border-radius:18px;padding:14px}.light .fl-card{background:#f8f9fc;border-color:#e3e7ef}.fl-card.full{grid-column:1/-1}.fl-card h3{margin:0 0 10px;font-size:15px}.fl-kpi{font-size:24px;font-weight:800}.fl-muted{opacity:.65;font-size:12px}.fl-row{display:flex;gap:8px;align-items:center}.fl-row>*{min-width:0}.fl-input{width:100%;padding:11px;border:1px solid #32415f;background:#0d1525;color:inherit}.light .fl-input{background:#fff;border-color:#dfe4ed}.fl-btn{padding:11px 13px;border:1px solid #33415d;background:#18243a;color:#fff;font-weight:700}.fl-btn.primary{background:#f5ad42;color:#17120b;border-color:#f5ad42}.fl-btn.danger{color:#ff9d9d}.fl-list{display:flex;flex-direction:column;gap:8px}.fl-item{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid #2b3853;border-radius:14px}.light .fl-item{border-color:#e2e6ee}.fl-item b{display:block}.fl-status{padding:4px 8px;border-radius:999px;font-size:11px;background:#243451}.fl-login{display:flex;align-items:center;justify-content:space-between;gap:10px}.fl-user{display:flex;align-items:center;gap:9px}.fl-user img{width:34px;height:34px;border-radius:50%}
+@media(max-width:520px){.fl-grid{grid-template-columns:1fr}.fl-card.full{grid-column:auto}.fl-sheet{padding:14px 14px 24px}.fl-tabs button{font-size:12px}}

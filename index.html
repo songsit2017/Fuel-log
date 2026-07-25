@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>FuelLog Pro v3.3 — Professional Suite</title>
+<title>FuelLog Pro v3.9 — Minimal Family RC</title>
 <meta name="theme-color" content="#14171C" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -163,6 +163,7 @@
 
 .quick-cost{flex:0 0 auto;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:999px;padding:7px 10px;font-size:12px;cursor:pointer;white-space:nowrap}.quick-cost:active{transform:scale(.97)}
 </style>
+<link rel="stylesheet" href="addons/minimal-pro.css?v=3.9">
 </head>
 <body>
 
@@ -2156,5 +2157,24 @@ if('serviceWorker' in navigator){
 render();
 window.addEventListener('load',()=>setTimeout(autoLoadLocationFeatures,500));
 </script>
+<script>
+window.FuelLogBridge = {
+  get vehicles(){ return vehicles; },
+  get entries(){ return entries; },
+  get costs(){ return costs; },
+  get reminders(){ return reminders; },
+  get currentVehicleId(){ return currentVehicleId; },
+  setCurrentVehicle(id){ currentVehicleId=id; localStorage.setItem('current-vehicle-id',id); render(); },
+  persistAll(){
+    localStorage.setItem('fuel-vehicles',JSON.stringify(vehicles));
+    localStorage.setItem('fuel-entries',JSON.stringify(entries));
+    localStorage.setItem('fuel-costs',JSON.stringify(costs));
+    localStorage.setItem('fuel-reminders',JSON.stringify(reminders));
+  },
+  refresh(){ render(); },
+  escape: typeof esc==='function' ? esc : (v=>String(v??''))
+};
+</script>
+<script type="module" src="addons/family-pro.js?v=3.9"></script>
 </body>
 </html>

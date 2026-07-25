@@ -1,5 +1,45 @@
-const CACHE_NAME = "fuellog-pro-v3.7-stable-20260726";
-const ASSETS = ["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png","./oil-prices.json","./original-v2.html"];
-self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)).catch(()=>{}));self.skipWaiting();});
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener("fetch",e=>{const u=new URL(e.request.url);if(["anthropic.com","overpass-api.de","overpass.kumi.systems","cdnjs.cloudflare.com","chnwt.dev","bangchak.co.th","accounts.google.com","googleapis.com"].some(h=>u.hostname.includes(h)))return;if(e.request.method!=="GET")return;if(e.request.mode==="navigate"){e.respondWith(fetch(e.request).then(r=>{const x=r.clone();caches.open(CACHE_NAME).then(c=>c.put("./index.html",x)).catch(()=>{});return r;}).catch(()=>caches.match("./index.html")));return;}e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request).then(r=>{if(r&&r.ok&&!r.redirected){const x=r.clone();caches.open(CACHE_NAME).then(k=>k.put(e.request,x)).catch(()=>{});}return r;})));});
+const CACHE_NAME = "fuellog-pro-v3.9-minimal-family-rc-20260726";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./oil-prices.json",
+  "./app.css",
+  "./app.js",
+  "./addons/minimal-pro.css",
+  "./addons/firebase-config.js",
+  "./addons/family-pro.js",
+  "./diagnostics.html",
+  "./original-v2.html"
+];
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).catch(() => {}));
+  self.skipWaiting();
+});
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))));
+  self.clients.claim();
+});
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  const externalHosts = ["anthropic.com","overpass-api.de","overpass.kumi.systems","cdnjs.cloudflare.com","bangchak.co.th","accounts.google.com","googleapis.com","gstatic.com"];
+  if (externalHosts.some(host => url.hostname.includes(host))) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).then(response => {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put("./index.html", clone)).catch(() => {});
+      return response;
+    }).catch(() => caches.match("./index.html")));
+    return;
+  }
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+    if (response && response.ok && !response.redirected) {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)).catch(() => {});
+    }
+    return response;
+  })));
+});

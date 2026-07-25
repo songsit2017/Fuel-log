@@ -1,4 +1,4 @@
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig } from './firebase-config.js?v=4.3.3';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
@@ -168,6 +168,10 @@ function authErrorText(error) {
   if (code === 'auth/popup-closed-by-user') return 'หน้าต่างเข้าสู่ระบบถูกปิดก่อนเสร็จ';
   if (code === 'auth/operation-not-allowed') return 'ยังไม่ได้เปิด Google Sign-in ใน Firebase Authentication';
   if (code === 'auth/network-request-failed') return 'เชื่อมต่อ Google ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
+  if (code === 'auth/api-key-not-valid') {
+    const key = String(firebaseConfig?.apiKey || '');
+    return `Firebase API key ใช้งานไม่ได้ (โหลดคีย์ลงท้าย ${key.slice(-6) || 'ไม่มีค่า'}) กรุณาตรวจ API key และข้อจำกัดของคีย์ใน Google Cloud Console`;
+  }
   return error?.message || 'เข้าสู่ระบบไม่สำเร็จ';
 }
 

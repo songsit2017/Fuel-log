@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuellog-pro-v4.3.2-google-login-ui-fix-20260726";
+const CACHE_NAME = "fuellog-pro-v4.3.3-firebase-cache-key-fix-20260726";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,7 +11,6 @@ const ASSETS = [
   "./addons/minimal-pro.css",
   "./addons/true-minimal-ui.css",
   "./addons/true-minimal-ui.js",
-  "./addons/firebase-config.js",
   "./addons/family-pro.js",
   "./diagnostics.html",
   "./original-v2.html"
@@ -29,6 +28,11 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   const externalHosts = ["anthropic.com","overpass-api.de","overpass.kumi.systems","cdnjs.cloudflare.com","bangchak.co.th","accounts.google.com","googleapis.com","gstatic.com","cdn.jsdelivr.net"];
   if (externalHosts.some(host => url.hostname.includes(host))) return;
+  // Firebase config must always come from network so an old invalid key is never kept by PWA cache.
+  if (url.pathname.endsWith('/addons/firebase-config.js') || url.pathname.endsWith('/addons/family-pro.js')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then(response => {
       const clone = response.clone();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuellog-pro-v4.1-true-minimal-ui-20260726";
+const CACHE_NAME = "fuellog-pro-v4.2-auto-nearest-station-20260726";
 const ASSETS = [
   "./",
   "./index.html",

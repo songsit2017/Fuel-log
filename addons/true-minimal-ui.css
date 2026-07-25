@@ -147,3 +147,62 @@ body:before{content:none!important}
   .odo-card:before{display:none}.odo-value{font-size:45px!important}.stat-grid{grid-template-columns:1fr!important}.stat-card{min-height:auto}
   .fl-min-nav button span{font-size:9px}
 }
+
+/* ================================================================
+   v4.3 — True single-page navigation (Fuelio-style)
+   ================================================================ */
+html{scroll-behavior:smooth}
+body{padding-bottom:92px!important;overflow-x:hidden}
+.fl-shell{width:min(100%,900px);margin:0 auto;min-height:calc(100dvh - 88px)}
+.fl-page{display:none;animation:flPageIn .18s ease both;padding:0 0 26px}
+.fl-page.active{display:block}
+@keyframes flPageIn{from{opacity:.3;transform:translateX(8px)}to{opacity:1;transform:none}}
+.fl-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:28px 33px 18px}
+.fl-page-head h1{font-size:27px;line-height:1.15;margin:0;color:#f7f8fb;letter-spacing:-.5px}
+.fl-page-head p{font-size:12px;color:#858c98;margin:7px 0 0}
+.fl-head-add{border:0;border-radius:15px;background:#ff9f12;color:#18130b;font-weight:850;font-size:13px;padding:11px 15px;box-shadow:none;white-space:nowrap}
+.fl-page-stack{display:grid;gap:14px}
+.fl-page [id="list"],.fl-page [id="costList"]{padding:0 33px 20px!important}
+.fl-page [id="costStatGrid"]{display:grid!important;padding:0;margin:0}
+.fl-cost-summary{padding:0 33px 14px}
+.fl-page .tool-card,.fl-page .home-station-card{margin-left:33px!important;margin-right:33px!important;width:auto!important}
+.fl-page .home-station-card{background:#101419!important;border:1px solid #292e35!important;box-shadow:none!important}
+.fl-large-action{width:calc(100% - 66px);margin:0 33px;border:1px solid #2a3038;background:#101419;color:#f4f5f7;border-radius:20px;padding:18px;display:flex;align-items:center;gap:14px;text-align:left}
+.fl-large-action>span{font-size:24px}.fl-large-action div{display:grid;gap:4px;flex:1}.fl-large-action b{font-size:14px}.fl-large-action small{font-size:11px;color:#858c98}.fl-large-action i{font-size:28px;color:#69717d;font-style:normal}
+.fl-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 33px 28px}
+.fl-more-grid button{min-height:135px;border:1px solid #292e35;border-radius:21px;background:#101419;color:#f5f6f8;padding:18px;text-align:left;display:grid;align-content:start;gap:7px;box-shadow:none}
+.fl-more-grid button>span{font-size:24px}.fl-more-grid button>b{font-size:14px}.fl-more-grid button>small{font-size:11px;line-height:1.45;color:#858c98}
+.fl-utility-controls{display:none!important}
+body[data-fl-page]:not([data-fl-page="home"])>.settings-link{display:none!important}
+body[data-fl-page="home"] .fl-page[data-page="home"] .header{padding-top:28px!important}
+
+/* Bottom navigation is part of the application chrome, not an overlay card. */
+.fl-min-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;border-radius:0!important;border:0!important;border-top:1px solid #252b32!important;background:rgba(8,11,15,.97)!important;padding:7px max(12px,calc((100vw - 900px)/2 + 12px)) calc(7px + env(safe-area-inset-bottom))!important;box-shadow:0 -10px 30px rgba(0,0,0,.22)!important;backdrop-filter:blur(18px)!important;display:grid!important;grid-template-columns:repeat(5,1fr)!important;z-index:1600!important}
+.fl-min-nav button{min-height:56px!important;background:transparent!important;border-radius:14px!important;padding:5px 2px!important;color:#8b929d!important;display:grid!important;place-items:center!important;align-content:center!important;gap:3px!important}
+.fl-min-nav button b{font-size:20px;line-height:1;font-weight:500}.fl-min-nav button span{font-size:10px!important}
+.fl-min-nav button.active{color:#ff9f12!important;background:rgba(255,159,18,.07)!important}
+
+/* Full-screen form pages instead of bottom sheets/overlays. */
+.fl-full-page-modal{position:fixed!important;inset:0!important;z-index:2400!important;background:#080b0f!important;backdrop-filter:none!important;align-items:stretch!important;justify-content:center!important;padding:0!important;overflow:auto!important}
+.fl-full-page-modal>.modal,.fl-full-page-modal>.fl-sheet{width:min(100%,900px)!important;max-width:900px!important;max-height:none!important;min-height:100dvh!important;margin:0 auto!important;border:0!important;border-radius:0!important;background:#080b0f!important;box-shadow:none!important;padding:24px 28px calc(32px + env(safe-area-inset-bottom))!important;overflow:visible!important}
+.fl-full-page-modal .modal-head,.fl-full-page-modal .fl-head{position:sticky!important;top:0!important;z-index:4!important;margin:-24px -28px 22px!important;padding:22px 28px 16px!important;background:rgba(8,11,15,.96)!important;border-bottom:1px solid #242a31!important;backdrop-filter:blur(16px)!important}
+.fl-full-page-modal .modal-title,.fl-full-page-modal .fl-head h2{font-size:21px!important}
+.fl-full-page-modal .close-btn,.fl-full-page-modal .fl-close{width:40px;height:40px;border-radius:50%!important;background:#14191f!important;border:1px solid #2c333b!important;color:#d5d8dd!important}
+body.fl-modal-open .fl-min-nav{display:none!important}
+
+/* De-emphasize elements that belonged to the old one-page layout. */
+#familyFab{display:none!important}
+#reminderSummaryCard{display:block!important}
+.fl-page[data-page="home"] #reminderSummaryCard{display:none!important}
+
+@media(max-width:620px){
+  .fl-page-head{padding:24px 20px 16px}
+  .fl-page [id="list"],.fl-page [id="costList"]{padding-left:20px!important;padding-right:20px!important}
+  .fl-cost-summary{padding-left:20px;padding-right:20px}
+  .fl-page .tool-card,.fl-page .home-station-card{margin-left:20px!important;margin-right:20px!important}
+  .fl-large-action{width:calc(100% - 40px);margin-left:20px;margin-right:20px}
+  .fl-more-grid{padding-left:20px;padding-right:20px;grid-template-columns:1fr 1fr}
+  .fl-full-page-modal>.modal,.fl-full-page-modal>.fl-sheet{padding-left:20px!important;padding-right:20px!important}
+  .fl-full-page-modal .modal-head,.fl-full-page-modal .fl-head{margin-left:-20px!important;margin-right:-20px!important;padding-left:20px!important;padding-right:20px!important}
+}
+@media(max-width:390px){.fl-more-grid{grid-template-columns:1fr}.fl-page-head h1{font-size:24px}}

@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuellog-pro-v4.0-minimal-family-ocr-20260726";
+const CACHE_NAME = "fuellog-pro-v4.1-true-minimal-ui-20260726";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,8 @@ const ASSETS = [
   "./app.css",
   "./app.js",
   "./addons/minimal-pro.css",
+  "./addons/true-minimal-ui.css",
+  "./addons/true-minimal-ui.js",
   "./addons/firebase-config.js",
   "./addons/family-pro.js",
   "./diagnostics.html",

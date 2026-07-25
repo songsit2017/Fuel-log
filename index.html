@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>FuelLog Pro v3.3 — Professional Suite</title>
+<title>FuelLog Pro v4.3.2 — Google Login UI Fix</title>
 <meta name="theme-color" content="#14171C" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -163,6 +163,8 @@
 
 .quick-cost{flex:0 0 auto;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:999px;padding:7px 10px;font-size:12px;cursor:pointer;white-space:nowrap}.quick-cost:active{transform:scale(.97)}
 </style>
+<link rel="stylesheet" href="addons/minimal-pro.css?v=4.0">
+<link rel="stylesheet" href="addons/true-minimal-ui.css?v=4.3.2">
 </head>
 <body>
 
@@ -1028,6 +1030,9 @@ function openAdd(){
   setPhotoSlotPreview('receiptSlot','receiptRemoveBtn',null);
   setPhotoSlotPreview('odoSlot','odoRemoveBtn',null);
   $('formOverlay').style.display='flex';
+  // ค้นหาปั๊มใกล้ที่สุดทันทีเมื่อผู้ใช้เปิดฟอร์มจากการกดเพิ่มรายการ
+  // เรียกหลัง modal แสดงผลเล็กน้อย เพื่อให้สถานะการค้นหาปรากฏอย่างถูกต้อง
+  setTimeout(()=>loadNearbyStations({target:'form',force:false,autoSelectNearest:true,showPermissionError:true}), 60);
 }
 
 function openEdit(id){
@@ -1655,7 +1660,7 @@ function renderHomeStations(list,content){
   content.innerHTML=list.map(s=>{const last=findLastPriceForStation(s.name);return `<button class="home-station-item" data-station="${esc(s.name)}" style="width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer"><div><div class="home-station-name">${esc(s.name)}</div>${last?`<div class="home-station-price">฿${fmt(last.pricePerLiter,2)}/ล. เมื่อคุณเติมล่าสุด (${esc(last.date)})</div>`:(s.brand?`<div class="home-station-price">${esc(s.brand)}</div>`:'')}</div><div class="home-station-dist num">${fmt(s.dist,1)} กม.</div></button>`}).join('');
   content.querySelectorAll('[data-station]').forEach(b=>b.onclick=()=>{ $('f_station').value=b.dataset.station; });
 }
-async function loadNearbyStations({target='home',force=false,showPermissionError=true}={}){
+async function loadNearbyStations({target='home',force=false,showPermissionError=true,autoSelectNearest=false}={}){
   if(nearbyLookupRunning) return; nearbyLookupRunning=true;
   const content=target==='form'?$('nearbyContent'):$('homeStationContent');
   if(target==='form') $('nearbyBox').style.display='';
@@ -1666,8 +1671,20 @@ async function loadNearbyStations({target='home',force=false,showPermissionError
     const moved=cache?haversine(pos.latitude,pos.longitude,cache.latitude,cache.longitude):999;
     if(!force&&cache&&Date.now()-cache.savedAt<3*60*60*1000&&moved<2) list=cache.list; else list=await queryNearbyStations(pos.latitude,pos.longitude,target==='form'?5000:7000);
     if(target==='form'){
-      content.innerHTML=list.map(s=>`<button class="nearby-item" data-name="${esc(s.name)}"><span>${esc(s.name)}</span><span class="num" style="color:var(--muted);font-size:11.5px;">${fmt(s.dist,1)} กม.</span></button>`).join('');
-      content.querySelectorAll('.nearby-item').forEach(btn=>btn.onclick=()=>{$('f_station').value=btn.dataset.name;$('nearbyBox').style.display='none'});
+      const nearest=list[0];
+      if(autoSelectNearest && nearest && !$('f_station').value.trim()){
+        $('f_station').value=nearest.name;
+        $('f_station').dataset.autoStation='1';
+      }
+      const autoNotice=autoSelectNearest&&nearest
+        ? `<div style="padding:2px 2px 9px;color:var(--teal);font-size:11.5px;">✓ เลือกปั๊มที่ใกล้ที่สุดให้อัตโนมัติ: <strong>${esc(nearest.name)}</strong> · ${fmt(nearest.dist,1)} กม.</div>`
+        : '';
+      content.innerHTML=autoNotice+list.map((s,i)=>`<button class="nearby-item" data-name="${esc(s.name)}"><span>${i===0?'📍 ':''}${esc(s.name)}</span><span class="num" style="color:var(--muted);font-size:11.5px;">${fmt(s.dist,1)} กม.</span></button>`).join('');
+      content.querySelectorAll('.nearby-item').forEach(btn=>btn.onclick=()=>{
+        $('f_station').value=btn.dataset.name;
+        delete $('f_station').dataset.autoStation;
+        $('nearbyBox').style.display='none';
+      });
     }else renderHomeStations(list,content);
   }catch(e){
     const denied=e&&e.code===1; content.innerHTML=denied&&!showPermissionError?'แตะ “ค้นหา” เพื่ออนุญาตตำแหน่งและดูปั๊มใกล้ตัว':`<span style="color:var(--red);">${denied?'กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้เคียง':'ค้นหาปั๊มไม่สำเร็จ กรุณาลองใหม่'}</span>`;
@@ -2138,9 +2155,18 @@ function renderProRange(){
  $('proRange').innerHTML=`หลังเติมเต็มถังล่าสุดวิ่งประมาณ <b>${fmt(used,0)} กม.</b> · คาดว่าเหลือ <b>${fmt(remaining,1)} ลิตร</b> · วิ่งต่อได้ประมาณ <b class="${range<60?'range-bad':range<120?'range-warn':'range-good'}">${fmt(range,0)} กม.</b><br><span class="pro-note">เป็นค่าประมาณจากประวัติ ไม่ใช่มาตรวัดน้ำมันจริง</span>`;
 }
 function proExcel(){
- const m=proMetrics(); let rows=[['ประเภท','วันที่','เลขไมล์','รายการ/ปั๊ม','จำนวนลิตร','จำนวนเงิน','หมายเหตุ']];
- m.es.forEach(e=>rows.push(['เติมน้ำมัน',e.date,e.odometer,e.station,e.liters,e.total,e.note||'']));m.cs.forEach(c=>rows.push([c.category,c.date,c.odometer,c.title,'',c.amount,c.note||'']));
- const html='<html><head><meta charset="UTF-8"></head><body><table>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('')+'</table></body></html>'; const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;a.click();URL.revokeObjectURL(a.href);
+ const m=proMetrics();
+ const rows=[['ประเภท','วันที่','เลขไมล์','รายการ/ปั๊ม','จำนวนลิตร','จำนวนเงิน','หมายเหตุ']];
+ m.es.forEach(e=>rows.push(['เติมน้ำมัน',e.date,e.odometer,e.station,e.liters,e.total,e.note||'']));
+ m.cs.forEach(c=>rows.push([c.category,c.date,c.odometer,c.title,'',c.amount,c.note||'']));
+ const table=rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('');
+ const html='<html><head><meta charset="UTF-8"></head><body><table>'+table+'</table></body></html>';
+ const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;
+ a.click();
+ URL.revokeObjectURL(a.href);
 }
 function printPro(){ renderPro(); const w=window.open('','_blank'); const name=(vehicles.find(v=>v.id===currentVehicleId)||{}).name||'รถ'; w.document.write(`<html><head><meta charset="UTF-8"><title>FuelLog Report</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{font-size:22px}table{width:100%;border-collapse:collapse}td,th{padding:7px;border-bottom:1px solid #ddd;text-align:left}.box{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}</style></head><body><h1>FuelLog Pro — ${esc(name)}</h1><p>สร้างเมื่อ ${new Date().toLocaleString('th-TH')}</p><div class="box">${$('proSummary').innerHTML}</div><h2>เปรียบเทียบปั๊ม</h2>${$('proStations').innerHTML}<h2>ค่าใช้จ่ายแยกหมวด</h2>${$('proCategories').innerHTML}</body></html>`); w.document.close(); setTimeout(()=>w.print(),300);
 }
@@ -2156,5 +2182,33 @@ if('serviceWorker' in navigator){
 render();
 window.addEventListener('load',()=>setTimeout(autoLoadLocationFeatures,500));
 </script>
+<script>
+window.FuelLogBridge = {
+  get vehicles(){ return vehicles; },
+  get entries(){ return entries; },
+  get costs(){ return costs; },
+  get reminders(){ return reminders; },
+  get currentVehicleId(){ return currentVehicleId; },
+  setCurrentVehicle(id){ currentVehicleId=id; localStorage.setItem('current-vehicle-id',id); render(); },
+  persistAll(){
+    localStorage.setItem('fuel-vehicles',JSON.stringify(vehicles));
+    localStorage.setItem('fuel-entries',JSON.stringify(entries));
+    localStorage.setItem('fuel-costs',JSON.stringify(costs));
+    localStorage.setItem('fuel-reminders',JSON.stringify(reminders));
+  },
+  refresh(){ render(); },
+  openFuelForm(){ document.getElementById('addBtn')?.click(); },
+  applyOcr(values){
+    document.getElementById('addBtn')?.click();
+    setTimeout(()=>{
+      const map={odometer:'f_odo',liters:'f_liters',price:'f_price',total:'f_total',station:'f_station',date:'f_date'};
+      Object.entries(map).forEach(([key,id])=>{ if(values[key]!==undefined && values[key]!==null && values[key]!=='' && document.getElementById(id)) document.getElementById(id).value=values[key]; });
+    },80);
+  },
+  escape: typeof esc==='function'?esc:(v=>String(v??''))
+};
+</script>
+<script type="module" src="addons/family-pro.js?v=4.3.3"></script>
+<script src="addons/true-minimal-ui.js?v=4.3.2"></script>
 </body>
 </html>

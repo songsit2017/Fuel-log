@@ -1596,126 +1596,131 @@ function haversine(lat1,lon1,lat2,lon2){
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-$('nearbyBtn').addEventListener('click', ()=>{
-  $('nearbyBox').style.display='';
-  $('nearbyContent').innerHTML = '<div style="font-size:12.5px;color:var(--muted);padding:6px 0;"><span class="spin">⏳</span> กำลังค้นหา...</div>';
-  if(!navigator.geolocation){
-    $('nearbyContent').innerHTML = '<div style="color:var(--red);font-size:12px;">อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง</div>';
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(async (pos)=>{
-    const {latitude, longitude} = pos.coords;
-    try{
-      const query = `[out:json][timeout:15];node["amenity"="fuel"](around:4000,${latitude},${longitude});out body 25;`;
-      const res = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:query});
-      const data = await res.json();
-      const list = (data.elements||[]).map(el=>{
-        const name = el.tags?.name || el.tags?.brand || 'ปั๊มน้ำมัน (ไม่ระบุชื่อ)';
-        const dist = haversine(latitude, longitude, el.lat, el.lon);
-        return {name, dist};
-      }).sort((a,b)=>a.dist-b.dist).slice(0,10);
-      if(!list.length){
-        $('nearbyContent').innerHTML = '<div style="color:var(--red);font-size:12px;">ไม่พบปั๊มน้ำมันในรัศมี 4 กม.</div>';
-        return;
-      }
-      $('nearbyContent').innerHTML = list.map(s=>`
-        <button class="nearby-item" data-name="${s.name.replace(/"/g,'&quot;')}">
-          <span>${s.name}</span><span class="num" style="color:var(--muted);font-size:11.5px;">${fmt(s.dist,1)} กม.</span>
-        </button>`).join('');
-      $('nearbyContent').querySelectorAll('.nearby-item').forEach(btn=>{
-        btn.addEventListener('click', ()=>{ $('f_station').value = btn.dataset.name; $('nearbyBox').style.display='none'; });
-      });
-    }catch(e){
-      $('nearbyContent').innerHTML = '<div style="color:var(--red);font-size:12px;">ดึงข้อมูลปั๊มไม่สำเร็จ ลองใหม่อีกครั้ง</div>';
-    }
-  }, ()=>{
-    $('nearbyContent').innerHTML = '<div style="color:var(--red);font-size:12px;">ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง</div>';
-  }, {enableHighAccuracy:true, timeout:10000});
-});
-$('closeNearby').addEventListener('click', ()=> $('nearbyBox').style.display='none');
+// Nearby stations: automatic + manual refresh, with cache and Overpass fallback
+const STATION_CACHE_KEY = 'fuel-nearby-stations-cache-v2';
+const LOCATION_CACHE_KEY = 'fuel-last-location-v2';
+const PRICE_CACHE_KEY = 'fuel-today-price-cache-v2';
+let nearbyLookupRunning = false;
 
-// ---------- Home screen: nearby stations + your own price history ----------
-function findLastPriceForStation(stationName){
-  // fuzzy match: station names often look like "ตำบล X - ปั๊มชื่อ Y"; compare on any shared word/substring
-  const target = stationName.toLowerCase();
-  const matches = currentEntries()
-    .filter(e => e.station && (target.includes(e.station.toLowerCase()) || e.station.toLowerCase().includes(target)))
-    .sort((a,b)=> new Date(b.date)-new Date(a.date));
-  return matches[0] || null;
+function readJsonCache(key){ try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null} }
+function writeJsonCache(key,value){ try{localStorage.setItem(key,JSON.stringify(value))}catch{} }
+function getCachedLocation(maxAgeMs=6*60*60*1000){
+  const x=readJsonCache(LOCATION_CACHE_KEY); return x&&Date.now()-x.savedAt<maxAgeMs?x:null;
 }
-$('homeStationRefresh').addEventListener('click', ()=>{
-  const content = $('homeStationContent');
-  content.innerHTML = '<span class="spin">⏳</span> กำลังค้นหา...';
-  if(!navigator.geolocation){
-    content.innerHTML = '<span style="color:var(--red);">อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง</span>';
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(async (pos)=>{
-    const {latitude, longitude} = pos.coords;
+function getPositionSmart(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation) return reject(new Error('อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง'));
+    const cached=getCachedLocation();
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const out={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy,savedAt:Date.now()};
+      writeJsonCache(LOCATION_CACHE_KEY,out); resolve(out);
+    },err=>{ if(cached) resolve(cached); else reject(err); },{enableHighAccuracy:false,maximumAge:10*60*1000,timeout:12000});
+  });
+}
+async function queryNearbyStations(latitude,longitude,radius=6000){
+  const q=`[out:json][timeout:18];(node["amenity"="fuel"](around:${radius},${latitude},${longitude});way["amenity"="fuel"](around:${radius},${latitude},${longitude});relation["amenity"="fuel"](around:${radius},${latitude},${longitude}););out center tags 35;`;
+  const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+  let lastError;
+  for(const url of endpoints){
     try{
-      const query = `[out:json][timeout:15];node["amenity"="fuel"](around:5000,${latitude},${longitude});out body 20;`;
-      const res = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:query});
-      const data = await res.json();
-      const list = (data.elements||[]).map(el=>{
-        const name = el.tags?.name || el.tags?.brand || 'ปั๊มน้ำมัน (ไม่ระบุชื่อ)';
-        const dist = haversine(latitude, longitude, el.lat, el.lon);
-        return { name, dist };
-      }).sort((a,b)=>a.dist-b.dist).slice(0,8);
-      if(!list.length){
-        content.innerHTML = '<span style="color:var(--red);">ไม่พบปั๊มน้ำมันในรัศมี 5 กม.</span>';
-        return;
-      }
-      content.innerHTML = list.map(s=>{
-        const last = findLastPriceForStation(s.name);
-        return `
-          <div class="home-station-item">
-            <div>
-              <div class="home-station-name">${s.name}</div>
-              ${last ? `<div class="home-station-price">฿${fmt(last.pricePerLiter,2)}/ล. เมื่อคุณเติมล่าสุด (${last.date})</div>` : ''}
-            </div>
-            <div class="home-station-dist num">${fmt(s.dist,1)} กม.</div>
-          </div>`;
-      }).join('');
-    }catch(e){
-      content.innerHTML = '<span style="color:var(--red);">ดึงข้อมูลปั๊มไม่สำเร็จ ลองใหม่อีกครั้ง</span>';
-    }
-  }, ()=>{
-    content.innerHTML = '<span style="color:var(--red);">ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง</span>';
-  }, {enableHighAccuracy:true, timeout:10000});
-});
-
-$('todayPriceRefresh').addEventListener('click', async ()=>{
-  const content = $('todayPriceContent');
-  content.innerHTML = '<span class="spin">⏳</span> กำลังโหลด...';
-  try{
-    const res = await fetch('https://api.chnwt.dev/thai-oil-api/latest');
-    const data = await res.json();
-    if(data.status !== 'success' || !data.response) throw new Error('no data');
-    const r = data.response;
-    const brands = [
-      { key:'ptt', label:'ปตท.' }, { key:'bcp', label:'บางจาก' }, { key:'shell', label:'เชลล์' },
-      { key:'esso', label:'เอสโซ่' }, { key:'caltex', label:'คาลเท็กซ์' }, { key:'pt', label:'พีที' },
-      { key:'susco', label:'ซัสโก้' },
-    ];
-    const fuelKeys = [
-      { key:'gasohol_95', label:'95' },
-      { key:'gasohol_91', label:'91' },
-      { key:'diesel_b7', label:'ดีเซล B7' },
-    ];
-    let rows = brands.map(b=>{
-      const st = r.stations && r.stations[b.key];
-      if(!st) return '';
-      const priceStr = fuelKeys.map(f=> st[f.key] ? `${f.label} ฿${st[f.key].price}` : null).filter(Boolean).join(' · ');
-      if(!priceStr) return '';
-      return `<div class="home-station-item"><div class="home-station-name">${b.label}</div><div class="home-station-dist num" style="text-align:right;">${priceStr}</div></div>`;
-    }).filter(Boolean).join('');
-    if(!rows){ throw new Error('empty'); }
-    content.innerHTML = `<div style="font-size:10.5px;color:var(--muted);margin-bottom:6px;">อัปเดตล่าสุด: ${r.date || '—'}</div>` + rows;
-  }catch(e){
-    content.innerHTML = '<span style="color:var(--red);">โหลดราคาไม่สำเร็จตอนนี้ (แหล่งข้อมูลอาจไม่พร้อมใช้งานชั่วคราว)</span><br><a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--teal);">เปิดดูที่ gasprice.kapook.com แทน</a>';
+      const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),20000);
+      const res=await fetch(url,{method:'POST',body:q,signal:ctrl.signal,headers:{'Content-Type':'text/plain;charset=UTF-8'}}); clearTimeout(timer);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      const seen=new Set();
+      const list=(data.elements||[]).map(el=>{
+        const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon;
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)) return null;
+        const tags=el.tags||{}; const name=(tags.name||tags['name:th']||tags.brand||tags.operator||'ปั๊มน้ำมัน (ไม่ระบุชื่อ)').trim();
+        const brand=(tags.brand||tags.operator||'').trim(); const key=(name+'|'+lat.toFixed(4)+'|'+lon.toFixed(4)).toLowerCase();
+        if(seen.has(key)) return null; seen.add(key);
+        return {name,brand,lat,lon,dist:haversine(latitude,longitude,lat,lon)};
+      }).filter(Boolean).sort((a,b)=>a.dist-b.dist).slice(0,12);
+      if(list.length){ writeJsonCache(STATION_CACHE_KEY,{savedAt:Date.now(),latitude,longitude,list}); return list; }
+    }catch(e){ lastError=e; }
   }
-});
+  throw lastError||new Error('ไม่พบปั๊ม');
+}
+function findLastPriceForStation(stationName){
+  const clean=x=>String(x||'').toLowerCase().replace(/ปั๊ม|station|service|สาขา|\s+/g,' ').trim();
+  const target=clean(stationName); const words=target.split(' ').filter(x=>x.length>1);
+  return currentEntries().filter(e=>{
+    const n=clean(e.station); return n&&(n.includes(target)||target.includes(n)||words.some(w=>n.includes(w)));
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date))[0]||null;
+}
+function renderHomeStations(list,content){
+  if(!list.length){content.innerHTML='<span style="color:var(--red);">ไม่พบปั๊มน้ำมันในบริเวณใกล้เคียง</span>';return;}
+  content.innerHTML=list.map(s=>{const last=findLastPriceForStation(s.name);return `<button class="home-station-item" data-station="${esc(s.name)}" style="width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer"><div><div class="home-station-name">${esc(s.name)}</div>${last?`<div class="home-station-price">฿${fmt(last.pricePerLiter,2)}/ล. เมื่อคุณเติมล่าสุด (${esc(last.date)})</div>`:(s.brand?`<div class="home-station-price">${esc(s.brand)}</div>`:'')}</div><div class="home-station-dist num">${fmt(s.dist,1)} กม.</div></button>`}).join('');
+  content.querySelectorAll('[data-station]').forEach(b=>b.onclick=()=>{ $('f_station').value=b.dataset.station; });
+}
+async function loadNearbyStations({target='home',force=false,showPermissionError=true}={}){
+  if(nearbyLookupRunning) return; nearbyLookupRunning=true;
+  const content=target==='form'?$('nearbyContent'):$('homeStationContent');
+  if(target==='form') $('nearbyBox').style.display='';
+  content.innerHTML='<span class="spin">⏳</span> กำลังค้นหาปั๊มใกล้เคียง...';
+  try{
+    const pos=await getPositionSmart();
+    let list; const cache=readJsonCache(STATION_CACHE_KEY);
+    const moved=cache?haversine(pos.latitude,pos.longitude,cache.latitude,cache.longitude):999;
+    if(!force&&cache&&Date.now()-cache.savedAt<3*60*60*1000&&moved<2) list=cache.list; else list=await queryNearbyStations(pos.latitude,pos.longitude,target==='form'?5000:7000);
+    if(target==='form'){
+      content.innerHTML=list.map(s=>`<button class="nearby-item" data-name="${esc(s.name)}"><span>${esc(s.name)}</span><span class="num" style="color:var(--muted);font-size:11.5px;">${fmt(s.dist,1)} กม.</span></button>`).join('');
+      content.querySelectorAll('.nearby-item').forEach(btn=>btn.onclick=()=>{$('f_station').value=btn.dataset.name;$('nearbyBox').style.display='none'});
+    }else renderHomeStations(list,content);
+  }catch(e){
+    const denied=e&&e.code===1; content.innerHTML=denied&&!showPermissionError?'แตะ “ค้นหา” เพื่ออนุญาตตำแหน่งและดูปั๊มใกล้ตัว':`<span style="color:var(--red);">${denied?'กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้เคียง':'ค้นหาปั๊มไม่สำเร็จ กรุณาลองใหม่'}</span>`;
+  }finally{nearbyLookupRunning=false;}
+}
+$('nearbyBtn').addEventListener('click',()=>loadNearbyStations({target:'form',force:true}));
+$('closeNearby').addEventListener('click',()=>$('nearbyBox').style.display='none');
+$('homeStationRefresh').addEventListener('click',()=>loadNearbyStations({target:'home',force:true}));
 
+function priceNumber(v){
+  if(v==null) return null;
+  if(typeof v==='object') v=v.price??v.value??v.amount??v.current??null;
+  const n=Number(String(v??'').replace(/[^0-9.\-]/g,'')); return Number.isFinite(n)&&n>0?n:null;
+}
+function normalizeOilPayload(data){
+  const root=data?.response??data?.data??data?.result??data;
+  const stations=root?.stations??root?.station??root?.prices??{};
+  const date=root?.date??root?.updated_at??root?.updatedAt??root?.last_update??data?.date??null;
+  return {stations,date,note:root?.note||''};
+}
+function displayOilPrices(payload,fromCache=false){
+  const content=$('todayPriceContent'), r=normalizeOilPayload(payload);
+  const brands=[['ptt','ปตท.'],['bcp','บางจาก'],['shell','เชลล์'],['esso','เอสโซ่'],['caltex','คาลเท็กซ์'],['pt','พีที'],['susco','ซัสโก้'],['pure','เพียว']];
+  const fuels=[['gasohol_95','95'],['gasohol_91','91'],['gasohol_e20','E20'],['diesel_b7','ดีเซล B7'],['diesel','ดีเซล']];
+  const rows=brands.map(([key,label])=>{
+    const st=r.stations?.[key]??r.stations?.[key.toUpperCase()]; if(!st)return '';
+    const shown=[]; const used=new Set();
+    for(const [fk,fl] of fuels){const p=priceNumber(st?.[fk]);if(p&&!used.has(fl)){shown.push(`${fl} ฿${fmt(p,2)}`);used.add(fl)}}
+    return shown.length?`<div class="home-station-item"><div class="home-station-name">${label}</div><div class="home-station-dist num" style="text-align:right;">${shown.slice(0,3).join(' · ')}</div></div>`:'';
+  }).filter(Boolean).join('');
+  if(!rows) throw new Error('รูปแบบข้อมูลราคาไม่รองรับ');
+  let updated='ไม่ระบุเวลา'; if(r.date){try{updated=new Date(r.date).toString()==='Invalid Date'?String(r.date):new Date(r.date).toLocaleString('th-TH')}catch{updated=String(r.date)}}
+  content.innerHTML=`<div style="font-size:10.5px;color:var(--muted);margin-bottom:6px;">อัปเดตล่าสุด: ${esc(updated)}${fromCache?' · ข้อมูลล่าสุดที่บันทึกไว้':''}</div>${rows}`;
+}
+async function loadTodayPrices(force=false){
+  const content=$('todayPriceContent'); content.innerHTML='<span class="spin">⏳</span> กำลังโหลด...';
+  const cache=readJsonCache(PRICE_CACHE_KEY);
+  if(!force&&cache&&Date.now()-cache.savedAt<60*60*1000){try{return displayOilPrices(cache.data,true)}catch{}}
+  try{
+    const res=await fetch('https://api.chnwt.dev/thai-oil-api/latest',{cache:'no-store'}); if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json(); displayOilPrices(data,false); writeJsonCache(PRICE_CACHE_KEY,{savedAt:Date.now(),data});
+  }catch(e){
+    if(cache?.data){try{return displayOilPrices(cache.data,true)}catch{}}
+    content.innerHTML='<span style="color:var(--red);">โหลดราคาไม่สำเร็จ หรือผู้ให้บริการเปลี่ยนรูปแบบข้อมูล</span><br><a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--teal);">เปิดดูราคาจากแหล่งข้อมูลโดยตรง</a>';
+  }
+}
+$('todayPriceRefresh').addEventListener('click',()=>loadTodayPrices(true));
+
+async function autoLoadLocationFeatures(){
+  loadTodayPrices(false);
+  try{
+    if(navigator.permissions){const p=await navigator.permissions.query({name:'geolocation'});if(p.state==='granted')loadNearbyStations({target:'home',force:false,showPermissionError:false});else if(p.state==='prompt')loadNearbyStations({target:'home',force:false,showPermissionError:false});}
+    else loadNearbyStations({target:'home',force:false,showPermissionError:false});
+  }catch{ loadNearbyStations({target:'home',force:false,showPermissionError:false}); }
+}
 
 
 // Receipt scan
@@ -2081,6 +2086,7 @@ if('serviceWorker' in navigator){
 }
 
 render();
+window.addEventListener('load',()=>setTimeout(autoLoadLocationFeatures,500));
 </script>
 </body>
 </html>

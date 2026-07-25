@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>FuelLog Pro — Full Function</title>
+<title>FuelLog Pro v3.2 — Full Function+</title>
 <meta name="theme-color" content="#14171C" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -147,6 +147,15 @@
   #backupBanner{position:sticky;top:0;z-index:40;backdrop-filter:blur(15px);background:rgba(58,47,26,.92)!important}
   @media(min-width:720px){.modal{border-radius:24px!important;margin:auto;max-height:88vh}.modal-overlay{align-items:center!important}.settings-link{right:calc((100vw - 900px)/2 + 18px)}}
 
+
+  /* v3.2 additive upgrade */
+  .tool-card{margin:0 20px 12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .tool-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.tool-title{font-size:13px;font-weight:700}.tool-note{font-size:11px;color:var(--muted)}
+  .search-row{display:grid;grid-template-columns:1fr auto;gap:8px}.search-input,.compact-select{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:13px;min-width:0}
+  .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.insight{background:var(--surface2);border-radius:11px;padding:10px;font-size:11.5px;line-height:1.45}.insight b{display:block;font-size:13px;margin-bottom:2px}
+  .reminder-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.reminder-item:last-child{border-bottom:0}.reminder-status{font-size:10px;border-radius:20px;padding:3px 7px;background:var(--surface2)}.reminder-status.due{color:#ffd18a;background:rgba(242,169,59,.12)}.reminder-status.overdue{color:#ff9b8a;background:rgba(224,101,79,.14)}.reminder-status.ok{color:#75d4b5;background:rgba(61,174,140,.12)}
+  .mini-btn{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:9px;padding:7px 9px;font-size:11.5px;cursor:pointer}.danger-text{color:var(--red)}
+  body.light{--bg:#F4F5F7;--surface:#FFFFFF;--surface2:#F0F2F5;--text:#1B1E23;--muted:#69707D;--line:#DDE1E7}
 </style>
 </head>
 <body>
@@ -229,6 +238,17 @@
   </div>
   <div id="todayPriceContent" style="font-size:12px;color:var(--muted);">แตะ "โหลดราคา" เพื่อดูราคาน้ำมันวันนี้จากปั๊มหลักทั่วประเทศ (ข้อมูลจาก gasprice.kapook.com)</div>
 </div>
+
+
+<div class="tool-card" id="insightCard">
+  <div class="tool-head"><div><div class="tool-title">✨ วิเคราะห์อัตโนมัติ</div><div class="tool-note">คำนวณจากข้อมูลของรถที่เลือก</div></div><button class="mini-btn" id="remindersBtn">🔧 เตือนบำรุง</button></div>
+  <div class="insight-grid" id="insightGrid"></div>
+</div>
+<div class="tool-card">
+  <div class="tool-head"><div class="tool-title">🔎 ค้นหาและกรอง</div><div class="tool-note" id="filterResultLabel"></div></div>
+  <div class="search-row"><input class="search-input" id="historySearch" placeholder="ปั๊ม, หมายเหตุ, เชื้อเพลิง, รายการซ่อม..."><select class="compact-select" id="historyPeriod"><option value="all">ทั้งหมด</option><option value="month">เดือนนี้</option><option value="year">ปีนี้</option><option value="12m">12 เดือน</option></select></div>
+</div>
+<div class="tool-card" id="reminderSummaryCard" style="display:none;"><div class="tool-head"><div class="tool-title">🔧 งานบำรุงรักษา</div><button class="mini-btn" id="addReminderQuick">＋ เพิ่ม</button></div><div id="reminderSummary"></div></div>
 
 <div class="actions-row">
   <button class="action-btn primary" id="addBtn">➕ เพิ่มรายการ</button>
@@ -355,6 +375,15 @@
   </div>
 </div>
 
+
+<!-- Maintenance reminders modal -->
+<div class="modal-overlay" id="remindersOverlay" style="display:none;"><div class="modal">
+ <div class="modal-head"><div class="modal-title">งานบำรุงรักษาและวันหมดอายุ</div><button class="close-btn" id="closeReminders">✕</button></div>
+ <div id="reminderListBox"></div><div style="height:1px;background:var(--line);margin:14px 0"></div>
+ <div class="form-grid"><div class="field" style="grid-column:1/-1"><label>รายการ</label><input id="r_title" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง"></div><div class="field"><label>ครบกำหนดเลขไมล์</label><input type="number" id="r_odo" placeholder="เช่น 170000"></div><div class="field"><label>ครบกำหนดวันที่</label><input type="date" id="r_date"></div><div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><input id="r_note" placeholder="เช่น ทุก 10,000 กม."></div></div>
+ <div class="save-row"><button class="save-btn" id="saveReminderBtn">เพิ่มรายการเตือน</button></div>
+</div></div>
+
 <!-- Settings modal -->
 <div class="modal-overlay" id="settingsOverlay" style="display:none;">
   <div class="modal">
@@ -392,6 +421,10 @@
       <input type="checkbox" id="backupPhotosToggle"> รวมรูปภาพในการสำรองอัตโนมัติ (ไฟล์ใหญ่/ช้าลงถ้ามีรูปเยอะ)
     </label>
 
+
+    <div style="height:1px;background:var(--line);margin:18px 0;"></div>
+    <div class="field"><label>ธีม</label><select id="themeSelect" style="width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;color:var(--text);"><option value="dark">มืด</option><option value="light">สว่าง</option><option value="system">ตามระบบ</option></select></div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="action-btn" id="createSnapshotBtn">🛡️ สร้างจุดคืนค่า</button><button class="action-btn" id="restoreSnapshotBtn">↩️ คืนค่าล่าสุด</button></div>
     <div class="save-row"><button class="save-btn" id="saveSettingsBtn">บันทึก</button></div>
   </div>
 </div>
@@ -415,6 +448,20 @@
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d=2) => (n===null||n===undefined||isNaN(n)) ? "—" : Number(n).toLocaleString('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d});
 
+const esc = (v='') => String(v).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+let historyQuery = '', historyPeriod = 'all';
+let reminders = JSON.parse(localStorage.getItem('fuel-reminders') || '[]');
+function persistReminders(){ localStorage.setItem('fuel-reminders', JSON.stringify(reminders)); renderReminderSummary(); }
+function latestOdo(){ const a=currentEntries().map(e=>Number(e.odometer)||0); const b=currentCosts().map(c=>Number(c.odometer)||0); return Math.max(0,...a,...b); }
+function createSnapshot(silent=false){
+ const snaps=JSON.parse(localStorage.getItem('fuel-local-snapshots')||'[]'); snaps.unshift({createdAt:new Date().toISOString(),entries,costs,vehicles,reminders,currentVehicleId}); localStorage.setItem('fuel-local-snapshots',JSON.stringify(snaps.slice(0,5))); if(!silent) alert('สร้างจุดคืนค่าในเครื่องแล้ว');
+}
+function restoreLatestSnapshot(){ const snaps=JSON.parse(localStorage.getItem('fuel-local-snapshots')||'[]'); if(!snaps.length)return alert('ยังไม่มีจุดคืนค่า'); if(!confirm('คืนค่าข้อมูลจากจุดล่าสุด? ข้อมูลปัจจุบันจะถูกแทนที่'))return; const x=snaps[0]; entries=x.entries||[];costs=x.costs||[];vehicles=x.vehicles||vehicles;reminders=x.reminders||[];currentVehicleId=x.currentVehicleId||vehicles[0].id;localStorage.setItem('fuel-entries',JSON.stringify(entries));localStorage.setItem('fuel-costs',JSON.stringify(costs));localStorage.setItem('fuel-vehicles',JSON.stringify(vehicles));persistReminders();render();alert('คืนค่าข้อมูลแล้ว'); }
+function applyTheme(){ const mode=localStorage.getItem('fuel-theme')||'dark'; const light=mode==='light'||(mode==='system'&&matchMedia('(prefers-color-scheme: light)').matches); document.body.classList.toggle('light',light); }
+function inSelectedPeriod(date){ if(historyPeriod==='all'||!date)return true; const d=new Date(date),n=new Date(); if(historyPeriod==='month')return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth(); if(historyPeriod==='year')return d.getFullYear()===n.getFullYear(); if(historyPeriod==='12m'){const x=new Date();x.setMonth(x.getMonth()-12);return d>=x;} return true; }
+function matchesHistory(o){ const q=historyQuery.trim().toLowerCase(); if(!inSelectedPeriod(o.date))return false; if(!q)return true; return [o.station,o.note,o.fuelType,o.title,o.category,o.date,o.odometer].some(v=>String(v||'').toLowerCase().includes(q)); }
+
+
 let entries = JSON.parse(localStorage.getItem('fuel-entries') || '[]');
 let costs = JSON.parse(localStorage.getItem('fuel-costs') || '[]');
 let vehicles = JSON.parse(localStorage.getItem('fuel-vehicles') || 'null');
@@ -436,6 +483,7 @@ function currentCosts(){ return costs.filter(c => c.vehicleId === currentVehicle
 
 function persistVehicles(){ localStorage.setItem('fuel-vehicles', JSON.stringify(vehicles)); }
 function persistCosts(){
+  createSnapshot(true);
   localStorage.setItem('fuel-costs', JSON.stringify(costs));
   render();
   if(typeof isDriveConnectedThisSession==='function' && isDriveConnectedThisSession()){ uploadToDrive(); }
@@ -538,6 +586,7 @@ $('addVehicleBtn').addEventListener('click', ()=>{
 });
 
 function persist(){
+  createSnapshot(true);
   localStorage.setItem('fuel-entries', JSON.stringify(entries));
   render();
   if(typeof isDriveConnectedThisSession==='function' && isDriveConnectedThisSession()){ uploadToDrive(); }
@@ -567,6 +616,9 @@ function render(){
   renderVehicles();
   const vEntries = currentEntries();
   const vCosts = currentCosts();
+
+  renderInsights(vEntries,vCosts);
+  renderReminderSummary();
   $('countLabel').textContent = currentView==='fuel' ? (vEntries.length + ' รายการบันทึก') : (vCosts.length + ' รายการค่าใช้จ่าย');
 
   // toggle view sections
@@ -667,14 +719,14 @@ function render(){
   if(vEntries.length===0){
     list.innerHTML = '<div class="empty">⛽<br><br>ยังไม่มีรายการสำหรับรถคันนี้ กดเพิ่มรายการเพื่อเริ่มบันทึก</div>';
   } else {
-    const rows = [...vEntries].sort((a,b)=> new Date(b.date)-new Date(a.date) || b.odometer-a.odometer);
+    const rows = [...vEntries].filter(matchesHistory).sort((a,b)=> new Date(b.date)-new Date(a.date) || b.odometer-a.odometer);
     list.innerHTML = rows.map(e=>`
       <div class="entry" data-id="${e.id}">
         <div class="entry-left">
           <div class="dot" style="background:${e.full?'#3DAE8C':'#8B909C'}"></div>
           <div>
-            <div class="entry-station">${e.station || 'ไม่ระบุปั๊ม'} ${(e.hasReceiptPhoto||e.hasOdoPhoto) ? '<span class="entry-photo-badge">📷</span>' : ''}</div>
-            <div class="entry-meta num">${e.date} · ${fmt(e.odometer,0)} กม. · ${fmt(e.liters,1)} ล.${e.fuelType?(' · '+e.fuelType):''}</div>
+            <div class="entry-station">${esc(e.station || 'ไม่ระบุปั๊ม')} ${(e.hasReceiptPhoto||e.hasOdoPhoto) ? '<span class="entry-photo-badge">📷</span>' : ''}</div>
+            <div class="entry-meta num">${e.date} · ${fmt(e.odometer,0)} กม. · ${fmt(e.liters,1)} ล.${e.fuelType?(' · '+esc(e.fuelType)):''}</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -693,13 +745,13 @@ function render(){
   if(vCosts.length===0){
     costList.innerHTML = '<div class="empty">🧾<br><br>ยังไม่มีค่าใช้จ่ายอื่นๆ บันทึกไว้ (บำรุงรักษา, ประกัน, ที่จอดรถ ฯลฯ)</div>';
   } else {
-    const crows = [...vCosts].sort((a,b)=> new Date(b.date)-new Date(a.date));
+    const crows = [...vCosts].filter(matchesHistory).sort((a,b)=> new Date(b.date)-new Date(a.date));
     costList.innerHTML = crows.map(c=>`
       <div class="cost-item" data-id="${c.id}">
         <div>
-          <div class="entry-station">${c.title || c.category}</div>
+          <div class="entry-station">${esc(c.title || c.category)}</div>
           <div class="entry-meta num">${c.date}${c.odometer?(' · '+fmt(c.odometer,0)+' กม.'):''}</div>
-          <span class="cost-cat-badge">${c.category}</span>
+          <span class="cost-cat-badge">${esc(c.category)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="entry-total num">฿${fmt(c.amount,0)}</div>
@@ -712,8 +764,20 @@ function render(){
     });
   }
 
+  $('filterResultLabel').textContent = historyQuery||historyPeriod!=='all' ? `พบ ${currentView==='fuel'?document.querySelectorAll('#list .entry').length:document.querySelectorAll('#costList .cost-item').length} รายการ` : '';
   if(typeof updateDriveUI==='function') updateDriveUI();
 }
+
+
+function renderInsights(vEntries,vCosts){
+ const box=$('insightGrid'); const stats=computeStats().filter(x=>x.kml&&isFinite(x.kml)); const avg=stats.length?stats.reduce((a,b)=>a+b.kml,0)/stats.length:null; const recent=stats.slice(-3); const prev=stats.slice(-6,-3); let trend='ข้อมูลยังไม่พอ'; if(recent.length&&prev.length){const a=recent.reduce((x,y)=>x+y.kml,0)/recent.length,b=prev.reduce((x,y)=>x+y.kml,0)/prev.length,p=(a-b)/b*100;trend=p>=0?`ประหยัดขึ้น ${fmt(Math.abs(p),1)}%`:`กินน้ำมันเพิ่ม ${fmt(Math.abs(p),1)}%`;}
+ const now=new Date(),month=vEntries.filter(e=>{const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()}).reduce((a,e)=>a+(+e.total||0),0); const total=vEntries.reduce((a,e)=>a+(+e.total||0),0)+vCosts.reduce((a,c)=>a+(+c.amount||0),0); const odo=latestOdo();
+ box.innerHTML=`<div class="insight"><b>${avg?fmt(avg,1)+' กม./ลิตร':'—'}</b>ค่าเฉลี่ยการใช้น้ำมัน</div><div class="insight"><b>${trend}</b>เทียบช่วงก่อนหน้า</div><div class="insight"><b>฿${fmt(month,0)}</b>ค่าน้ำมันเดือนนี้</div><div class="insight"><b>฿${fmt(total,0)}</b>ค่าใช้จ่ายสะสม · ${fmt(odo,0)} กม.</div>`;
+}
+function reminderState(r){ const odo=latestOdo(),today=new Date();today.setHours(0,0,0,0); let overdue=false,due=false,msg=[]; if(r.dueOdo){const left=+r.dueOdo-odo;msg.push(left>=0?`อีก ${fmt(left,0)} กม.`:`เกิน ${fmt(-left,0)} กม.`);overdue|=left<0;due|=left>=0&&left<=1000;} if(r.dueDate){const days=Math.ceil((new Date(r.dueDate)-today)/86400000);msg.push(days>=0?`อีก ${days} วัน`:`เกิน ${-days} วัน`);overdue|=days<0;due|=days>=0&&days<=30;} return {cls:overdue?'overdue':due?'due':'ok',label:overdue?'เลยกำหนด':due?'ใกล้ถึง':'ปกติ',msg:msg.join(' · ')||'ยังไม่กำหนด'}; }
+function renderReminderSummary(){ const list=reminders.filter(r=>r.vehicleId===currentVehicleId); $('reminderSummaryCard').style.display=list.length?'':'none'; $('reminderSummary').innerHTML=list.slice().sort((a,b)=>{const A=reminderState(a),B=reminderState(b);return (A.cls==='overdue'?-2:A.cls==='due'?-1:0)-(B.cls==='overdue'?-2:B.cls==='due'?-1:0)}).slice(0,4).map(r=>{const st=reminderState(r);return `<div class="reminder-item"><div><div class="entry-station">${esc(r.title)}</div><div class="entry-meta">${esc(st.msg)}</div></div><span class="reminder-status ${st.cls}">${st.label}</span></div>`}).join(''); }
+function openReminders(){ $('remindersOverlay').style.display='flex'; renderReminderList(); }
+function renderReminderList(){ const list=reminders.filter(r=>r.vehicleId===currentVehicleId); $('reminderListBox').innerHTML=list.length?list.map(r=>{const st=reminderState(r);return `<div class="reminder-item"><div><div class="entry-station">${esc(r.title)}</div><div class="entry-meta">${esc(st.msg)}${r.note?' · '+esc(r.note):''}</div></div><button class="mini-btn danger-text" data-rid="${r.id}">ลบ</button></div>`}).join(''):'<div class="empty" style="padding:22px">ยังไม่มีรายการเตือน</div>'; $('reminderListBox').querySelectorAll('[data-rid]').forEach(b=>b.onclick=()=>{if(confirm('ลบรายการเตือนนี้?')){reminders=reminders.filter(r=>r.id!==b.dataset.rid);persistReminders();renderReminderList();}}); }
 
 function switchView(view){
   currentView = view;
@@ -721,6 +785,13 @@ function switchView(view){
   $('tabCosts').classList.toggle('active', view==='costs');
   render();
 }
+
+$('historySearch').addEventListener('input',e=>{historyQuery=e.target.value;render();}); $('historyPeriod').addEventListener('change',e=>{historyPeriod=e.target.value;render();});
+$('remindersBtn').onclick=openReminders;$('addReminderQuick').onclick=openReminders;$('closeReminders').onclick=()=> $('remindersOverlay').style.display='none';$('remindersOverlay').onclick=e=>{if(e.target.id==='remindersOverlay')e.currentTarget.style.display='none'};
+$('saveReminderBtn').onclick=()=>{const title=$('r_title').value.trim();if(!title)return alert('กรุณาระบุรายการ'); reminders.push({id:'r-'+Date.now(),vehicleId:currentVehicleId,title,dueOdo:+$('r_odo').value||null,dueDate:$('r_date').value||'',note:$('r_note').value.trim()}); $('r_title').value=$('r_odo').value=$('r_date').value=$('r_note').value='';persistReminders();renderReminderList();render();};
+$('createSnapshotBtn').onclick=()=>createSnapshot(false);$('restoreSnapshotBtn').onclick=restoreLatestSnapshot;
+applyTheme();
+
 $('tabFuel').addEventListener('click', ()=> switchView('fuel'));
 $('tabCosts').addEventListener('click', ()=> switchView('costs'));
 
@@ -971,6 +1042,7 @@ $('costDelBtn').addEventListener('click', ()=>{
 });
 
 $('saveBtn').addEventListener('click', ()=>{
+  const enteredOdo=Number($('f_odo').value)||0; const otherOdos=currentEntries().filter(e=>e.id!==editingId).map(e=>Number(e.odometer)||0); const maxOdo=Math.max(0,...otherOdos); if(enteredOdo&&maxOdo&&enteredOdo<maxOdo&&!confirm(`เลขไมล์ ${fmt(enteredOdo,0)} ต่ำกว่ารายการล่าสุด ${fmt(maxOdo,0)} กม. ต้องการบันทึกต่อหรือไม่?`)) return;
   const odo = parseFloat($('f_odo').value);
   const liters = parseFloat($('f_liters').value);
   const total = parseFloat($('f_total').value);
@@ -1653,6 +1725,7 @@ $('settingsBtn').addEventListener('click', ()=>{
   $('apiKeyInput').value = localStorage.getItem('anthropic-api-key') || '';
   $('gClientIdInput').value = getClientId();
   $('backupPhotosToggle').checked = localStorage.getItem('drive-backup-photos') === '1';
+  $('themeSelect').value = localStorage.getItem('fuel-theme') || 'dark';
   $('settingsOverlay').style.display='flex';
   updateDriveUI();
 });
@@ -1669,6 +1742,7 @@ $('saveSettingsBtn').addEventListener('click', ()=>{
   if(gid) localStorage.setItem('g-client-id', gid);
   else localStorage.removeItem('g-client-id');
   localStorage.setItem('drive-backup-photos', $('backupPhotosToggle').checked ? '1' : '0');
+  localStorage.setItem('fuel-theme',$('themeSelect').value); applyTheme();
   $('settingsOverlay').style.display='none';
 });
 

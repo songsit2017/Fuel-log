@@ -242,7 +242,7 @@
     <div class="home-station-title">⛽ ราคาน้ำมันวันนี้ (ทั่วประเทศ)</div>
     <button class="home-station-refresh" id="todayPriceRefresh">โหลดราคา</button>
   </div>
-  <div id="todayPriceContent" style="font-size:12px;color:var(--muted);">แตะ "โหลดราคา" เพื่อดูราคาน้ำมันวันนี้จากปั๊มหลักทั่วประเทศ (ข้อมูลจาก gasprice.kapook.com)</div>
+  <div id="todayPriceContent" style="font-size:12px;color:var(--muted);">แตะ "โหลดราคา" เพื่อดูราคาน้ำมันวันนี้จากปั๊มหลักทั่วประเทศ (ข้อมูลทางการจากบางจาก)</div>
 </div>
 
 
@@ -1677,39 +1677,54 @@ $('homeStationRefresh').addEventListener('click',()=>loadNearbyStations({target:
 
 function priceNumber(v){
   if(v==null) return null;
-  if(typeof v==='object') v=v.price??v.value??v.amount??v.current??null;
+  if(typeof v==='object') v=v.price??v.value??v.amount??v.current??v.PriceToday??null;
   const n=Number(String(v??'').replace(/[^0-9.\-]/g,'')); return Number.isFinite(n)&&n>0?n:null;
 }
-function normalizeOilPayload(data){
-  const root=data?.response??data?.data??data?.result??data;
-  const stations=root?.stations??root?.station??root?.prices??{};
-  const date=root?.date??root?.updated_at??root?.updatedAt??root?.last_update??data?.date??null;
-  return {stations,date,note:root?.note||''};
+function parseBangchakPayload(data){
+  const head=Array.isArray(data)?data[0]:data;
+  if(!head) throw new Error('ไม่พบข้อมูลราคา');
+  let list=head.OilList??head.oilList??head.list??[];
+  if(typeof list==='string') list=JSON.parse(list);
+  if(!Array.isArray(list)||!list.length) throw new Error('รูปแบบข้อมูลราคาไม่รองรับ');
+  return {
+    provider:'บางจาก (ข้อมูลทางการ)',
+    date:head.OilRemark2||`${head.OilPriceDate||head.OilDateNow||''} ${head.OilPriceTime||''}`.trim(),
+    items:list.map(x=>({
+      name:x.OilName||x.name||'เชื้อเพลิง',
+      today:priceNumber(x.PriceToday??x.today??x.price),
+      tomorrow:priceNumber(x.PriceTomorrow??x.tomorrow),
+      diff:Number(x.PriceDifTomorrow??x.diff??0)||0
+    })).filter(x=>x.today)
+  };
 }
-function displayOilPrices(payload,fromCache=false){
-  const content=$('todayPriceContent'), r=normalizeOilPayload(payload);
-  const brands=[['ptt','ปตท.'],['bcp','บางจาก'],['shell','เชลล์'],['esso','เอสโซ่'],['caltex','คาลเท็กซ์'],['pt','พีที'],['susco','ซัสโก้'],['pure','เพียว']];
-  const fuels=[['gasohol_95','95'],['gasohol_91','91'],['gasohol_e20','E20'],['diesel_b7','ดีเซล B7'],['diesel','ดีเซล']];
-  const rows=brands.map(([key,label])=>{
-    const st=r.stations?.[key]??r.stations?.[key.toUpperCase()]; if(!st)return '';
-    const shown=[]; const used=new Set();
-    for(const [fk,fl] of fuels){const p=priceNumber(st?.[fk]);if(p&&!used.has(fl)){shown.push(`${fl} ฿${fmt(p,2)}`);used.add(fl)}}
-    return shown.length?`<div class="home-station-item"><div class="home-station-name">${label}</div><div class="home-station-dist num" style="text-align:right;">${shown.slice(0,3).join(' · ')}</div></div>`:'';
-  }).filter(Boolean).join('');
-  if(!rows) throw new Error('รูปแบบข้อมูลราคาไม่รองรับ');
-  let updated='ไม่ระบุเวลา'; if(r.date){try{updated=new Date(r.date).toString()==='Invalid Date'?String(r.date):new Date(r.date).toLocaleString('th-TH')}catch{updated=String(r.date)}}
-  content.innerHTML=`<div style="font-size:10.5px;color:var(--muted);margin-bottom:6px;">อัปเดตล่าสุด: ${esc(updated)}${fromCache?' · ข้อมูลล่าสุดที่บันทึกไว้':''}</div>${rows}`;
+function displayBangchakPrices(data,fromCache=false){
+  const content=$('todayPriceContent');
+  const r=parseBangchakPayload(data);
+  const preferred=['แก๊สโซฮอล์ 95','แก๊สโซฮอล์ 91','E20','E85','ดีเซล B20','ไฮดีเซล','พรีเมียม'];
+  const rank=n=>{const i=preferred.findIndex(k=>n.includes(k));return i<0?99:i};
+  const rows=r.items.slice().sort((a,b)=>rank(a.name)-rank(b.name)).map(x=>{
+    const tomorrow=x.tomorrow&&Math.abs(x.tomorrow-x.today)>0.001
+      ? `<span style="font-size:10px;color:${x.tomorrow>x.today?'var(--red)':'var(--teal)'};"> → พรุ่งนี้ ฿${fmt(x.tomorrow,2)}</span>`:'';
+    return `<div class="home-station-item"><div class="home-station-name" style="font-size:12px;">${esc(x.name)}</div><div class="home-station-dist num" style="text-align:right;white-space:nowrap;">฿${fmt(x.today,2)}${tomorrow}</div></div>`;
+  }).join('');
+  content.innerHTML=`<div style="font-size:10.5px;color:var(--muted);margin-bottom:6px;">${esc(r.provider)} · ${esc(r.date||'อัปเดตล่าสุด')}${fromCache?' · ข้อมูลที่บันทึกไว้':''}<br>ราคาขายปลีก กทม. อาจยังไม่รวมภาษีบำรุงท้องถิ่น</div>${rows}`;
+}
+async function fetchJsonWithTimeout(url,ms=15000){
+  const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),ms);
+  try{const res=await fetch(url,{cache:'no-store',signal:ctrl.signal});if(!res.ok)throw new Error('HTTP '+res.status);return await res.json();}
+  finally{clearTimeout(timer)}
 }
 async function loadTodayPrices(force=false){
-  const content=$('todayPriceContent'); content.innerHTML='<span class="spin">⏳</span> กำลังโหลด...';
+  const content=$('todayPriceContent'); content.innerHTML='<span class="spin">⏳</span> กำลังโหลดราคาจากแหล่งทางการ...';
   const cache=readJsonCache(PRICE_CACHE_KEY);
-  if(!force&&cache&&Date.now()-cache.savedAt<60*60*1000){try{return displayOilPrices(cache.data,true)}catch{}}
+  if(!force&&cache&&Date.now()-cache.savedAt<60*60*1000){try{return displayBangchakPrices(cache.data,true)}catch{}}
   try{
-    const res=await fetch('https://api.chnwt.dev/thai-oil-api/latest',{cache:'no-store'}); if(!res.ok)throw new Error('HTTP '+res.status);
-    const data=await res.json(); displayOilPrices(data,false); writeJsonCache(PRICE_CACHE_KEY,{savedAt:Date.now(),data});
+    const data=await fetchJsonWithTimeout('https://oil-price.bangchak.co.th/ApiOilPrice2/th');
+    displayBangchakPrices(data,false); writeJsonCache(PRICE_CACHE_KEY,{savedAt:Date.now(),data,source:'bangchak'});
   }catch(e){
-    if(cache?.data){try{return displayOilPrices(cache.data,true)}catch{}}
-    content.innerHTML='<span style="color:var(--red);">โหลดราคาไม่สำเร็จ หรือผู้ให้บริการเปลี่ยนรูปแบบข้อมูล</span><br><a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--teal);">เปิดดูราคาจากแหล่งข้อมูลโดยตรง</a>';
+    console.warn('official oil price failed',e);
+    if(cache?.data){try{return displayBangchakPrices(cache.data,true)}catch{}}
+    content.innerHTML='<span style="color:var(--red);">โหลดราคาอัตโนมัติไม่สำเร็จ</span><br><a href="https://oil-price.bangchak.co.th/BcpOilPrice1/th" target="_blank" rel="noopener" style="color:var(--teal);">เปิดราคาน้ำมันจากบางจากโดยตรง</a>';
   }
 }
 $('todayPriceRefresh').addEventListener('click',()=>loadTodayPrices(true));
@@ -1818,6 +1833,20 @@ let tokenClient = null;
 let accessToken = null;
 let tokenExpiry = 0;
 let isUploading = false;
+const DRIVE_TOKEN_KEY = 'fuel-drive-session-token-v1';
+function restoreDriveSessionToken(){
+  try{
+    const x=JSON.parse(sessionStorage.getItem(DRIVE_TOKEN_KEY)||'null');
+    if(x&&x.accessToken&&Number(x.expiry)>Date.now()+30000){accessToken=x.accessToken;tokenExpiry=Number(x.expiry);return true;}
+    sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+  }catch{}
+  return false;
+}
+function rememberDriveSessionToken(){
+  try{sessionStorage.setItem(DRIVE_TOKEN_KEY,JSON.stringify({accessToken,expiry:tokenExpiry}));}catch{}
+}
+function clearDriveSessionToken(){accessToken=null;tokenExpiry=0;try{sessionStorage.removeItem(DRIVE_TOKEN_KEY)}catch{}}
+restoreDriveSessionToken();
 
 function getClientId(){ return localStorage.getItem('g-client-id') || ''; }
 function isDriveConfigured(){ return !!getClientId(); }
@@ -1826,8 +1855,8 @@ function isDriveConnectedThisSession(){ return accessToken && Date.now() < token
 function updateDriveUI(){
   const status = $('driveStatus');
   if(status){
-    status.textContent = isDriveConnectedThisSession() ? '✅ เชื่อมต่อแล้ว (ใช้งานได้จนกว่าจะปิดแอป)' :
-      (isDriveConfigured() ? 'ยังไม่ได้เชื่อมต่อในเซสชันนี้' : 'ยังไม่ได้ตั้งค่า Client ID');
+    status.textContent = isDriveConnectedThisSession() ? '✅ เชื่อมต่อแล้ว (จำสถานะระหว่างเปิดแอปและรีโหลด)' :
+      (isDriveConfigured() ? 'พร้อมเชื่อมต่อ Google Drive' : 'ยังไม่ได้ตั้งค่า Client ID');
   }
   const banner = $('backupBanner');
   const lastBackup = localStorage.getItem('last-drive-backup');
@@ -1850,7 +1879,7 @@ function updateDriveUI(){
       badge.innerHTML = '☁️ ซิงค์แล้ว' + (t ? ` เมื่อ ${t}` : '');
     } else {
       badge.style.display='flex';
-      badge.innerHTML = '🔌 ยังไม่ได้เชื่อมต่อ Drive ในเซสชันนี้';
+      badge.innerHTML = '🔌 แตะหน้าแอปหรือปุ่มเชื่อมต่อเพื่อใช้ Drive';
     }
   }
 }
@@ -1870,6 +1899,7 @@ function ensureTokenClient(){
         if(resp.error){ alert('เชื่อมต่อไม่สำเร็จ: ' + resp.error); return; }
         accessToken = resp.access_token;
         tokenExpiry = Date.now() + (resp.expires_in*1000 - 60000);
+        rememberDriveSessionToken();
         localStorage.setItem('drive-was-connected', '1');
         updateDriveUI();
         if(window._driveAfterConnect){ window._driveAfterConnect(); window._driveAfterConnect=null; }
@@ -1884,13 +1914,26 @@ function connectDrive(after){
   const client = ensureTokenClient();
   if(!client) return;
   window._driveAfterConnect = after || null;
-  client.requestAccessToken({ prompt: isDriveConnectedThisSession() ? '' : 'consent' });
+  client.requestAccessToken({ prompt: localStorage.getItem('drive-was-connected')==='1' ? '' : 'consent' });
 }
+
+let driveSilentAttempted=false;
+function trySilentDriveReconnect(){
+  if(driveSilentAttempted||isDriveConnectedThisSession()||!isDriveConfigured()||localStorage.getItem('drive-was-connected')!=='1') return;
+  driveSilentAttempted=true;
+  const client=ensureTokenClient();
+  if(!client) return;
+  try{client.requestAccessToken({prompt:''});}catch(e){driveSilentAttempted=false;}
+}
+// Google requires token renewal from a user-driven event. The first tap/key press is used
+// to renew quietly when the account has already granted Drive permission.
+['pointerdown','keydown','touchstart'].forEach(type=>window.addEventListener(type,trySilentDriveReconnect,{once:true,passive:true}));
 
 async function driveFindFile(){
   const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("name='fuel-log-backup.json' and trashed=false") + '&fields=files(id,name)', {
     headers:{ Authorization: 'Bearer ' + accessToken }
   });
+  if(res.status===401){clearDriveSessionToken();updateDriveUI();throw new Error('สิทธิ์ Google หมดอายุ กรุณาแตะเชื่อมต่ออีกครั้ง');}
   const data = await res.json();
   return (data.files && data.files[0]) ? data.files[0].id : null;
 }

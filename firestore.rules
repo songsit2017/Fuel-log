@@ -1,46 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function member(vehicleId) {
-      return signedIn() && exists(/databases/$(database)/documents/vehicles/$(vehicleId)/members/$(request.auth.uid));
-    }
-    function role(vehicleId) {
-      return get(/databases/$(database)/documents/vehicles/$(vehicleId)/members/$(request.auth.uid)).data.role;
-    }
-    function editor(vehicleId) { return member(vehicleId) && role(vehicleId) in ['owner','editor']; }
-    function owner(vehicleId) { return member(vehicleId) && role(vehicleId) == 'owner'; }
-
-    match /vehicles/{vehicleId} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read: if member(vehicleId);
-      allow update, delete: if owner(vehicleId);
-
-      match /members/{uid} {
-        allow read: if member(vehicleId);
-        allow create: if signedIn() && (
-          (uid == request.auth.uid && get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.ownerId == request.auth.uid && request.resource.data.role == 'owner') ||
-          (uid == request.auth.uid && request.resource.data.inviteCode is string &&
-            exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)) &&
-            get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.vehicleId == vehicleId &&
-            get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.active == true)
-        );
-        allow update, delete: if owner(vehicleId);
+    function signedIn(){ return request.auth != null; }
+    function vehicleDoc(vehicleId){ return get(/databases/$(database)/documents/vehicles/$(vehicleId)); }
+    function isMember(vehicleId){ return signedIn() && (vehicleDoc(vehicleId).data.ownerUid == request.auth.uid || vehicleDoc(vehicleId).data.members[request.auth.uid].role in ['owner','editor','viewer']); }
+    function canEdit(vehicleId){ return signedIn() && (vehicleDoc(vehicleId).data.ownerUid == request.auth.uid || vehicleDoc(vehicleId).data.members[request.auth.uid].role in ['owner','editor']); }
+    function isOwner(vehicleId){ return signedIn() && vehicleDoc(vehicleId).data.ownerUid == request.auth.uid; }
+    match /users/{uid}{ allow read,write: if signedIn() && request.auth.uid == uid; }
+    match /vehicles/{vehicleId}{
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.members[request.auth.uid].role in ['owner','editor','viewer']);
+      allow update,delete: if isOwner(vehicleId);
+      match /{collection}/{docId}{
+        allow read: if isMember(vehicleId);
+        allow create,update: if canEdit(vehicleId);
+        allow delete: if canEdit(vehicleId);
       }
-
-      match /entries/{docId} { allow read: if member(vehicleId); allow create, update, delete: if editor(vehicleId); }
-      match /costs/{docId} { allow read: if member(vehicleId); allow create, update, delete: if editor(vehicleId); }
-      match /reminders/{docId} { allow read: if member(vehicleId); allow create, update, delete: if editor(vehicleId); }
     }
-
-    match /users/{uid}/vehicles/{vehicleId} {
-      allow read, create, update, delete: if signedIn() && request.auth.uid == uid;
-    }
-
-    match /invites/{code} {
+    match /invites/{code}{
+      allow create: if signedIn();
       allow read: if signedIn();
-      allow create: if signedIn() && owner(request.resource.data.vehicleId) && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && owner(resource.data.vehicleId);
+      allow delete: if signedIn();
+      allow update: if false;
     }
   }
 }

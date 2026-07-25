@@ -168,7 +168,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
-<script src="cloudinary-config.js" defer></script>
+<script src="drive-family-config.js" defer></script>
 </head>
 <body>
 
@@ -2126,7 +2126,7 @@ function proExcel(){
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
-<script src="cloudinary-config.js" defer></script>
+<script src="drive-family-config.js" defer></script>
 </head><body><table>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v??'')+'</td>').join('')+'</tr>').join('')+'</table>
 <script src="family-sharing.js" defer></script>
 </body></html>'; const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FuelLog-${new Date().toISOString().slice(0,10)}.xls`;a.click();URL.revokeObjectURL(a.href);
@@ -2136,12 +2136,69 @@ function printPro(){ renderPro(); const w=window.open('','_blank'); const name=(
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
 <script src="firebase-config.js" defer></script>
-<script src="cloudinary-config.js" defer></script>
+<script src="drive-family-config.js" defer></script>
 </head><body><h1>FuelLog Pro — ${esc(name)}</h1><p>สร้างเมื่อ ${new Date().toLocaleString('th-TH')}</p><div class="box">${$('proSummary').innerHTML}</div><h2>เปรียบเทียบปั๊ม</h2>${$('proStations').innerHTML}<h2>ค่าใช้จ่ายแยกหมวด</h2>${$('proCategories').innerHTML}
 <script src="family-sharing.js" defer></script>
 </body></html>`); w.document.close(); setTimeout(()=>w.print(),300);
 }
 $('proDashboardBtn').onclick=()=>{renderPro();$('proOverlay').style.display='flex'};$('closePro').onclick=()=>$('proOverlay').style.display='none';$('proOverlay').onclick=e=>{if(e.target===$('proOverlay'))$('proOverlay').style.display='none'};$('proTankCapacity').oninput=()=>{localStorage.setItem(proVehicleKey(),JSON.stringify({tankCapacity:Number($('proTankCapacity').value)||0}));renderProRange()};$('exportExcelBtn').onclick=proExcel;$('printReportBtn').onclick=printPro;
+
+
+// ---------- Family Drive bridge (private shared folders) ----------
+window.FUELLOG_DRIVE = {
+  isConfigured: () => typeof isDriveConfigured === 'function' && isDriveConfigured(),
+  isConnected: () => typeof isDriveConnectedThisSession === 'function' && isDriveConnectedThisSession(),
+  connect: () => new Promise((resolve,reject)=>{
+    try{ connectDrive(ok=>ok?resolve(true):reject(new Error('เชื่อมต่อ Drive ไม่สำเร็จ'))); }
+    catch(e){ reject(e); }
+  }),
+  async api(path, options={}){
+    if(!isDriveConnectedThisSession()) await this.connect();
+    const headers={...(options.headers||{}),Authorization:`Bearer ${accessToken}`};
+    const r=await fetch(`https://www.googleapis.com${path}`,{...options,headers});
+    if(r.status===401){ clearDriveSessionToken(); updateDriveUI(); throw new Error('สิทธิ์ Google Drive หมดอายุ กรุณาเชื่อมต่อใหม่'); }
+    if(!r.ok){ const t=await r.text(); throw new Error(`Drive HTTP ${r.status}: ${t.slice(0,180)}`); }
+    if(r.status===204) return null;
+    return r.json();
+  },
+  async findFolder(name,parentId){
+    const q=[`name='${String(name).replace(/'/g,"\\'")}'`,`mimeType='application/vnd.google-apps.folder'`,`trashed=false`];
+    if(parentId) q.push(`'${parentId}' in parents`);
+    const d=await this.api(`/drive/v3/files?q=${encodeURIComponent(q.join(' and '))}&fields=files(id,name,webViewLink)&spaces=drive`);
+    return d.files?.[0]||null;
+  },
+  async ensureFolder(name,parentId){
+    const found=await this.findFolder(name,parentId); if(found) return found;
+    return this.api('/drive/v3/files?fields=id,name,webViewLink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',...(parentId?{parents:[parentId]}:{})})});
+  },
+  async ensureVehicleFolders(vehicleId,vehicleName){
+    const c=window.FUELLOG_FAMILY_DRIVE_CONFIG||{};
+    const root=await this.ensureFolder(c.rootFolderName||'FuelLog Family');
+    const vehicle=await this.ensureFolder(`${vehicleName||'Vehicle'} [${vehicleId}]`,root.id);
+    const receipt=await this.ensureFolder(c.receiptFolderName||'Fuel Receipts',vehicle.id);
+    const odo=await this.ensureFolder(c.odometerFolderName||'Odometer Photos',vehicle.id);
+    const maintenance=await this.ensureFolder(c.maintenanceFolderName||'Maintenance',vehicle.id);
+    const documents=await this.ensureFolder(c.documentsFolderName||'Documents',vehicle.id);
+    return {rootId:root.id,vehicleId:vehicle.id,receiptId:receipt.id,odoId:odo.id,maintenanceId:maintenance.id,documentsId:documents.id};
+  },
+  async shareFolder(folderId,email,role='writer'){
+    return this.api(`/drive/v3/files/${encodeURIComponent(folderId)}/permissions?sendNotificationEmail=true&fields=id,emailAddress,role`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'user',role,emailAddress:email})});
+  },
+  async uploadBlob(folderId,name,blob,existingFileId){
+    const meta={name,parents:existingFileId?undefined:[folderId]};
+    const boundary='fuellog_'+Math.random().toString(36).slice(2);
+    const head=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${blob.type||'image/jpeg'}\r\n\r\n`;
+    const body=new Blob([head,blob,`\r\n--${boundary}--`],{type:`multipart/related; boundary=${boundary}`});
+    const path=existingFileId?`/upload/drive/v3/files/${encodeURIComponent(existingFileId)}?uploadType=multipart&fields=id,name,webViewLink,size`:'/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,size';
+    return this.api(path,{method:existingFileId?'PATCH':'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body});
+  },
+  async downloadBlob(fileId){
+    if(!isDriveConnectedThisSession()) await this.connect();
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,{headers:{Authorization:`Bearer ${accessToken}`}});
+    if(!r.ok) throw new Error(`ดาวน์โหลดรูปจาก Drive ไม่สำเร็จ (${r.status})`);
+    return r.blob();
+  }
+};
 
 // Service worker registration
 if('serviceWorker' in navigator){

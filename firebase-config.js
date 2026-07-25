@@ -1,5 +1,5 @@
-// FuelLog Pro Family Sharing — Firebase configuration
-// Replace the values below with your Firebase Web App config.
+// FuelLog Pro Family Sharing — Firebase Web App config
+// Firebase web config is not a password. Access is protected by Authentication + Firestore Rules.
 window.FUELLOG_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBkhbAr9HLXzUDvqFfiy9yPKP5DFKRavwI",
   authDomain: "fuellog-pro-f2a12.firebaseapp.com",

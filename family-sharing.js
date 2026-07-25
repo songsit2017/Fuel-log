@@ -3,8 +3,8 @@
   'use strict';
   const cfg = window.FUELLOG_FIREBASE_CONFIG || {};
   const configured = !!(cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId);
-  const cloudinaryCfg = window.FUELLOG_CLOUDINARY_CONFIG || {};
-  const cloudinaryConfigured = !!(cloudinaryCfg.cloudName && cloudinaryCfg.uploadPreset);
+  const drive = window.FUELLOG_DRIVE || null;
+  const driveConfigured = !!drive;
   let auth = null, db = null, user = null, roleByVehicle = new Map();
   let unsubscribers = [], applyingRemote = false, syncTimer = null, photoSyncTimer = null;
 
@@ -19,58 +19,57 @@
   const clean = (obj) => JSON.parse(JSON.stringify(obj, (k,v) => v === undefined ? null : v));
 
   const photoKinds = [
-    {kind:'receipt', flag:'hasReceiptPhoto', pathField:'receiptCloudinaryId', urlField:'receiptPhotoUrl', sizeField:'receiptPhotoSize'},
-    {kind:'odo', flag:'hasOdoPhoto', pathField:'odoCloudinaryId', urlField:'odoPhotoUrl', sizeField:'odoPhotoSize'}
+    {kind:'receipt', flag:'hasReceiptPhoto', pathField:'receiptDriveFileId', urlField:'receiptDriveViewLink', sizeField:'receiptPhotoSize'},
+    {kind:'odo', flag:'hasOdoPhoto', pathField:'odoDriveFileId', urlField:'odoDriveViewLink', sizeField:'odoPhotoSize'}
   ];
   const photoKey = (entryId, kind) => `${entryId}-${kind}`;
 
-  async function uploadCloudinaryImage(vehicleId, entryId, kind, blob){
-    if(!cloudinaryConfigured) throw new Error('ยังไม่ได้ตั้งค่า Cloudinary');
-    const form = new FormData();
-    form.append('file', blob, `${kind}.jpg`);
-    form.append('upload_preset', cloudinaryCfg.uploadPreset);
-    form.append('folder', `${cloudinaryCfg.folder || 'fuellog'}/${vehicleId}/${entryId}`);
-    form.append('tags', `fuellog,vehicle_${vehicleId},entry_${entryId},${kind}`);
-    const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudinaryCfg.cloudName)}/image/upload`;
-    const res = await fetch(endpoint, {method:'POST', body:form});
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok || !data.secure_url) throw new Error(data.error?.message || `Cloudinary HTTP ${res.status}`);
-    return data;
+  async function ensureDriveFolders(vehicleId){
+    const v=selectedVehicle();
+    if(!drive) throw new Error('ไม่พบระบบ Google Drive');
+    if(!drive.isConnected()) await drive.connect();
+    let folders=v?.driveFolders || null;
+    if(!folders?.vehicleId){
+      folders=await drive.ensureVehicleFolders(vehicleId,v?.name||'Vehicle');
+      if(v){ v.driveFolders=folders; persistVehicles(); }
+      await db.collection('vehicles').doc(vehicleId).set({driveFolders:folders},{merge:true});
+    }
+    return folders;
   }
 
   async function uploadEntryPhotos(vehicleId, entry){
-    if(!user || !canEdit() || !cloudinaryConfigured) return;
-    const docRef = db.collection('vehicles').doc(vehicleId).collection('entries').doc(String(entry.id));
-    const patch = {};
+    if(!user || !canEdit() || !drive) return;
+    const folders=await ensureDriveFolders(vehicleId);
+    const docRef=db.collection('vehicles').doc(vehicleId).collection('entries').doc(String(entry.id));
+    const patch={};
     for(const p of photoKinds){
       if(entry[p.flag] === false){
-        // Static GitHub Pages cannot securely call Cloudinary Destroy API because it requires an API secret.
-        // Remove the shared URL from Firestore; the old Cloudinary asset may remain as an orphan.
-        patch[p.pathField] = firebase.firestore.FieldValue.delete();
-        patch[p.urlField] = firebase.firestore.FieldValue.delete();
-        patch[p.sizeField] = firebase.firestore.FieldValue.delete();
+        patch[p.pathField]=firebase.firestore.FieldValue.delete();
+        patch[p.urlField]=firebase.firestore.FieldValue.delete();
+        patch[p.sizeField]=firebase.firestore.FieldValue.delete();
         continue;
       }
       if(!entry[p.flag]) continue;
-      const blob = await getPhotoBlob(photoKey(entry.id,p.kind)).catch(()=>null);
+      const blob=await getPhotoBlob(photoKey(entry.id,p.kind)).catch(()=>null);
       if(!blob) continue;
-      if(entry[p.sizeField] === blob.size && entry[p.urlField]) continue;
-      const uploaded = await uploadCloudinaryImage(vehicleId, entry.id, p.kind, blob);
-      patch[p.pathField] = uploaded.public_id || '';
-      patch[p.urlField] = uploaded.secure_url;
-      patch[p.sizeField] = uploaded.bytes || blob.size;
-      patch.photoUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      if(entry[p.sizeField]===blob.size && entry[p.pathField]) continue;
+      const folderId=p.kind==='receipt'?folders.receiptId:folders.odoId;
+      const uploaded=await drive.uploadBlob(folderId,`${entry.id}-${p.kind}.jpg`,blob,entry[p.pathField]||null);
+      patch[p.pathField]=uploaded.id;
+      patch[p.urlField]=uploaded.webViewLink||'';
+      patch[p.sizeField]=Number(uploaded.size)||blob.size;
+      patch.photoUpdatedAt=firebase.firestore.FieldValue.serverTimestamp();
     }
     if(Object.keys(patch).length) await docRef.set(patch,{merge:true});
   }
 
   async function syncCurrentVehiclePhotos(){
     const v=selectedVehicle();
-    if(!v?.cloudId || !user || !canEdit() || !cloudinaryConfigured) return;
-    const list = entries.filter(x=>x.vehicleId===v.id);
+    if(!v?.cloudId || !user || !canEdit() || !drive) return;
+    const list=entries.filter(x=>x.vehicleId===v.id);
     for(const entry of list){
       try{ await uploadEntryPhotos(v.cloudId,entry); }
-      catch(e){ console.warn('photo upload failed',entry.id,e); }
+      catch(e){ console.warn('Drive photo upload failed',entry.id,e); }
     }
   }
 
@@ -80,20 +79,15 @@
   }
 
   async function hydrateRemotePhotos(list){
-    if(!cloudinaryConfigured) return;
+    if(!drive) return;
     for(const entry of list){
       for(const p of photoKinds){
-        if(!entry[p.flag]) continue;
+        if(!entry[p.flag] || !entry[p.pathField]) continue;
         const key=photoKey(entry.id,p.kind);
         const local=await getPhotoBlob(key).catch(()=>null);
         if(local) continue;
-        try{
-          let url=entry[p.urlField];
-          if(!url) continue;
-          const res=await fetch(url);
-          if(!res.ok) throw new Error(`HTTP ${res.status}`);
-          await savePhotoBlob(key,await res.blob());
-        }catch(e){ console.warn('photo download failed',entry.id,p.kind,e); }
+        try{ await savePhotoBlob(key,await drive.downloadBlob(entry[p.pathField])); }
+        catch(e){ console.warn('Drive photo download failed',entry.id,p.kind,e); }
       }
     }
   }
@@ -107,7 +101,7 @@
       <div id="familyAuthBox" class="tool-card" style="margin:0 0 12px"><div class="tool-title">บัญชีผู้ใช้</div><div id="familyUser" style="font-size:12px;color:var(--muted);margin:8px 0">ยังไม่ได้เข้าสู่ระบบ</div><button class="action-btn primary" id="familyLogin">เข้าสู่ระบบด้วย Google</button><button class="action-btn" id="familyLogout" style="display:none;margin-top:8px">ออกจากระบบ</button></div>
       <div id="familyCloudTools" style="display:none">
         <div class="tool-card" style="margin:0 0 12px"><div class="tool-title">รถที่กำลังเลือก</div><div id="familyVehicleState" style="font-size:12px;color:var(--muted);margin:8px 0"></div><button class="action-btn primary" id="publishVehicle">☁️ นำรถคันนี้ขึ้น Cloud</button><button class="action-btn" id="syncVehicleNow" style="display:none;margin-top:8px">🔄 ซิงก์ตอนนี้</button></div>
-        <div class="tool-card" id="ownerShareBox" style="display:none;margin:0 0 12px"><div class="tool-title">เชิญสมาชิก</div><div style="font-size:11px;color:var(--muted);margin:6px 0 10px">สร้างรหัสแล้วส่งให้สมาชิก รหัสมีอายุ 7 วัน</div><button class="action-btn primary" id="createInvite">สร้างรหัสเชิญ</button><div id="inviteResult" style="margin-top:10px"></div><div id="memberList" style="margin-top:12px"></div></div>
+        <div class="tool-card" id="ownerShareBox" style="display:none;margin:0 0 12px"><div class="tool-title">เชิญสมาชิก</div><div style="font-size:11px;color:var(--muted);margin:6px 0 10px">ใส่ Gmail ของสมาชิก เพื่อแชร์โฟลเดอร์รูปแบบส่วนตัว แล้วสร้างรหัสเชิญ</div><input id="inviteEmail" type="email" placeholder="member@gmail.com" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);margin-bottom:8px"><button class="action-btn primary" id="createInvite">สร้างรหัสและแชร์ Drive</button><div id="inviteResult" style="margin-top:10px"></div><div id="memberList" style="margin-top:12px"></div></div>
         <div class="tool-card" style="margin:0"><div class="tool-title">เข้าร่วมรถของคนอื่น</div><div style="display:flex;gap:8px;margin-top:10px"><input id="joinCode" maxlength="10" placeholder="กรอกรหัสเชิญ" style="flex:1;text-transform:uppercase;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text)"><button class="action-btn primary" id="joinVehicle" style="flex:none">เข้าร่วม</button></div></div>
       </div>
     </div>`;
@@ -137,18 +131,18 @@
 
   function updateUI(){
     const mini = E('familyMiniStatus');
-    if(mini) mini.textContent = !configured ? 'ยังไม่ได้ตั้งค่า Firebase' : !cloudinaryConfigured ? 'Firebase พร้อมแล้ว • ยังไม่ได้ตั้งค่า Cloudinary' : user ? `เชื่อมต่อ Cloud: ${user.email}` : 'ยังไม่ได้เข้าสู่ระบบ Family Sharing';
+    if(mini) mini.textContent = !configured ? 'ยังไม่ได้ตั้งค่า Firebase' : !driveConfigured ? 'Firebase พร้อมแล้ว • ไม่พบระบบ Google Drive' : user ? `เชื่อมต่อ Cloud: ${user.email}` : 'ยังไม่ได้เข้าสู่ระบบ Family Sharing';
     if(!E('familyOverlay')) return;
-    const missing=[]; if(!configured) missing.push('Firebase'); if(!cloudinaryConfigured) missing.push('Cloudinary');
+    const missing=[]; if(!configured) missing.push('Firebase'); if(!driveConfigured) missing.push('Google Drive');
     E('familyConfigWarning').style.display = missing.length ? 'block' : 'none';
-    E('familyConfigWarning').innerHTML = missing.length ? `ยังไม่ได้ตั้งค่า <b>${missing.join(' และ ')}</b> กรุณาทำตามไฟล์ <b>FIREBASE-CLOUDINARY-SETUP-TH.md</b>` : '';
+    E('familyConfigWarning').innerHTML = missing.length ? `ยังไม่ได้ตั้งค่า <b>${missing.join(' และ ')}</b> กรุณาทำตามไฟล์ <b>FIREBASE-DRIVE-SETUP-TH.md</b>` : '';
     E('familyLogin').style.display = user ? 'none' : '';
     E('familyLogout').style.display = user ? '' : 'none';
     E('familyCloudTools').style.display = user ? '' : 'none';
     E('familyUser').innerHTML = user ? `<b>${escFS(user.displayName || user.email)}</b><br>${escFS(user.email || '')}` : 'ยังไม่ได้เข้าสู่ระบบ';
     const v = selectedVehicle();
     if(user && v){
-      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b><br><span style="font-size:11px;color:var(--muted)">📷 รูปบิลและรูปเรือนไมล์แชร์ผ่าน Cloudinary</span>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
+      E('familyVehicleState').innerHTML = isCloudVehicle(v) ? `☁️ ซิงก์ร่วมกันแล้ว • สิทธิ์ <b>${escFS(role() || 'member')}</b><br><span style="font-size:11px;color:var(--muted)">📷 รูปบิลและรูปเรือนไมล์เก็บในโฟลเดอร์ Google Drive ที่แชร์เฉพาะสมาชิก</span>` : '📱 รถคันนี้เก็บอยู่ในเครื่องเท่านั้น';
       E('publishVehicle').style.display = isCloudVehicle(v) ? 'none' : '';
       E('syncVehicleNow').style.display = isCloudVehicle(v) && canEdit() ? '' : 'none';
       E('ownerShareBox').style.display = isCloudVehicle(v) && canManage() ? '' : 'none';
@@ -204,6 +198,8 @@
     batch.set(db.collection('users').doc(user.uid).collection('vehicles').doc(vid), {vehicleId:vid,role:'owner',name:v.name,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     await batch.commit();
     v.cloudId=vid; v.cloudRole='owner'; roleByVehicle.set(vid,'owner'); persistVehicles();
+    try{ v.driveFolders=await ensureDriveFolders(vid); persistVehicles(); }
+    catch(e){ console.warn('ยังสร้างโฟลเดอร์ Drive ไม่สำเร็จ',e); }
     await syncCurrentVehicle(true); subscribeCurrentCloudVehicle(); render(); updateUI(); toastFS('เปิด Family Sharing แล้ว');
   }
 
@@ -255,9 +251,14 @@
 
   async function createInvite(){
     const v=selectedVehicle(); if(!user || !v?.cloudId || !canManage()) return;
+    const email=(E('inviteEmail')?.value||'').trim().toLowerCase();
+    if(!email || !email.includes('@')) return alert('กรุณาใส่ Gmail ของสมาชิก');
+    if(!drive?.isConnected()) await drive.connect();
+    const folders=await ensureDriveFolders(v.cloudId);
+    await drive.shareFolder(folders.vehicleId,email,'writer');
     const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code=''; for(let i=0;i<8;i++) code+=chars[Math.floor(Math.random()*chars.length)];
     const expiresAt=firebase.firestore.Timestamp.fromDate(new Date(Date.now()+7*864e5));
-    await db.collection('invites').doc(code).set({code,vehicleId:v.cloudId,vehicleName:v.name,ownerId:user.uid,role:'editor',active:true,expiresAt,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await db.collection('invites').doc(code).set({code,vehicleId:v.cloudId,vehicleName:v.name,ownerId:user.uid,role:'editor',inviteEmail:email,driveFolders:folders,active:true,expiresAt,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     E('inviteResult').innerHTML=`<div class="invite-code">${code}</div><button class="action-btn" id="copyInvite" style="width:100%;margin-top:8px">คัดลอกรหัส</button>`;
     E('copyInvite').onclick=async()=>{await navigator.clipboard.writeText(code);toastFS('คัดลอกรหัสแล้ว')};
   }

@@ -1,4 +1,4 @@
-const VERSION = '7.8.3';
+const VERSION = '7.8.5';
 const CACHE = `fuellog-main-v${VERSION}`;
 const CORE = [
   './', './index.html', `./styles.css?v=${VERSION}`, `./app.js?v=${VERSION}`,

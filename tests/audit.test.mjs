@@ -12,6 +12,8 @@ const androidWorkflow = await readFile(new URL('../.github/workflows/build-andro
 const androidConfigScript = await readFile(new URL('../mobile/scripts/configure-android.mjs', import.meta.url), 'utf8');
 const mobilePackage = await readFile(new URL('../mobile/package.json', import.meta.url), 'utf8');
 const capacitorConfig = await readFile(new URL('../mobile/capacitor.config.json', import.meta.url), 'utf8');
+const nativeVehiclesViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/vehicles/VehiclesViewModel.kt', import.meta.url), 'utf8');
+const nativeVehicleRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/VehicleRepository.kt', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -27,7 +29,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  assert.match(sw, /const VERSION = '7\.8\.3'/);
+  assert.match(sw, /const VERSION = '7\.8\.5'/);
   for (const asset of ['styles.css','app.js','firebase-config.js'])
     assert.ok(sw.includes('`./'+asset+'?v=${VERSION}`'),`missing versioned cached ${asset}`);
 });
@@ -128,7 +130,7 @@ test('generic fuel pump icon is a consistent vector rather than a colorful emoji
 });
 
 test('Android installed PWA actively replaces stale application caches', () => {
-  assert.match(sw, /const VERSION = '7\.8\.3'/);
+  assert.match(sw, /const VERSION = '7\.8\.5'/);
   assert.match(sw, /cache:'reload'/);
   assert.match(sw, /cache:'no-store'/);
   assert.match(sw, /self\.skipWaiting\(\)/);
@@ -161,6 +163,28 @@ test('Android APK uses native Google authentication without a browser redirect',
   assert.match(androidWorkflow, /FIREBASE_ANDROID_CONFIG_BASE64/);
   assert.match(androidWorkflow, /android\/app\/google-services\.json/);
   assert.match(androidWorkflow, /SHA1:\|SHA256:/);
+});
+
+test('vehicle sync discovers Cloud vehicles before creating or uploading a local placeholder', () => {
+  assert.match(app, /async function discoverCloudVehicles\(\)/);
+  assert.match(app, /where\('ownerUid','==',user\.uid\)/);
+  assert.match(app, /await pullVehicleById\(cloudVehicle\.id\)/);
+  assert.match(app, /if\(cloudVehicles\.length\)/);
+  assert.match(app, /memberUids:\[user\.uid\]/);
+});
+
+test('first Google session restores Cloud vehicles automatically', () => {
+  assert.match(app, /await autoRestoreCloudVehicles\(\)/);
+  assert.match(app, /const autoRestoredUsers = new Set\(\)/);
+  assert.match(app, /await restoreDiscoveredCloudVehicles\(cloudVehicles\)/);
+});
+
+test('parallel Kotlin migration starts with repository and ViewModel boundaries', () => {
+  assert.match(nativeVehicleRepository, /interface VehicleRepository/);
+  assert.match(nativeVehicleRepository, /suspend fun restoreOwnedVehicles/);
+  assert.match(nativeVehiclesViewModel, /class VehiclesViewModel/);
+  assert.match(nativeVehiclesViewModel, /fun onSignedIn\(uid: String\)/);
+  assert.match(nativeVehiclesViewModel, /StateFlow<VehiclesUiState>/);
 });
 
 test('home has one vehicle selector', () => {

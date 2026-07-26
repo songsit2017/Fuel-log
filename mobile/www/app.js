@@ -3,15 +3,15 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.8.3';
+const APP_VERSION = '7.8.5';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
 const FIREBASE_SDK_VERSION = '12.13.0';
 let app = null, auth = null, db = null, storage = null, functions = null;
-let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+let GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, getRedirectResult,
     signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
-    doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
+    doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, query, where, writeBatch, serverTimestamp,
     ref, uploadBytes, getDownloadURL, httpsCallable;
 let firebaseReadyPromise = null;
 let firebaseLoadError = null;
@@ -36,17 +36,20 @@ async function initFirebase(){
     storage = storageMod.getStorage(app);
     functions = functionsMod.getFunctions(app, 'asia-southeast1');
 
-    ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+    ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, getRedirectResult,
       signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
-    ({doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
+    ({doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, query, where, writeBatch, serverTimestamp} = fireMod);
     ({ref, uploadBytes, getDownloadURL} = storageMod);
     ({httpsCallable} = functionsMod);
 
     await setPersistence(auth, browserLocalPersistence).catch(console.warn);
-    getRedirectResult(auth).catch(console.warn);
+    if(!isNativeApp()) getRedirectResult(auth).catch(console.warn);
     onAuthStateChanged(auth, async u=>{
       user = u;
-      if(u) await ensureUser().catch(console.warn);
+      if(u){
+        await ensureUser().catch(console.warn);
+        await autoRestoreCloudVehicles().catch(error=>console.warn('Automatic Cloud restore failed:',error));
+      }
       if(currentPanel==='family' && $('.page[data-page="panel"]')?.classList.contains('active')) renderPanel('family');
       if($('#formDialog')?.open && $('#formDialog').dataset.type==='fuel') loadFamilyDriverOptions();
     });
@@ -153,6 +156,7 @@ const toDisplayEfficiency = kml => (Number(kml)||0)*distFactor()/volFactor();
 let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'system', units:{distance:'km',volume:'liters'} };
 let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups', currentPanel = null, serviceMap = null, serviceStations = [], stationView = 'map', serviceMapProvider = 'leaflet', serviceMapMarkers = [];
 const familyMembersCache = {};
+const autoRestoredUsers = new Set();
 
 function seed(){
   const oldVehicles = JSON.parse(store.getItem('fuel-vehicles')||'null');
@@ -1290,7 +1294,37 @@ function settingsPanel(){
 function backupPanel(){return `<div class="card"><h2>สำรองข้อมูล</h2><p class="muted">ข้อมูลใช้งานร่วมกันซิงก์ผ่าน Firebase ส่วนไฟล์สำรองใช้สำหรับเก็บฉุกเฉิน</p><div class="panel-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="importBtn">นำเข้า JSON / Fuelio</button><input hidden type="file" id="importFile" accept=".json,.csv,.fuelio,.zip"></div></div>`;}
 function vehiclesPanel(){return `<div class="card"><div id="vehicleManage">${state.vehicles.map(v=>`<div class="list-row"><input data-rename-vehicle="${v.id}" value="${esc(v.name)}"><button class="secondary" data-delete-vehicle="${v.id}">ลบ</button></div>`).join('')}</div><button class="primary" id="addVehicleBtn">＋ เพิ่มรถ</button></div>`;}
 
-async function login(){await requireFirebase();const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});try{await signInWithPopup(auth,p);}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))await signInWithRedirect(auth,p);else $('#authMessage').textContent=e.message;}}
+function isNativeApp(){
+  return Boolean(window.Capacitor?.isNativePlatform?.());
+}
+
+async function login(){
+  await requireFirebase();
+  try{
+    if(isNativeApp()){
+      const nativeAuth=window.Capacitor?.registerPlugin?.('FirebaseAuthentication')
+        || window.Capacitor?.Plugins?.FirebaseAuthentication;
+      if(!nativeAuth?.signInWithGoogle) throw new Error('ไม่พบ Native Google Login กรุณาติดตั้ง APK รุ่นล่าสุด');
+      const result=await nativeAuth.signInWithGoogle({skipNativeAuth:true});
+      const idToken=result?.credential?.idToken;
+      const accessToken=result?.credential?.accessToken;
+      if(!idToken) throw new Error('Google ไม่ได้ส่ง ID token กรุณาตรวจ SHA-1 และ google-services.json');
+      await signInWithCredential(auth,GoogleAuthProvider.credential(idToken,accessToken||undefined));
+      return;
+    }
+    const p=new GoogleAuthProvider();
+    p.setCustomParameters({prompt:'select_account'});
+    try{await signInWithPopup(auth,p);}
+    catch(e){
+      if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code)) await signInWithRedirect(auth,p);
+      else throw e;
+    }
+  }catch(e){
+    console.error('FuelLog Google login failed:',e);
+    const message=e?.message||String(e);
+    if($('#authMessage')) $('#authMessage').textContent=message;
+  }
+}
 async function ensureUser(){await requireFirebase();if(!user)throw new Error('กรุณาเข้าสู่ระบบ');await setDoc(doc(db,'users',user.uid),{email:user.email,emailLower:user.email.toLowerCase(),displayName:user.displayName||'',photoURL:user.photoURL||'',updatedAt:serverTimestamp()},{merge:true});}
 async function ensureCloudVehicle(){
   await ensureUser();
@@ -1298,7 +1332,9 @@ async function ensureCloudVehicle(){
   let s=null;
   try{ s=await getDoc(vr); }catch(e){ s=null; } // a not-yet-created vehicle doc reads as permission-denied under the rules, not as "doesn't exist" — treat that as "needs creating"
   if(!s||!s.exists()){
-    await setDoc(vr,{name:vehicle().name,ownerUid:user.uid,members:{[user.uid]:{role:'owner',email:user.email,displayName:user.displayName||''}},createdAt:serverTimestamp()});
+    await setDoc(vr,{name:vehicle().name,ownerUid:user.uid,memberUids:[user.uid],members:{[user.uid]:{role:'owner',email:user.email,displayName:user.displayName||''}},createdAt:serverTimestamp()});
+  }else if(s.data().ownerUid===user.uid&&!Array.isArray(s.data().memberUids)){
+    await setDoc(vr,{memberUids:Object.keys(s.data().members||{[user.uid]:true})},{merge:true});
   }
   return getDoc(vr);
 }
@@ -1309,8 +1345,26 @@ async function syncVehicleWithStatus(){
   const original=btn.textContent;
   btn.disabled=true;
   btn.textContent='กำลังเตรียมข้อมูล…';
-  if(status) status.textContent='กำลังตรวจสอบรถและสิทธิ์บน Cloud…';
+  if(status) status.textContent='กำลังค้นหารถของบัญชีนี้บน Cloud…';
   try{
+    const cloudVehicles=await discoverCloudVehicles();
+    if(cloudVehicles.length){
+      btn.textContent='กำลังดาวน์โหลด…';
+      if(status) status.textContent=`พบรถบน Cloud ${cloudVehicles.length} คัน กำลังดึงข้อมูล…`;
+      await restoreDiscoveredCloudVehicles(cloudVehicles);
+      btn.textContent='ดึงข้อมูลสำเร็จ ✓';
+      if(status) status.textContent=`พบและดาวน์โหลดรถ ${cloudVehicles.length} คันจาก Cloud แล้ว`;
+      toast('ดึงข้อมูลยานพาหนะจาก Cloud สำเร็จ');
+      setTimeout(()=>{
+        if($('#syncBtn')===btn){
+          btn.disabled=false;
+          btn.textContent=original;
+        }
+      },1800);
+      return;
+    }
+
+    if(status) status.textContent='ไม่พบรถเดิมบน Cloud กำลังอัปโหลดข้อมูลในเครื่อง…';
     await ensureCloudVehicle();
     btn.textContent='กำลังอัปโหลด…';
     const groups=[['entries',entries()],['expenses',expenses()],['reminders',reminders()],['trips',trips()]];
@@ -1339,7 +1393,76 @@ async function syncVehicleWithStatus(){
     if(status) status.textContent=`ซิงก์ไม่สำเร็จ: ${e.message||e}`;
   }
 }
-async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const raw=d.data(),x=name==='entries'?normalizeFuelEntry(raw):raw;map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
+function vehicleHasLocalData(vehicleId){
+  return ['entries','expenses','reminders','trips'].some(name=>state[name].some(item=>item.vehicleId===vehicleId));
+}
+async function discoverCloudVehicles(){
+  await ensureUser();
+  const found=new Map();
+  const addSnapshot=snapshot=>snapshot.forEach(record=>{
+    const data=record.data();
+    found.set(record.id,{id:record.id,name:data.name||'รถจาก Cloud'});
+  });
+
+  // Owner vehicles work for legacy documents as well.
+  addSnapshot(await getDocs(query(collection(db,'vehicles'),where('ownerUid','==',user.uid))));
+
+  // New/shared documents keep a queryable member list. Older shared vehicles
+  // remain accessible through their invitation code and are upgraded on join.
+  try{
+    addSnapshot(await getDocs(query(collection(db,'vehicles'),where('memberUids','array-contains',user.uid))));
+  }catch(error){
+    console.warn('Shared vehicle discovery unavailable:',error);
+  }
+  return [...found.values()];
+}
+async function restoreDiscoveredCloudVehicles(cloudVehicles){
+  if(!cloudVehicles.length) return 0;
+  const disposablePlaceholder=state.vehicles.length===1&&!vehicleHasLocalData(state.vehicles[0].id)
+    ? state.vehicles[0].id
+    : null;
+  for(const cloudVehicle of cloudVehicles){
+    const existing=state.vehicles.find(v=>v.id===cloudVehicle.id);
+    if(existing) Object.assign(existing,cloudVehicle);
+    else state.vehicles.push(cloudVehicle);
+    await pullVehicleById(cloudVehicle.id);
+  }
+  const cloudIds=new Set(cloudVehicles.map(v=>v.id));
+  if(disposablePlaceholder&&!cloudIds.has(disposablePlaceholder)){
+    state.vehicles=state.vehicles.filter(v=>v.id!==disposablePlaceholder);
+  }
+  if(!cloudIds.has(state.currentVehicleId) && !vehicleHasLocalData(state.currentVehicleId)){
+    state.currentVehicleId=cloudVehicles[0].id;
+  }
+  save();
+  renderAll();
+  return cloudVehicles.length;
+}
+async function autoRestoreCloudVehicles(){
+  if(!user) return 0;
+  if(autoRestoredUsers.has(user.uid)) return 0;
+  autoRestoredUsers.add(user.uid);
+  const cloudVehicles=await discoverCloudVehicles();
+  const restored=await restoreDiscoveredCloudVehicles(cloudVehicles);
+  if(restored){
+    toast(`ซิงค์รถจาก Cloud อัตโนมัติแล้ว ${restored} คัน`);
+    if(currentPanel==='family') renderPanel('family');
+  }
+  return restored;
+}
+async function pullVehicleById(vehicleId){
+  for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){
+    const snapshot=await getDocs(collection(db,'vehicles',vehicleId,name));
+    const map=new Map(target.map((item,index)=>[item.id,index]));
+    snapshot.forEach(record=>{
+      const raw={...record.data(),id:record.id,vehicleId};
+      const item=name==='entries'?normalizeFuelEntry(raw):raw;
+      if(map.has(item.id)) target[map.get(item.id)]=item;
+      else target.push(item);
+    });
+  }
+}
+async function pullVehicle(){await ensureUser();await pullVehicleById(state.currentVehicleId);save();renderAll();toast('ดึงข้อมูลแล้ว');}
 async function loadMembers(){const box=$('#membersBody');if(!box||!user)return;const s=await getDoc(doc(db,'vehicles',state.currentVehicleId));if(!s.exists()){box.innerHTML='รถคันนี้ยังไม่ขึ้น Cloud';return;}const d=s.data(),members=Object.values(d.members||{});familyMembersCache[state.currentVehicleId]=members;box.innerHTML=members.map(m=>`<div class="list-row"><div><b>${esc(m.displayName||m.email)}</b><small>${esc(m.email||'')}</small></div><b>${esc(m.role)}</b></div>`).join('');}
 async function invite(){try{const email=$('#inviteEmail').value.trim().toLowerCase(),role=$('#inviteRole').value,s=await ensureCloudVehicle();if(s.data().ownerUid!==user.uid)throw new Error('เฉพาะ Owner สร้างคำเชิญได้');const code=Math.random().toString(36).slice(2,10).toUpperCase();await setDoc(doc(db,'invites',code),{vehicleId:state.currentVehicleId,vehicleName:vehicle().name,emailLower:email,role,ownerUid:user.uid,expiresAt:Date.now()+7*864e5,createdAt:serverTimestamp()});$('#inviteResult').innerHTML=`รหัสเชิญ: <b>${code}</b> (7 วัน)`;}catch(e){alert(e.message)}}
 async function join(){
@@ -1369,6 +1492,7 @@ async function join(){
 
     setStatus('กำลังเพิ่มสมาชิก…');
     const vr=doc(db,'vehicles',inv.vehicleId);
+    const vehicleBeforeJoin=(await getDoc(vr)).data()||{};
     await updateDoc(vr,{
       [`members.${user.uid}`]:{
         role:inv.role,
@@ -1376,6 +1500,7 @@ async function join(){
         emailLower,
         displayName:user.displayName||''
       },
+      memberUids:[...new Set([...(Array.isArray(vehicleBeforeJoin.memberUids)?vehicleBeforeJoin.memberUids:Object.keys(vehicleBeforeJoin.members||{})),user.uid])],
       lastJoinCode:code,
       updatedAt:serverTimestamp()
     });

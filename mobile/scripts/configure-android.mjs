@@ -8,7 +8,7 @@ const gradleFile=resolve(mobile,'android','app','build.gradle');
 const variablesFile=resolve(mobile,'android','variables.gradle');
 await access(gradleFile);
 
-const versionName=process.env.FUELLOG_VERSION_NAME||'8.0.0-beta.1';
+const versionName=process.env.FUELLOG_VERSION_NAME||'8.0.0-beta.3';
 const versionCode=Math.max(1,Number.parseInt(process.env.FUELLOG_VERSION_CODE||'1',10)||1);
 let gradle=await readFile(gradleFile,'utf8');
 

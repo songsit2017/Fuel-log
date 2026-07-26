@@ -140,7 +140,11 @@ function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTM
 function renderAll(){renderVehicleStrip();renderHome();renderFuel();renderExpenses();renderMaintenance();$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';save();}
 
 function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#formTitle').textContent=type==='fuel'?(obj.id?'แก้ไขการเติมน้ำมัน':'เพิ่มรายการเติมน้ำมัน'):type==='expense'?(obj.id?'แก้ไขค่าใช้จ่าย':'เพิ่มค่าใช้จ่าย'):'ตั้งเตือนบำรุงรักษา';d.dataset.type=type;d.dataset.id=obj.id||'';
- if(type==='fuel')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">🧾 รูปใบเสร็จ<input hidden type="file" id="receiptFile" accept="image/*"></label><label class="photo-pick">🔢 รูปเรือนไมล์<input hidden type="file" id="odoFile" accept="image/*"></label></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div><div class="field"><label>ยอดรวม</label><input name="total" type="number" step=".01" value="${obj.total||''}"></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
+ if(type==='fuel')b.innerHTML=`<div class="photo-grid">
+<label class="photo-pick">🧾 รูปใบเสร็จ<input hidden type="file" id="receiptFile" accept="image/*"></label>
+<label class="photo-pick">🔢 รูปเรือนไมล์<input hidden type="file" id="odoFile" accept="image/*"></label>
+<label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
+</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div><div class="field"><label>ยอดรวม</label><input name="total" type="number" step=".01" value="${obj.total||''}"></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
   'แก๊สโซฮอล์ 95','แก๊สโซฮอล์ 91','แก๊สโซฮอล์ E20','แก๊สโซฮอล์ E85',
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
@@ -149,9 +153,84 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
 ].includes(obj.fuelType)?`<option value="${esc(obj.fuelType)}" selected>${esc(obj.fuelType)}</option>`:''}</select></div><div class="field full"><label>ปั๊ม</label><input id="stationInput" name="station" value="${esc(obj.station||'')}" placeholder="กำลังค้นหาปั๊มใกล้ฉัน…"><div id="formNearby" class="nearby-options"></div></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div><label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label></div>`;
- if(type==='expense')b.innerHTML=`<div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
+ if(type==='expense')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label></div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
- d.showModal(); if(type==='fuel'&&!obj.station)setTimeout(autoNearby,150);}
+ d.showModal();
+ $('#fuelOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'fuel'));
+ $('#expenseOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'expense'));
+ if(type==='fuel'&&!obj.station)setTimeout(autoNearby,150);}
+
+let tesseractLoadPromise=null;
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise=loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js').then(()=>window.Tesseract);
+  return tesseractLoadPromise;
+}
+function firstMoneyValue(text){
+  const matches=[...String(text).matchAll(/(?:total|grand total|ยอดรวม|รวมทั้งสิ้น|สุทธิ|amount)[^\d]{0,15}(\d[\d,]*\.\d{2})/gi)];
+  if(matches.length) return parseFloat(matches.at(-1)[1].replaceAll(',',''));
+  const nums=[...String(text).matchAll(/\b(\d[\d,]*\.\d{2})\b/g)].map(m=>parseFloat(m[1].replaceAll(',',''))).filter(n=>n>0&&n<1000000);
+  return nums.length?Math.max(...nums):null;
+}
+function receiptDate(text){
+  const s=String(text);
+  let m=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](20\d{2}|25\d{2})\b/);
+  if(!m) return null;
+  let y=+m[3]; if(y>2400)y-=543;
+  return `${String(y).padStart(4,'0')}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`;
+}
+function namedNumber(text,patterns){
+  for(const p of patterns){
+    const m=String(text).match(p);
+    if(m){const n=parseFloat(m[1].replace(',','.'));if(Number.isFinite(n))return n;}
+  }
+  return null;
+}
+function guessMerchant(text){
+  return String(text).split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>=3&&!/^\d[\d\s:./-]*$/.test(x)).slice(0,3).join(' ').slice(0,80);
+}
+async function scanReceipt(file,type){
+  const status=$('#ocrStatus');
+  if(status) status.textContent='กำลังเตรียม OCR…';
+  try{
+    const T=await loadTesseract();
+    const result=await T.recognize(file,'tha+eng',{logger:m=>{
+      if(status&&m.status==='recognizing text') status.textContent=`กำลังอ่านข้อความ ${Math.round((m.progress||0)*100)}%`;
+    }});
+    const text=result?.data?.text||'';
+    const total=firstMoneyValue(text);
+    const date=receiptDate(text);
+    if(date&&$('[name="date"]')) $('[name="date"]').value=date;
+    if(total){
+      const el=type==='fuel'?$('[name="total"]'):$('[name="amount"]');
+      if(el) el.value=total;
+    }
+    if(type==='fuel'){
+      const liters=namedNumber(text,[
+        /(?:liters?|litres?|ลิตร)[^\d]{0,10}(\d+(?:[.,]\d+)?)/i,
+        /(\d+(?:[.,]\d+)?)\s*(?:liters?|litres?|ลิตร)/i
+      ]);
+      const ppl=namedNumber(text,[
+        /(?:price\/?l|บาท\/ลิตร|ราคา\/ลิตร)[^\d]{0,10}(\d+(?:[.,]\d+)?)/i,
+        /(\d+(?:[.,]\d+)?)\s*(?:บาท\/ลิตร)/i
+      ]);
+      if(liters&&$('[name="liters"]')) $('[name="liters"]').value=liters;
+      if(ppl&&$('[name="pricePerLiter"]')) $('[name="pricePerLiter"]').value=ppl;
+      const station=guessMerchant(text);
+      if(station&&$('#stationInput')&&!$('#stationInput').value) $('#stationInput').value=station;
+      if(!total&&liters&&ppl&&$('[name="total"]')) $('[name="total"]').value=(liters*ppl).toFixed(2);
+    }else{
+      const merchant=guessMerchant(text);
+      if(merchant&&$('[name="title"]')&&!$('[name="title"]').value) $('[name="title"]').value=merchant;
+    }
+    if(status) status.textContent=`อ่านบิลเสร็จแล้ว${total?` • พบยอด ฿${fmt(total,2)}`:' • กรุณาตรวจค่าที่กรอก'}`;
+  }catch(e){
+    console.error('OCR failed',e);
+    if(status) status.textContent='สแกนไม่สำเร็จ กรุณากรอกข้อมูลเองหรือเลือกรูปใหม่';
+  }
+}
+
 async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.dataset.type,idv=d.dataset.id||uid(),data=Object.fromEntries(new FormData($('#dynamicForm')));
  if(type==='fuel'){
    const odoRaw=+data.odometer||0, litersRaw=+data.liters||0;
@@ -218,41 +297,57 @@ async function refreshFuelNearby(){
   }catch(e){ box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่ง</div>'; }
 }
 
+
 function renderTodayPrices(data){
-  if(!data||data.status!=='success'||!data.response||typeof data.response!=='object') return null;
-  const r=data.response;
-  const brands=[{key:'ptt',label:'ปตท.'},{key:'bcp',label:'บางจาก'},{key:'shell',label:'เชลล์'},{key:'esso',label:'เอสโซ่'},{key:'caltex',label:'คาลเท็กซ์'},{key:'pt',label:'พีที'},{key:'susco',label:'ซัสโก้'}];
-  const fuels=[{key:'gasohol_95',label:'95'},{key:'gasohol_91',label:'91'},{key:'diesel_b7',label:'ดีเซล B7'}];
-  const isValid=v=>{ if(v===null||v===undefined||v==='') return false; const n=parseFloat(v); return !isNaN(n)&&n>0&&n<200; };
-  const rows=brands.map(b=>{
-    const st=r.stations&&typeof r.stations==='object'?r.stations[b.key]:null;
-    if(!st||typeof st!=='object') return '';
-    const parts=fuels.map(f=>(st[f.key]&&isValid(st[f.key].price))?`${f.label} ฿${parseFloat(st[f.key].price).toFixed(2)}`:null).filter(Boolean);
-    if(!parts.length) return '';
-    return `<div class="list-row"><b>${b.label}</b><span>${parts.join(' · ')}</span></div>`;
-  }).filter(Boolean).join('');
-  if(!rows) return null;
-  const dateLine=(typeof r.date==='string'&&r.date.trim())?`<div class="muted" style="margin-bottom:6px;font-size:10.5px;">อัปเดตล่าสุด: ${esc(r.date)}</div>`:'';
-  return dateLine+rows;
+  // Local GitHub Action format from oil-prices.json (Bangchak API snapshot)
+  if(data?.data?.[0]?.OilList){
+    try{
+      const root=data.data[0], list=JSON.parse(root.OilList);
+      const rows=list.filter(x=>Number(x.PriceToday)>0).map(x=>`<div class="list-row"><b>${esc(x.OilName)}</b><span>฿${fmt(x.PriceToday,2)}</span></div>`).join('');
+      if(rows) return `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(root.OilRemark2||root.OilPriceDate||'ข้อมูลราคาล่าสุด')}</div>${rows}`;
+    }catch(e){ console.warn('Invalid local oil-prices.json',e); }
+  }
+  // Legacy thai-oil-api format
+  if(data?.status==='success'&&data.response&&typeof data.response==='object'){
+    const r=data.response;
+    const brands=[{key:'ptt',label:'ปตท.'},{key:'bcp',label:'บางจาก'},{key:'shell',label:'เชลล์'},{key:'esso',label:'เอสโซ่'},{key:'caltex',label:'คาลเท็กซ์'},{key:'pt',label:'พีที'},{key:'susco',label:'ซัสโก้'}];
+    const fuels=[{key:'gasohol_95',label:'95'},{key:'gasohol_91',label:'91'},{key:'diesel_b7',label:'ดีเซล B7'}];
+    const rows=brands.map(b=>{
+      const st=r.stations?.[b.key]; if(!st)return '';
+      const parts=fuels.map(f=>{const n=parseFloat(st[f.key]?.price);return Number.isFinite(n)&&n>0?`${f.label} ฿${n.toFixed(2)}`:null}).filter(Boolean);
+      return parts.length?`<div class="list-row"><b>${b.label}</b><span>${parts.join(' · ')}</span></div>`:'';
+    }).join('');
+    if(rows)return rows;
+  }
+  return null;
 }
 async function loadTodayPrices(){
-  const box=$('#todayPriceList');if(!box)return;
-  box.innerHTML='<div class="muted">กำลังโหลด…</div>';
-  const SRC='https://api.chnwt.dev/thai-oil-api/latest';
+  const box=$('#todayPriceList'); if(!box)return;
+  box.innerHTML='<div class="muted">กำลังโหลดราคาน้ำมัน…</div>';
+  const cached=store.getItem('fuellog-oil-cache');
   const attempts=[
-    ()=>fetch(SRC),
-    ()=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(SRC)), // fallback in case the API blocks direct browser (CORS) requests
+    async()=>fetch(`./oil-prices.json?v=${Date.now()}`,{cache:'no-store'}),
+    async()=>fetch('https://api.chnwt.dev/thai-oil-api/latest'),
+    async()=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.chnwt.dev/thai-oil-api/latest'))
   ];
   for(const attempt of attempts){
     try{
-      const res=await attempt();
-      if(!res.ok) continue;
-      const data=await res.json();
-      const html=renderTodayPrices(data);
-      if(html){ box.innerHTML=html; return; }
-    }catch(e){ /* try next method */ }
+      const res=await attempt(); if(!res.ok)continue;
+      const data=await res.json(), html=renderTodayPrices(data);
+      if(html){
+        box.innerHTML=html;
+        store.setItem('fuellog-oil-cache',JSON.stringify({html,time:Date.now()}));
+        return;
+      }
+    }catch(e){ console.warn('Oil source failed',e); }
   }
-  box.innerHTML='<div class="muted">โหลดราคาไม่สำเร็จตอนนี้ (แหล่งข้อมูลอาจไม่พร้อมใช้งานชั่วคราว) — <a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--accent)">เปิดดูที่ kapook แทน</a></div>';
+  if(cached){
+    try{
+      const c=JSON.parse(cached);
+      if(c.html){box.innerHTML=`<div class="muted" style="margin-bottom:6px;">แสดงข้อมูลล่าสุดที่บันทึกไว้</div>${c.html}`;return;}
+    }catch{}
+  }
+  box.innerHTML='<div class="muted">ยังโหลดราคาไม่ได้ กรุณาตรวจว่าไฟล์ oil-prices.json อยู่ที่รากโปรเจกต์และ GitHub Action อัปเดตสำเร็จ</div>';
 }
 
 async function uploadAttachedPhotos(logId){if(!user)return;const files=[['receipt',$('#receiptFile')?.files[0]],['odometer',$('#odoFile')?.files[0]]].filter(x=>x[1]);for(const [type,file] of files){const path=`vehicles/${state.currentVehicleId}/fuel/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;const sr=ref(storage,path);await uploadBytes(sr,file,{contentType:file.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(sr);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{type,path,url,name:file.name,logId,uploadedBy:user.uid,createdAt:serverTimestamp()});}}

@@ -1,4 +1,4 @@
-const CACHE = 'fuellog-v5-family-507';
+const CACHE = 'fuellog-v5-family-508';
 const CORE = [
   './', './index.html', './styles.css?v=5.0.5', './app.js?v=5.0.5',
   './firebase-config.js?v=5.0.5', './manifest.json', './icon-192.png', './icon-512.png'

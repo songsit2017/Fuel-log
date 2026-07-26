@@ -157,9 +157,253 @@ function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOu
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){const rows=[['type','vehicleId','date','odometer','liters','amount','category','title','station','note']];state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.total,'','',x.station||'',x.note||'']));state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','',x.amount,x.category||'',x.title||'','',x.note||'']));download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');}
-async function importFile(file){try{if(file.name.endsWith('.json')){const d=JSON.parse(await file.text());state={...state,...d};save();renderAll();toast('นำเข้าแล้ว');return;}if(/\.(fuelio|zip)$/i.test(file.name)){await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');const zip=await JSZip.loadAsync(file),files=Object.values(zip.files).filter(x=>!x.dir&&/\.(csv|json)$/i.test(x.name));let imported=0;for(const f of files){const text=await f.async('text');if(f.name.endsWith('.json')){try{const d=JSON.parse(text);const arr=Array.isArray(d)?d:d.records||[];for(const x of arr){if(x.odometer||x.mileage){state.entries.push({id:uid(),vehicleId:state.currentVehicleId,date:String(x.date||today()).slice(0,10),odometer:+(x.odometer||x.mileage)||0,liters:+(x.liters||x.volume)||0,total:+(x.total||x.cost)||0,pricePerLiter:+(x.pricePerLiter||x.price)||0,station:x.station||x.place||'',fuelType:x.fuelType||'',full:x.full!==false});imported++;}}}catch{}}else{const lines=text.split(/\r?\n/),head=lines.shift().split(',').map(x=>x.replaceAll('"','').trim().toLowerCase());for(const line of lines){if(!line.trim())continue;const vals=line.match(/("[^"]*(?:""[^"]*)*"|[^,]*)/g)?.filter((_,i)=>i%2===0).map(x=>x.replace(/^"|"$/g,'').replaceAll('""','"'))||line.split(',');const o=Object.fromEntries(head.map((h,i)=>[h,vals[i]]));const odo=+(o.odometer||o.mileage||o['เลขไมล์']);if(odo){state.entries.push({id:uid(),vehicleId:state.currentVehicleId,date:String(o.date||o.datetime||today()).slice(0,10),odometer:odo,liters:+(o.liters||o.volume||0),total:+(o.total||o.cost||o.amount||0),pricePerLiter:+(o.price||o.priceperliter||0),station:o.station||o.place||'',fuelType:o.fueltype||'',full:true});imported++;}}}}save();renderAll();toast(`นำเข้า ${imported} รายการ`);return;}alert('รองรับ JSON และ .fuelio/.zip');}catch(e){alert(`นำเข้าไม่สำเร็จ: ${e.message}`)}}
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}
+function ensureJSZip(){return window.JSZip?Promise.resolve():loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');}
 
+// ---------- Fuelio import (CSV / .fuelio / .zip — multi-vehicle, real quoted-section format, costs, pictures.data) ----------
+function isFuelioSectionMarker(line){ if(!line) return false; const t=line.trim().replace(/^"+|"+$/g,''); return t.startsWith('##'); }
+function fuelioSectionName(line){ const t=line.trim().replace(/^"+|"+$/g,''); return t.replace(/^##\s*/,'').trim().toLowerCase(); }
+function splitFuelioCsvLine(line,delim){ const result=[]; let cur='',inQuotes=false; for(let i=0;i<line.length;i++){ const c=line[i]; if(c==='"'){ inQuotes=!inQuotes; continue; } if(c===delim&&!inQuotes){ result.push(cur); cur=''; continue; } cur+=c; } result.push(cur); return result.map(s=>s.trim()); }
+function detectFuelioDelimiter(sampleLines){ const semi=sampleLines.reduce((a,l)=>a+((l.match(/;/g)||[]).length),0); const comma=sampleLines.reduce((a,l)=>a+((l.match(/,/g)||[]).length),0); return semi>=comma?';':','; }
+function parseFuelioNum(str){ if(str==null) return NaN; let s=String(str).trim(); if(!s) return NaN; if(s.indexOf(',')>-1&&s.indexOf('.')===-1) s=s.replace(',','.'); s=s.replace(/[^\d.\-]/g,''); return parseFloat(s); }
+function normalizeFuelioDate(raw){ if(!raw) return today(); const s=raw.trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if(m){ const dd=m[1].padStart(2,'0'),mm=m[2].padStart(2,'0'),yyyy=m[3]; return `${yyyy}-${mm}-${dd}`; } const d=new Date(s); if(!isNaN(d.getTime())) return d.toISOString().slice(0,10); return today(); }
+function extractFuelioTime(raw){ if(!raw) return ''; const m=raw.trim().match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*$/); if(!m) return ''; const hh=m[1].padStart(2,'0'),mm=m[2]; if(+hh>23||+mm>59) return ''; return `${hh}:${mm}`; }
+
+function findFuelioVehicleName(lines,beforeIdx){
+  for(let i=0;i<beforeIdx;i++){
+    const l=lines[i]; if(!l) continue;
+    const low=l.toLowerCase();
+    if(low.includes('name')&&(low.includes('plate')||low.includes('type')||low.includes('vehicle')||low.includes('tank')||low.includes('fuel unit')||low.includes('odometer unit'))){
+      const delim=detectFuelioDelimiter([l,lines[i+1]||'']);
+      const hdrs=splitFuelioCsvLine(l,delim).map(h=>h.toLowerCase());
+      const nameIdx=hdrs.findIndex(h=>h==='name'||h.includes('name'));
+      if(nameIdx>-1){
+        for(let j=i+1;j<beforeIdx;j++){
+          const dl=lines[j]; if(!dl||!dl.trim()||isFuelioSectionMarker(dl)) break;
+          const cols=splitFuelioCsvLine(dl,delim);
+          if(cols[nameIdx]&&cols[nameIdx].trim()) return cols[nameIdx].trim();
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parseFuelioCSV(text){
+  const lines=text.split(/\r\n|\n|\r/);
+  let headerIdx=-1;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i]; if(!l||isFuelioSectionMarker(l)) continue;
+    const low=l.toLowerCase();
+    if(low.includes('odo')&&low.includes('fuel')){ headerIdx=i; break; }
+  }
+  if(headerIdx===-1) throw new Error('ไม่พบส่วนบันทึกการเติมน้ำมัน (Log) ในไฟล์ — ตรวจว่าเป็นไฟล์ backup จาก Fuelio จริงหรือไม่');
+
+  const vehicleName=findFuelioVehicleName(lines,headerIdx);
+  const delim=detectFuelioDelimiter(lines.slice(headerIdx,headerIdx+5));
+  const headers=splitFuelioCsvLine(lines[headerIdx],delim);
+  const findCol=pred=>headers.findIndex(h=>pred(h.toLowerCase()));
+  const idxDate=findCol(h=>h==='date'||h==='data'||h.startsWith('date'));
+  const idxOdo=findCol(h=>h.includes('odo'));
+  const idxFuel=findCol(h=>h.includes('fuel')&&!h.includes('type')&&(h.includes('litre')||h.includes('liter')||h.includes('gallon')||h.includes('amount')));
+  const idxFull=findCol(h=>h==='full'||h.startsWith('full'));
+  const idxPrice=findCol(h=>h.includes('price')||h.includes('cost'));
+  const idxStation=findCol(h=>h.includes('city')||h.includes('station'));
+  const idxNote=findCol(h=>h.includes('note'));
+  const idxMissed=findCol(h=>h==='missed');
+  const idxUniqueId=findCol(h=>h.replace(/\s/g,'')==='uniqueid');
+  if(idxDate===-1||idxOdo===-1||idxFuel===-1) throw new Error('รูปแบบคอลัมน์ไม่ตรงกับที่รองรับ');
+
+  const odoIsMiles=headers[idxOdo].toLowerCase().includes('mi');
+  const fuelIsGallons=headers[idxFuel].toLowerCase().includes('gallon');
+
+  const results=[]; let skipped=0, i=headerIdx+1;
+  for(;i<lines.length;i++){
+    const raw=lines[i]; if(raw==null) continue;
+    const trimmed=raw.trim(); if(!trimmed) break;
+    if(isFuelioSectionMarker(trimmed)) break;
+    const cols=splitFuelioCsvLine(raw,delim);
+    if(cols.length<=Math.max(idxDate,idxOdo,idxFuel)){ skipped++; continue; }
+    if(idxMissed>-1&&(cols[idxMissed]||'').trim()==='1'){ skipped++; continue; }
+    let odo=parseFuelioNum(cols[idxOdo]), liters=parseFuelioNum(cols[idxFuel]);
+    if(isNaN(odo)||isNaN(liters)){ skipped++; continue; }
+    if(odoIsMiles) odo*=1.60934;
+    if(fuelIsGallons) liters*=3.78541;
+    const full=(cols[idxFull]||'').toString().trim()==='1';
+    let total=idxPrice>-1?parseFuelioNum(cols[idxPrice]):NaN; if(isNaN(total)) total=0;
+    const pricePerLiter=(liters>0&&total>0)?total/liters:0;
+    results.push({
+      id: uid(),
+      date: normalizeFuelioDate(cols[idxDate]),
+      time: extractFuelioTime(cols[idxDate]),
+      odometer: Math.round(odo*10)/10,
+      liters: Math.round(liters*100)/100,
+      pricePerLiter: Math.round(pricePerLiter*100)/100,
+      total: Math.round(total*100)/100,
+      full, fuelType:'',
+      station: idxStation>-1?(cols[idxStation]||'').trim():'',
+      note: idxNote>-1?(cols[idxNote]||'').trim():'',
+      _uniqueId: idxUniqueId>-1?(cols[idxUniqueId]||'').trim():'',
+    });
+  }
+  const logEndIdx=i;
+
+  const categoryMap={};
+  let catHeaderIdx=-1;
+  for(let k=logEndIdx;k<lines.length;k++) if(isFuelioSectionMarker(lines[k])&&fuelioSectionName(lines[k])==='costcategories'){ catHeaderIdx=k+1; break; }
+  if(catHeaderIdx>-1&&lines[catHeaderIdx]){
+    const cH=splitFuelioCsvLine(lines[catHeaderIdx],delim).map(h=>h.toLowerCase());
+    const idIdx=cH.findIndex(h=>h==='costtypeid'), nameIdx=cH.findIndex(h=>h==='name');
+    if(idIdx>-1&&nameIdx>-1) for(let k=catHeaderIdx+1;k<lines.length;k++){ const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break; const cols=splitFuelioCsvLine(l,delim); if(cols[idIdx]) categoryMap[cols[idIdx].trim()]=(cols[nameIdx]||'').trim(); }
+  }
+
+  const costRecords=[];
+  let costsHeaderIdx=-1;
+  for(let k=logEndIdx;k<lines.length;k++) if(isFuelioSectionMarker(lines[k])&&fuelioSectionName(lines[k])==='costs'){ costsHeaderIdx=k+1; break; }
+  if(costsHeaderIdx>-1&&lines[costsHeaderIdx]){
+    const coH=splitFuelioCsvLine(lines[costsHeaderIdx],delim).map(h=>h.toLowerCase());
+    const titleIdx=coH.findIndex(h=>h==='costtitle'), dateIdx=coH.findIndex(h=>h==='date'), odoIdx=coH.findIndex(h=>h==='odo'), typeIdIdx=coH.findIndex(h=>h==='costtypeid'), noteIdx=coH.findIndex(h=>h==='notes'), amtIdx=coH.findIndex(h=>h==='cost'), templateIdx=coH.findIndex(h=>h==='istemplate');
+    if(titleIdx>-1&&dateIdx>-1&&amtIdx>-1){
+      for(let k=costsHeaderIdx+1;k<lines.length;k++){
+        const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break;
+        const cols=splitFuelioCsvLine(l,delim);
+        if(cols.length<=Math.max(titleIdx,dateIdx,amtIdx)) continue;
+        if(templateIdx>-1&&(cols[templateIdx]||'').trim()==='1') continue;
+        const amount=parseFuelioNum(cols[amtIdx]), odo=odoIdx>-1?parseFuelioNum(cols[odoIdx]):NaN;
+        const catName=typeIdIdx>-1?(categoryMap[(cols[typeIdIdx]||'').trim()]||'อื่นๆ'):'อื่นๆ';
+        costRecords.push({ id:uid(), title:(cols[titleIdx]||'').trim(), date:normalizeFuelioDate(cols[dateIdx]), odometer:(!isNaN(odo)&&odo>0)?Math.round(odo*10)/10:null, category:catName, amount:isNaN(amount)?0:Math.round(amount*100)/100, note:noteIdx>-1?(cols[noteIdx]||'').trim():'' });
+      }
+    }
+  }
+
+  const pictureMap={};
+  let picHeaderIdx=-1;
+  for(let k=logEndIdx;k<lines.length;k++) if(isFuelioSectionMarker(lines[k])&&fuelioSectionName(lines[k])==='pictures'){ picHeaderIdx=k+1; break; }
+  if(picHeaderIdx>-1&&lines[picHeaderIdx]){
+    const pH=splitFuelioCsvLine(lines[picHeaderIdx],delim).map(h=>h.toLowerCase());
+    const fIdx=pH.findIndex(h=>h==='filename'), tIdx=pH.findIndex(h=>h==='type'), idIdx=pH.findIndex(h=>h==='target_id');
+    if(fIdx>-1&&tIdx>-1&&idIdx>-1) for(let k=picHeaderIdx+1;k<lines.length;k++){ const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break; const cols=splitFuelioCsvLine(l,delim); if((cols[tIdx]||'').trim()==='1'){ const tid=(cols[idIdx]||'').trim(),fn=(cols[fIdx]||'').trim(); if(tid&&fn){ if(!pictureMap[tid]) pictureMap[tid]=[]; pictureMap[tid].push(fn); } } }
+  }
+
+  return { results, skipped, vehicleName, pictureMap, costRecords };
+}
+
+function resizeImportedPhoto(blob,maxDim=1280,quality=0.72){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(), url=URL.createObjectURL(blob);
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>h){ if(w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; } } else { if(h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; } }
+      const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(b=>{ URL.revokeObjectURL(url); resolve(b||blob); },'image/jpeg',quality);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('อ่านรูปไม่สำเร็จ')); };
+    img.src=url;
+  });
+}
+
+async function uploadImportedPhoto(vehicleId,logId,type,blob,filename){
+  const resized=await resizeImportedPhoto(blob).catch(()=>blob);
+  const path=`vehicles/${vehicleId}/fuel/${logId}/${type}-${Date.now()}-${(filename||'photo').replace(/[^\w.-]/g,'_')}`;
+  const sr=ref(storage,path);
+  await uploadBytes(sr,resized,{contentType:'image/jpeg',customMetadata:{uploadedBy:user.uid}});
+  const url=await getDownloadURL(sr);
+  await setDoc(doc(db,'vehicles',vehicleId,'photos',uid()),{type,path,url,name:filename||'',logId,uploadedBy:user.uid,createdAt:serverTimestamp()});
+}
+
+async function importFuelioArchive(file){
+  await ensureJSZip();
+  const zip=await JSZip.loadAsync(file);
+  const parsedVehicles=[];
+  for(const name of Object.keys(zip.files)){
+    if(zip.files[name].dir||!/\.csv$/i.test(name)) continue;
+    try{ const text=await zip.files[name].async('string'); const attempt=parseFuelioCSV(text); if(attempt.results.length) parsedVehicles.push(attempt); }catch(e){ /* not a fuel log CSV */ }
+  }
+  if(!parsedVehicles.length) throw new Error('ไม่พบไฟล์ CSV ข้อมูลการเติมน้ำมันที่อ่านได้ในไฟล์นี้');
+
+  let picturesZip=null;
+  const picturesEntry=Object.keys(zip.files).find(n=>/(^|\/)pictures\.data$/i.test(n));
+  if(picturesEntry){ try{ const b=await zip.files[picturesEntry].async('blob'); picturesZip=await JSZip.loadAsync(b); }catch(e){ picturesZip=null; } }
+  const imageMap={};
+  if(picturesZip) for(const name of Object.keys(picturesZip.files)){ if(picturesZip.files[name].dir) continue; imageMap[name.split('/').pop().toLowerCase()]=picturesZip.files[name]; }
+
+  return { parsedVehicles, imageMap };
+}
+
+async function applyFuelioVehicle(parsed, imageMap, allowPhotos){
+  const { results, skipped, vehicleName, pictureMap, costRecords } = parsed;
+  let targetVehicleId = state.currentVehicleId;
+  if(vehicleName){
+    const existing = state.vehicles.find(v=>v.name.trim().toLowerCase()===vehicleName.trim().toLowerCase());
+    if(existing) targetVehicleId = existing.id;
+    else { const v={id:uid(),name:vehicleName}; state.vehicles.push(v); targetVehicleId=v.id; }
+  }
+
+  let photosMatched=0;
+  for(const r of results){
+    const filenames=(r._uniqueId&&pictureMap[r._uniqueId])||[];
+    if(allowPhotos&&filenames.length){
+      const slots=['receipt','odometer'];
+      for(let s=0;s<Math.min(filenames.length,slots.length);s++){
+        const base=filenames[s].split(/[\\/]/).pop().toLowerCase();
+        const zf=imageMap[base]; if(!zf) continue;
+        try{ const blob=await zf.async('blob'); await uploadImportedPhoto(targetVehicleId,r.id,slots[s],blob,filenames[s]); photosMatched++; }catch(e){ /* skip this photo */ }
+      }
+    }
+    delete r._uniqueId;
+  }
+
+  state.entries.push(...results.map(r=>({...r,vehicleId:targetVehicleId})));
+  if(costRecords&&costRecords.length) state.expenses.push(...costRecords.map(c=>({...c,vehicleId:targetVehicleId})));
+
+  return { vehicleId:targetVehicleId, vehicleName:state.vehicles.find(v=>v.id===targetVehicleId)?.name, count:results.length, skipped, costCount:costRecords?.length||0, photosMatched };
+}
+
+async function importFile(file){
+  try{
+    if(file.name.endsWith('.json')){
+      const d=JSON.parse(await file.text()); state={...state,...d}; save(); renderAll(); toast('นำเข้าแล้ว'); return;
+    }
+    if(/\.csv$/i.test(file.name)){
+      const text=await file.text();
+      let parsed;
+      try{ parsed=parseFuelioCSV(text); }catch(e){ alert('อ่านไฟล์ CSV ไม่สำเร็จ: '+e.message); return; }
+      const msg=`พบ ${parsed.results.length} รายการ${parsed.skipped?` (ข้าม ${parsed.skipped} แถวที่อ่านไม่ได้)`:''}`+
+        (parsed.costRecords.length?`\nพบค่าใช้จ่ายอื่นๆ ${parsed.costRecords.length} รายการด้วย`:'')+
+        (parsed.vehicleName?`\nไฟล์นี้เป็นข้อมูลรถ "${parsed.vehicleName}"`:'')+
+        `\n\nนำเข้าไปยังรถ "${vehicle()?.name}" (หรือสร้างรถใหม่ถ้าตรวจพบชื่อรถอื่น) เลยไหม?`;
+      if(!confirm(msg)) return;
+      const r=await applyFuelioVehicle(parsed,{},false);
+      save(); renderAll();
+      toast(`นำเข้า ${r.count} รายการ${r.costCount?` + ค่าใช้จ่าย ${r.costCount} รายการ`:''}`);
+      return;
+    }
+    if(/\.(fuelio|zip)$/i.test(file.name)){
+      let archive;
+      try{ archive=await importFuelioArchive(file); }catch(e){ alert('อ่านไฟล์ .fuelio ไม่สำเร็จ: '+e.message+'\n\nลองแตกไฟล์ zip เองแล้วนำเข้าเฉพาะไฟล์ .csv ข้างในแทนได้ครับ'); return; }
+      const { parsedVehicles, imageMap } = archive;
+      const totalEntries=parsedVehicles.reduce((s,v)=>s+v.results.length,0);
+      const totalCosts=parsedVehicles.reduce((s,v)=>s+(v.costRecords?.length||0),0);
+      const names=parsedVehicles.map(v=>v.vehicleName||'(ไม่ระบุชื่อรถ)').join(', ');
+      const photoNote = user ? '\nจะพยายามแนบรูปภาพให้ด้วย (อาจใช้เวลาสักครู่ถ้ามีรูปเยอะ)' : '\n(ยังไม่ได้เข้าสู่ระบบ Google — จะนำเข้าเฉพาะข้อมูลตัวเลข ไม่แนบรูปภาพ)';
+      if(!confirm(`พบข้อมูล ${parsedVehicles.length} คัน: ${names}\nรวม ${totalEntries} รายการเติมน้ำมัน, ค่าใช้จ่ายอื่นๆ ${totalCosts} รายการ${photoNote}\n\nนำเข้าทั้งหมดเลยไหม?`)) return;
+
+      toast('กำลังนำเข้า...');
+      let totalImported=0, totalCostImported=0, totalPhotos=0;
+      for(const v of parsedVehicles){
+        const r=await applyFuelioVehicle(v, imageMap, !!user);
+        totalImported+=r.count; totalCostImported+=r.costCount; totalPhotos+=r.photosMatched;
+      }
+      save(); renderAll();
+      toast(`นำเข้าสำเร็จ ${totalImported} รายการ${totalCostImported?` + ค่าใช้จ่าย ${totalCostImported}`:''}${totalPhotos?` + รูป ${totalPhotos}`:''}`);
+      return;
+    }
+    alert('รองรับไฟล์ JSON, CSV และ .fuelio/.zip');
+  }catch(e){
+    alert(`นำเข้าไม่สำเร็จ: ${e.message}`);
+  }
+}
 function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){$('#stationInput').value=st.dataset.station;}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshNearby').onclick=autoNearby;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.body.classList.toggle('light',state.theme==='light');save();};}
 
 function boot(){

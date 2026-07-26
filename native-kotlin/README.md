@@ -19,6 +19,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Versioned JSON backup/restore for every Room collection using Android's file picker.
 - Manual Google/Firebase sync that preserves divergent copies as explicit conflicts.
 - Persistent conflict cards where the user explicitly chooses the Local or Cloud copy.
+- Persistent deletion tombstones prevent removed records from returning on another device.
 - A Thai minimal Compose dashboard and launcher icon.
 - A separate prerelease APK workflow that cannot replace Stable.
 

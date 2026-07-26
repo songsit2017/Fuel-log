@@ -10,6 +10,7 @@ import java.util.UUID
 
 class LocalMaintenanceRepository(
     private val dao: MaintenanceDao,
+    private val deletionRecorder: LocalDeletionRecorder,
 ) {
     fun observe(vehicleId: String): Flow<List<MaintenanceTask>> =
         dao.observeForVehicle(vehicleId).map { tasks -> tasks.map(MaintenanceEntity::toDomain) }
@@ -47,7 +48,7 @@ class LocalMaintenanceRepository(
 
     suspend fun markDone(task: MaintenanceTask, currentOdometerKm: Double?, today: LocalDate = LocalDate.now()) {
         if (task.repeatMonths == null && task.repeatOdometerKm == null) {
-            dao.deleteById(task.id)
+            delete(task.id)
             return
         }
         val nextDate = task.repeatMonths?.let { months ->
@@ -64,7 +65,12 @@ class LocalMaintenanceRepository(
         dao.upsert(task.toEntity(nextDate, nextOdometer))
     }
 
-    suspend fun delete(id: String) = dao.deleteById(id)
+    suspend fun delete(id: String) = deletionRecorder.delete(
+        collectionName = "reminders",
+        recordId = id,
+        vehicleId = { dao.getById(id)?.vehicleId },
+        deleteLocal = { dao.deleteById(id) },
+    )
     suspend fun deleteForVehicle(vehicleId: String) = dao.deleteForVehicle(vehicleId)
 }
 

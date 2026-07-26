@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MaintenanceEntity::class,
         TripEntity::class,
         SyncConflictEntity::class,
+        DeletionTombstoneEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -26,6 +27,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun tripDao(): TripDao
     abstract fun syncConflictDao(): SyncConflictDao
+    abstract fun deletionTombstoneDao(): DeletionTombstoneDao
 
     companion object {
         @Volatile private var instance: FuelLogDatabase? = null
@@ -135,6 +137,21 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 )
             }
         }
+        private val migration7To8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS deletion_tombstones (
+                        `key` TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        collectionName TEXT NOT NULL,
+                        recordId TEXT NOT NULL,
+                        deletedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -149,6 +166,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration4To5,
                     migration5To6,
                     migration6To7,
+                    migration7To8,
                 )
                     .build()
                     .also { instance = it }

@@ -33,6 +33,13 @@ const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/
 const nativeCloudSync = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreSyncRepository.kt', import.meta.url), 'utf8');
 const nativeSyncDecision = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/SyncDecision.kt', import.meta.url), 'utf8');
 const nativeConflictDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/SyncConflictDao.kt', import.meta.url), 'utf8');
+const nativeDeletionEntity = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/DeletionTombstoneEntity.kt', import.meta.url), 'utf8');
+const nativeDeletionDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/DeletionTombstoneDao.kt', import.meta.url), 'utf8');
+const nativeDeletionRecorder = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalDeletionRecorder.kt', import.meta.url), 'utf8');
+const nativeFuelRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalFuelRepository.kt', import.meta.url), 'utf8');
+const nativeExpenseRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalExpenseRepository.kt', import.meta.url), 'utf8');
+const nativeMaintenanceRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalMaintenanceRepository.kt', import.meta.url), 'utf8');
+const nativeTripRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalTripRepository.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -326,7 +333,6 @@ test('native Cloud sync never overwrites divergent records automatically', () =>
   for (const collection of ['entries', 'expenses', 'reminders', 'trips']) {
     assert.match(nativeCloudSync, new RegExp(`collection = "${collection}"`));
   }
-  assert.doesNotMatch(nativeCloudSync, /\.delete\(\)\.await/);
   assert.match(nativeCloudSync, /normalizeLegacyVehicleId/);
   assert.match(nativeCloudSync, /UUID\.randomUUID\(\)\.toString\(\)/);
   assert.match(nativeCloudSync, /database\.withTransaction/);
@@ -348,6 +354,29 @@ test('native Cloud conflicts persist until the user chooses a side', () => {
   assert.match(nativeFuelApp, /ใช้ข้อมูลในเครื่อง/);
   assert.match(nativeFuelApp, /ใช้ข้อมูล Cloud/);
   assert.match(nativeMain, /cloudRepository\.resolveConflict/);
+});
+
+test('native record deletions use persistent Cloud tombstones', () => {
+  assert.match(nativeFuelDatabase, /DeletionTombstoneEntity::class/);
+  assert.match(nativeFuelDatabase, /Migration\(7, 8\)/);
+  assert.match(nativeDeletionEntity, /tableName = "deletion_tombstones"/);
+  assert.match(nativeDeletionDao, /getForVehicle/);
+  assert.match(nativeDeletionRecorder, /database\.withTransaction/);
+  assert.match(nativeDeletionRecorder, /deletionTombstoneDao\(\)\.upsert/);
+  for (const [repository, collection] of [
+    [nativeFuelRepository, 'entries'],
+    [nativeExpenseRepository, 'expenses'],
+    [nativeMaintenanceRepository, 'reminders'],
+    [nativeTripRepository, 'trips'],
+  ]) {
+    assert.match(repository, new RegExp(`collectionName = "${collection}"`));
+    assert.match(repository, /deletionRecorder\.delete/);
+  }
+  assert.match(nativeCloudSync, /syncDeletionTombstones\(vehicleId\)/);
+  assert.match(nativeCloudSync, /DELETIONS_COLLECTION = "_deletions"/);
+  assert.match(nativeCloudSync, /deletionTombstoneDao\(\)\.upsertAll\(merged\)/);
+  assert.match(nativeCloudSync, /deleteLocalRecord/);
+  assert.match(nativeCloudSync, /\.delete\(\)\.await/);
 });
 
 test('home has one vehicle selector', () => {

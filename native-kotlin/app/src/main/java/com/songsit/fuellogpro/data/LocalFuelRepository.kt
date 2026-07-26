@@ -9,6 +9,7 @@ import java.util.UUID
 
 class LocalFuelRepository(
     private val dao: FuelEntryDao,
+    private val deletionRecorder: LocalDeletionRecorder,
 ) {
     fun observe(vehicleId: String): Flow<List<FuelEntry>> =
         dao.observeForVehicle(vehicleId).map { entries -> entries.map(FuelEntryEntity::toDomain) }
@@ -40,7 +41,12 @@ class LocalFuelRepository(
         )
     }
 
-    suspend fun delete(id: String) = dao.deleteById(id)
+    suspend fun delete(id: String) = deletionRecorder.delete(
+        collectionName = "entries",
+        recordId = id,
+        vehicleId = { dao.getById(id)?.vehicleId },
+        deleteLocal = { dao.deleteById(id) },
+    )
 
     suspend fun deleteForVehicle(vehicleId: String) = dao.deleteForVehicle(vehicleId)
 }

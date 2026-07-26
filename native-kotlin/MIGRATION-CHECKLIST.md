@@ -21,7 +21,8 @@
 - [x] Conflict-safe sync: local-only uploads, Cloud-only downloads, divergent IDs never overwrite.
 - [x] Legacy fixed vehicle ID is transactionally replaced by a UUID before Cloud upload.
 - [x] Persistent user-visible conflict list with explicit Local/Cloud resolution.
-- [ ] Deletion tombstones.
+- [x] Record deletion tombstones for fuel, expenses, reminders and trips.
+- [ ] Shared/owned vehicle deletion lifecycle.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

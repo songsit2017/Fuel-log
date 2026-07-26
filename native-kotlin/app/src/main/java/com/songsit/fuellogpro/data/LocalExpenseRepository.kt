@@ -9,6 +9,7 @@ import java.util.UUID
 
 class LocalExpenseRepository(
     private val dao: ExpenseDao,
+    private val deletionRecorder: LocalDeletionRecorder,
 ) {
     fun observe(vehicleId: String): Flow<List<Expense>> =
         dao.observeForVehicle(vehicleId).map { expenses -> expenses.map(ExpenseEntity::toDomain) }
@@ -41,7 +42,12 @@ class LocalExpenseRepository(
         )
     }
 
-    suspend fun delete(id: String) = dao.deleteById(id)
+    suspend fun delete(id: String) = deletionRecorder.delete(
+        collectionName = "expenses",
+        recordId = id,
+        vehicleId = { dao.getById(id)?.vehicleId },
+        deleteLocal = { dao.deleteById(id) },
+    )
     suspend fun deleteForVehicle(vehicleId: String) = dao.deleteForVehicle(vehicleId)
 }
 

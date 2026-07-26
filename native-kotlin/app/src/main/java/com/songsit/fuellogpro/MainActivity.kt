@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.songsit.fuellogpro.data.LocalFuelRepository
+import com.songsit.fuellogpro.data.LocalDeletionRecorder
 import com.songsit.fuellogpro.data.LocalExpenseRepository
 import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.LocalMaintenanceRepository
@@ -86,11 +87,12 @@ class MainActivity : ComponentActivity() {
         backupRepository = LocalBackupRepository(database)
         val authRepository = GoogleAuthRepository()
         val cloudRepository = FirestoreSyncRepository(database)
-        val fuelRepository = LocalFuelRepository(database.fuelEntryDao())
-        val expenseRepository = LocalExpenseRepository(database.expenseDao())
+        val deletionRecorder = LocalDeletionRecorder(database)
+        val fuelRepository = LocalFuelRepository(database.fuelEntryDao(), deletionRecorder)
+        val expenseRepository = LocalExpenseRepository(database.expenseDao(), deletionRecorder)
         val vehicleRepository = LocalVehicleRepository(database.vehicleDao())
-        val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao())
-        val tripRepository = LocalTripRepository(database.tripDao())
+        val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao(), deletionRecorder)
+        val tripRepository = LocalTripRepository(database.tripDao(), deletionRecorder)
         setContent {
             var cloudState by remember {
                 mutableStateOf(

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.songsit.fuellogpro.data.local.DeletionTombstoneEntity
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
@@ -13,6 +14,7 @@ import com.songsit.fuellogpro.data.local.MaintenanceEntity
 import com.songsit.fuellogpro.data.local.TripEntity
 import com.songsit.fuellogpro.data.local.VehicleEntity
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
+import com.songsit.fuellogpro.data.local.deletionTombstoneKey
 import kotlinx.coroutines.tasks.await
 import com.songsit.fuellogpro.domain.SyncDecision
 import com.songsit.fuellogpro.domain.decideSync
@@ -68,6 +70,10 @@ class FirestoreSyncRepository(
 
         val vehicleIds = localVehicles.keys + cloudVehicles.keys
         for (vehicleId in vehicleIds) {
+            syncDeletionTombstones(vehicleId).also {
+                uploaded += it.uploaded
+                downloaded += it.downloaded
+            }
             syncCollection(
                 vehicleId = vehicleId,
                 collection = "entries",
@@ -214,6 +220,8 @@ class FirestoreSyncRepository(
     companion object {
         private const val LEGACY_VEHICLE_ID = "local-default"
         private const val VEHICLES_COLLECTION = "vehicles"
+        private const val DELETIONS_COLLECTION = "_deletions"
+        private val RECORD_COLLECTIONS = setOf("entries", "expenses", "reminders", "trips")
     }
 
     private suspend fun <T> syncCollection(
@@ -266,6 +274,81 @@ class FirestoreSyncRepository(
         }
         if (imported.isNotEmpty()) database.withTransaction { upsert(imported) }
         return RecordSyncCount(uploaded, imported.size, conflicts)
+    }
+
+    private suspend fun syncDeletionTombstones(vehicleId: String): RecordSyncCount {
+        val localByKey = database.deletionTombstoneDao().getForVehicle(vehicleId)
+            .associateBy(DeletionTombstoneEntity::key)
+        val cloudByKey = firestore.collection(VEHICLES_COLLECTION).document(vehicleId)
+            .collection(DELETIONS_COLLECTION).get().await().documents
+            .mapNotNull { document ->
+                val collectionName = document.getString("collectionName")
+                val recordId = document.getString("recordId")
+                if (collectionName == null || collectionName !in RECORD_COLLECTIONS || recordId.isNullOrBlank()) {
+                    return@mapNotNull null
+                }
+                val item = DeletionTombstoneEntity(
+                    key = deletionTombstoneKey(collectionName, vehicleId, recordId),
+                    vehicleId = vehicleId,
+                    collectionName = collectionName,
+                    recordId = recordId,
+                    deletedAt = document.getLong("deletedAt") ?: 0L,
+                )
+                item.key to item
+            }
+            .toMap()
+
+        var uploaded = 0
+        for ((key, item) in localByKey) {
+            if (key !in cloudByKey) {
+                firestore.collection(VEHICLES_COLLECTION).document(vehicleId)
+                    .collection(DELETIONS_COLLECTION).document(key)
+                    .set(
+                        mapOf(
+                            "collectionName" to item.collectionName,
+                            "recordId" to item.recordId,
+                            "deletedAt" to item.deletedAt,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ),
+                        SetOptions.merge(),
+                    ).await()
+                uploaded++
+            }
+        }
+
+        val merged = (localByKey.keys + cloudByKey.keys).mapNotNull { key ->
+            listOfNotNull(localByKey[key], cloudByKey[key]).maxByOrNull { it.deletedAt }
+        }
+        if (merged.isNotEmpty()) {
+            database.withTransaction {
+                database.deletionTombstoneDao().upsertAll(merged)
+                for (item in merged) {
+                    deleteLocalRecord(item.collectionName, item.recordId)
+                    database.syncConflictDao().deleteByKey(
+                        conflictKey(item.collectionName, vehicleId, item.recordId),
+                    )
+                }
+            }
+            for (item in merged) {
+                firestore.collection(VEHICLES_COLLECTION).document(vehicleId)
+                    .collection(item.collectionName).document(item.recordId)
+                    .delete().await()
+            }
+        }
+        return RecordSyncCount(
+            uploaded = uploaded,
+            downloaded = cloudByKey.keys.count { it !in localByKey },
+            conflicts = 0,
+        )
+    }
+
+    private suspend fun deleteLocalRecord(collectionName: String, recordId: String) {
+        when (collectionName) {
+            "entries" -> database.fuelEntryDao().deleteById(recordId)
+            "expenses" -> database.expenseDao().deleteById(recordId)
+            "reminders" -> database.maintenanceDao().deleteById(recordId)
+            "trips" -> database.tripDao().deleteById(recordId)
+        }
     }
 
     private suspend fun recordConflict(vehicleId: String, collection: String, recordId: String) {

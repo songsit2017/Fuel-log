@@ -1,8 +1,9 @@
 # FuelLog Pro Native (Kotlin) — migration workspace
 
-This directory is the parallel native Android implementation. The current
-Capacitor APK remains the production fallback until each native feature passes
-data-parity tests.
+This directory is the primary Android implementation. GitHub Actions builds
+this Kotlin/Compose project as the downloadable Android artifact. The current
+Capacitor project remains a compatibility fallback until each native feature
+passes data-parity tests.
 
 All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 

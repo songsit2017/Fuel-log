@@ -15,6 +15,26 @@ android {
         versionCode = providers.environmentVariable("FUELLOG_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("FUELLOG_VERSION_NAME").orNull ?: "9.0.0-native-alpha.1"
     }
+    signingConfigs {
+        create("release") {
+            val keystoreFile = providers.environmentVariable("FUELLOG_KEYSTORE_FILE").orNull
+            if (!keystoreFile.isNullOrBlank()) {
+                storeFile = file(keystoreFile)
+                storePassword = providers.environmentVariable("FUELLOG_KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("FUELLOG_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("FUELLOG_KEY_PASSWORD").orNull
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            val keystoreFile = providers.environmentVariable("FUELLOG_KEYSTORE_FILE").orNull
+            if (!keystoreFile.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -45,4 +65,3 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
-

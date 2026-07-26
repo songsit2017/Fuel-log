@@ -105,6 +105,10 @@ function stationBadge(stationName){
   if(brand) return `<div class="ico brand-badge brand-${brand.key}" title="${brand.label}" aria-label="${brand.label}">${BRAND_ICONS[brand.key]}</div>`;
   return `<div class="ico generic-fuel-badge">${FUEL_PUMP_ICON}</div>`;
 }
+function stationBrandLogo(station){
+  return stationBadge(`${station?.brand||''} ${station?.name||''}`)
+    .replace('class="ico ', 'class="station-brand-icon ico ');
+}
 const KEY = 'fuellog-v5-data';
 const memoryStore = new Map();
 const store = (()=>{
@@ -896,7 +900,6 @@ function stationKey(station){return station.id||`${station.name}|${Number(statio
 function stationIsFavorite(station){return state.favoriteStations.includes(stationKey(station));}
 function stationPrice(station){const last=findLastPriceForStation(station.name);return last?.pricePerLiter?{value:toDisplayPricePerVol(last.pricePerLiter),date:last.date}:null;}
 function stationVisitCount(station){const name=station.name.toLowerCase();return entries().filter(entry=>{const saved=String(entry.station||'').toLowerCase();return saved&&(name.includes(saved)||saved.includes(name));}).length;}
-function stationBrandLabel(station){const brand=String(station.brand||station.name).toLowerCase();if(brand.includes('shell'))return 'S';if(brand.includes('caltex'))return 'C';if(brand.includes('บางจาก'))return 'BCP';if(brand.includes('ptt')||brand.includes('ปตท')||brand.includes('pt '))return 'PT';return '⛽';}
 function stationDirectionsUrl(station){return `https://www.google.com/maps/dir/?${new URLSearchParams({api:'1',destination:`${station.lat},${station.lon}`,travelmode:'driving',dir_action:'navigate'})}`;}
 function filteredServiceStations(filter='all'){
   if(filter==='favorites')return serviceStations.filter(stationIsFavorite);
@@ -906,7 +909,7 @@ function filteredServiceStations(filter='all'){
 function renderServiceStationList(filter='all'){
   const box=$('#serviceStationList');if(!box)return;
   const stations=filteredServiceStations(filter);
-  box.innerHTML=stations.length?stations.map(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station),visits=stationVisitCount(station);return `<article class="card station-row"><div class="station-brand-icon">${esc(stationBrandLabel(station))}</div><div><b>${esc(station.name)}</b><small>${fmtDist(station.dist,1)}${visits?` • เยี่ยมชม ${fmtCount(visits)} ครั้ง`:''}</small><small>${esc(station.brand||'สถานีบริการน้ำมัน')}${price?` • บันทึกล่าสุด ${price.date}`:''}</small></div><div class="station-row-price">${price?`${money(price.value)}<small>/${volUnit()}</small>`:'—'}</div><button class="station-favorite ${favorite?'active':''}" data-favorite-station="${esc(stationKey(station))}" aria-label="ชื่นชอบ">★</button><a class="primary station-nav" href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">นำทาง</a></article>`;}).join(''):'<div class="empty">ไม่พบสถานีในตัวกรองนี้</div>';
+  box.innerHTML=stations.length?stations.map(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station),visits=stationVisitCount(station);return `<article class="card station-row">${stationBrandLogo(station)}<div><b>${esc(station.name)}</b><small>${fmtDist(station.dist,1)}${visits?` • เยี่ยมชม ${fmtCount(visits)} ครั้ง`:''}</small><small>${esc(station.brand||'สถานีบริการน้ำมัน')}${price?` • บันทึกล่าสุด ${price.date}`:''}</small></div><div class="station-row-price">${price?`${money(price.value)}<small>/${volUnit()}</small>`:'—'}</div><button class="station-favorite ${favorite?'active':''}" data-favorite-station="${esc(stationKey(station))}" aria-label="ชื่นชอบ">★</button><a class="primary station-nav" href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">นำทาง</a></article>`;}).join(''):'<div class="empty">ไม่พบสถานีในตัวกรองนี้</div>';
 }
 function renderServiceStationMarkers(filter='all'){
   if(!serviceMap)return;

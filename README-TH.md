@@ -52,7 +52,7 @@ OCR และ Firebase ต้องทดสอบบนเว็บจริง
 
 ## Android APK Beta และ GitHub Releases
 
-- Workflow `.github/workflows/build-android.yml` สร้าง APK ผ่าน Capacitor 7.6.4
+- Workflow `.github/workflows/build-android.yml` สร้าง APK/AAB หลักจาก Kotlin + Jetpack Compose
 - กด Run workflow เพื่อรับ TEST APK จากหน้า Actions
 - เมื่อตั้ง GitHub Actions signing secrets แล้ว การ push tag `v*` จะสร้าง signed APK และ AAB พร้อม GitHub Release
 - อ่านขั้นตอนสร้าง keystore และตั้ง Secret ที่ `mobile/README-ANDROID-TH.md`
@@ -68,7 +68,7 @@ OCR และ Firebase ต้องทดสอบบนเว็บจริง
 
 ## v6.1 Main + Android Ready
 - ตัวเลือกรูปแบบ Bottom Sheet: กล้อง / แกลเลอรี / ยกเลิก
-- โฟลเดอร์ `mobile/` สำหรับ Capacitor และ Android Studio
+- โฟลเดอร์ `native-kotlin/` คือแอป Android หลัก ส่วน `mobile/` เก็บ Capacitor ไว้เป็น fallback ระหว่างย้ายฟีเจอร์
 - เว็บไซต์บน GitHub Pages ยัง deploy จากไฟล์รากเหมือนเดิม
 
 

@@ -18,8 +18,10 @@ self.addEventListener('fetch', event => {
   if(event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Never cache Firebase/Google responses.
-  if(url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com')){
+  // Never cache Firebase/Google responses, or third-party live-data APIs.
+  if(url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com') ||
+     url.hostname.includes('overpass-api.de') || url.hostname.includes('chnwt.dev') ||
+     url.hostname.includes('allorigins.win')){
     event.respondWith(fetch(event.request));
     return;
   }

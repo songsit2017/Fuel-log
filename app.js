@@ -144,9 +144,20 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
  if(type==='expense')b.innerHTML=`<div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
  d.showModal(); if(type==='fuel'&&!obj.station)setTimeout(autoNearby,150);}
-async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.dataset.type,idv=d.dataset.id||uid(),data=Object.fromEntries(new FormData($('#dynamicForm')));if(type==='fuel'){data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=toCanonicalDist(+data.odometer||0);data.liters=toCanonicalVol(+data.liters||0);data.pricePerLiter=toCanonicalPricePerVol(+data.pricePerLiter||0);data.total=+data.total||0;data.full=$('[name="full"]')?.checked??true;if(!data.pricePerLiter&&data.total&&data.liters)data.pricePerLiter=data.total/data.liters;const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);}
- if(type==='expense'){data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=data.odometer?toCanonicalDist(+data.odometer):null;data.amount=+data.amount||0;const old=state.expenses.findIndex(x=>x.id===idv);old>=0?state.expenses[old]=data:state.expenses.push(data);}
- if(type==='reminder'){data.id=idv;data.vehicleId=state.currentVehicleId;data.nextOdo=data.nextOdo?toCanonicalDist(+data.nextOdo):null;data.repeatOdo=data.repeatOdo?toCanonicalDist(+data.repeatOdo):null;data.repeatMonths=+data.repeatMonths||null;const old=state.reminders.findIndex(x=>x.id===idv);old>=0?state.reminders[old]=data:state.reminders.push(data);}
+async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.dataset.type,idv=d.dataset.id||uid(),data=Object.fromEntries(new FormData($('#dynamicForm')));
+ if(type==='fuel'){
+   const odoRaw=+data.odometer||0, litersRaw=+data.liters||0;
+   if(odoRaw<=0||litersRaw<=0){ alert(`กรอกเลข${distUnit()}และปริมาณ${volUnit()}ให้ครบก่อนบันทึก`); return; }
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=toCanonicalDist(odoRaw);data.liters=toCanonicalVol(litersRaw);data.pricePerLiter=toCanonicalPricePerVol(+data.pricePerLiter||0);data.total=+data.total||0;data.full=$('[name="full"]')?.checked??true;if(!data.pricePerLiter&&data.total&&data.liters)data.pricePerLiter=data.total/data.liters;const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);
+ }
+ if(type==='expense'){
+   if(!(+data.amount>0)){ alert('กรอกจำนวนเงินให้ครบก่อนบันทึก'); return; }
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=data.odometer?toCanonicalDist(+data.odometer):null;data.amount=+data.amount||0;const old=state.expenses.findIndex(x=>x.id===idv);old>=0?state.expenses[old]=data:state.expenses.push(data);
+ }
+ if(type==='reminder'){
+   if(!data.name?.trim()){ alert('กรอกชื่อรายการเตือนก่อนบันทึก'); return; }
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.nextOdo=data.nextOdo?toCanonicalDist(+data.nextOdo):null;data.repeatOdo=data.repeatOdo?toCanonicalDist(+data.repeatOdo):null;data.repeatMonths=+data.repeatMonths||null;const old=state.reminders.findIndex(x=>x.id===idv);old>=0?state.reminders[old]=data:state.reminders.push(data);
+ }
  d.close();renderAll();toast('บันทึกแล้ว');if(user)syncVehicle().catch(()=>{});}
 
 function markReminderDone(id){
@@ -173,7 +184,7 @@ async function fetchNearbyStations(){
 }
 async function autoNearby(){const box=$('#formNearby'),input=$('#stationInput');if(!box)return;box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';try{const stations=await fetchNearbyStations();nearbyCache=stations;if(stations[0]&&!input.value)input.value=stations[0].name;renderNearby(stations,box);renderNearby(stations,$('#nearbyList'));}catch(e){box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</div>';}}
 function haversine(a,b,c,d){const R=6371,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,z=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return R*2*Math.atan2(Math.sqrt(z),Math.sqrt(1-z));}
-function renderNearby(arr,box){if(!box)return;box.innerHTML=arr?.length?arr.map(x=>`<button type="button" class="nearby-option" data-station="${esc(x.name)}"><b>${esc(x.name)}</b><small> ${fmt(x.dist,1)} กม.</small></button>`).join(''):'<div class="muted">ไม่พบปั๊ม</div>';}
+function renderNearby(arr,box){if(!box)return;box.innerHTML=arr?.length?arr.map(x=>`<button type="button" class="nearby-option" data-station="${esc(x.name)}"><b>${esc(x.name)}</b><small> ${fmtDist(x.dist,1)}</small></button>`).join(''):'<div class="muted">ไม่พบปั๊ม</div>';}
 
 function findLastPriceForStation(stationName){
   const target=stationName.toLowerCase();
@@ -185,41 +196,62 @@ async function refreshHomeNearby(){
   box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';
   try{
     const stations=await fetchNearbyStations();
-    box.innerHTML=stations.length?stations.map(s=>{const last=findLastPriceForStation(s.name);return `<div class="list-row"><div><b>${esc(s.name)}</b>${last?`<br><small style="color:var(--green)">฿${fmt(last.pricePerLiter,2)}/ล. เมื่อคุณเติมล่าสุด (${last.date})</small>`:''}</div><b>${fmt(s.dist,1)} กม.</b></div>`;}).join(''):'<div class="muted">ไม่พบปั๊มในรัศมี 7 กม.</div>';
+    nearbyCache=stations;
+    box.innerHTML=stations.length?stations.map(s=>{const last=findLastPriceForStation(s.name);return `<div class="list-row"><div><b>${esc(s.name)}</b>${last?`<br><small style="color:var(--green)">฿${fmt(toDisplayPricePerVol(last.pricePerLiter),2)}/${volUnit()} เมื่อคุณเติมล่าสุด (${last.date})</small>`:''}</div><b>${fmtDist(s.dist,1)}</b></div>`;}).join(''):'<div class="muted">ไม่พบปั๊มในรัศมี 7 กม.</div>';
+  }catch(e){ box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่ง</div>'; }
+}
+async function refreshFuelNearby(){
+  const box=$('#nearbyList');if(!box)return;
+  box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';
+  try{
+    const stations=await fetchNearbyStations();
+    nearbyCache=stations;
+    renderNearby(stations, box);
   }catch(e){ box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่ง</div>'; }
 }
 
+function renderTodayPrices(data){
+  if(!data||data.status!=='success'||!data.response||typeof data.response!=='object') return null;
+  const r=data.response;
+  const brands=[{key:'ptt',label:'ปตท.'},{key:'bcp',label:'บางจาก'},{key:'shell',label:'เชลล์'},{key:'esso',label:'เอสโซ่'},{key:'caltex',label:'คาลเท็กซ์'},{key:'pt',label:'พีที'},{key:'susco',label:'ซัสโก้'}];
+  const fuels=[{key:'gasohol_95',label:'95'},{key:'gasohol_91',label:'91'},{key:'diesel_b7',label:'ดีเซล B7'}];
+  const isValid=v=>{ if(v===null||v===undefined||v==='') return false; const n=parseFloat(v); return !isNaN(n)&&n>0&&n<200; };
+  const rows=brands.map(b=>{
+    const st=r.stations&&typeof r.stations==='object'?r.stations[b.key]:null;
+    if(!st||typeof st!=='object') return '';
+    const parts=fuels.map(f=>(st[f.key]&&isValid(st[f.key].price))?`${f.label} ฿${parseFloat(st[f.key].price).toFixed(2)}`:null).filter(Boolean);
+    if(!parts.length) return '';
+    return `<div class="list-row"><b>${b.label}</b><span>${parts.join(' · ')}</span></div>`;
+  }).filter(Boolean).join('');
+  if(!rows) return null;
+  const dateLine=(typeof r.date==='string'&&r.date.trim())?`<div class="muted" style="margin-bottom:6px;font-size:10.5px;">อัปเดตล่าสุด: ${esc(r.date)}</div>`:'';
+  return dateLine+rows;
+}
 async function loadTodayPrices(){
   const box=$('#todayPriceList');if(!box)return;
   box.innerHTML='<div class="muted">กำลังโหลด…</div>';
-  const fallback=()=>{ box.innerHTML='<div class="muted">โหลดราคาไม่สำเร็จตอนนี้ — <a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--accent)">เปิดดูที่ kapook แทน</a></div>'; };
-  try{
-    const res=await fetch('https://api.chnwt.dev/thai-oil-api/latest');
-    if(!res.ok) throw new Error('bad status');
-    const data=await res.json();
-    if(!data||data.status!=='success'||!data.response||typeof data.response!=='object'){ fallback(); return; }
-    const r=data.response;
-    const brands=[{key:'ptt',label:'ปตท.'},{key:'bcp',label:'บางจาก'},{key:'shell',label:'เชลล์'},{key:'esso',label:'เอสโซ่'},{key:'caltex',label:'คาลเท็กซ์'},{key:'pt',label:'พีที'},{key:'susco',label:'ซัสโก้'}];
-    const fuels=[{key:'gasohol_95',label:'95'},{key:'gasohol_91',label:'91'},{key:'diesel_b7',label:'ดีเซล B7'}];
-    const isValid=v=>{ if(v===null||v===undefined||v==='') return false; const n=parseFloat(v); return !isNaN(n)&&n>0&&n<200; };
-    const rows=brands.map(b=>{
-      const st=r.stations&&typeof r.stations==='object'?r.stations[b.key]:null;
-      if(!st||typeof st!=='object') return '';
-      const parts=fuels.map(f=>(st[f.key]&&isValid(st[f.key].price))?`${f.label} ฿${parseFloat(st[f.key].price).toFixed(2)}`:null).filter(Boolean);
-      if(!parts.length) return '';
-      return `<div class="list-row"><b>${b.label}</b><span>${parts.join(' · ')}</span></div>`;
-    }).filter(Boolean).join('');
-    if(!rows){ fallback(); return; }
-    const dateLine=(typeof r.date==='string'&&r.date.trim())?`<div class="muted" style="margin-bottom:6px;font-size:10.5px;">อัปเดตล่าสุด: ${esc(r.date)}</div>`:'';
-    box.innerHTML=dateLine+rows;
-  }catch(e){ fallback(); }
+  const SRC='https://api.chnwt.dev/thai-oil-api/latest';
+  const attempts=[
+    ()=>fetch(SRC),
+    ()=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(SRC)), // fallback in case the API blocks direct browser (CORS) requests
+  ];
+  for(const attempt of attempts){
+    try{
+      const res=await attempt();
+      if(!res.ok) continue;
+      const data=await res.json();
+      const html=renderTodayPrices(data);
+      if(html){ box.innerHTML=html; return; }
+    }catch(e){ /* try next method */ }
+  }
+  box.innerHTML='<div class="muted">โหลดราคาไม่สำเร็จตอนนี้ (แหล่งข้อมูลอาจไม่พร้อมใช้งานชั่วคราว) — <a href="https://gasprice.kapook.com/" target="_blank" rel="noopener" style="color:var(--accent)">เปิดดูที่ kapook แทน</a></div>';
 }
 
 async function uploadAttachedPhotos(logId){if(!user)return;const files=[['receipt',$('#receiptFile')?.files[0]],['odometer',$('#odoFile')?.files[0]]].filter(x=>x[1]);for(const [type,file] of files){const path=`vehicles/${state.currentVehicleId}/fuel/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;const sr=ref(storage,path);await uploadBytes(sr,file,{contentType:file.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(sr);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{type,path,url,name:file.name,logId,uploadedBy:user.uid,createdAt:serverTimestamp()});}}
 
 function openPanel(name){const d=$('#panelDialog');$('#panelTitle').textContent={family:'ครอบครัวและ Cloud',trips:'ทริปและหน้างาน',gallery:'รูปและเอกสาร',reports:'รายงาน',backup:'สำรองและนำเข้า',vehicles:'จัดการรถ',search:'ค้นหาทุกอย่าง',settings:'การตั้งค่า'}[name];d.dataset.panel=name;renderPanel(name);d.showModal();}
 function renderPanel(name){const b=$('#panelBody');if(name==='family')b.innerHTML=familyPanel();if(name==='trips')b.innerHTML=tripsPanel();if(name==='gallery'){b.innerHTML='<div id="galleryBody" class="muted">กำลังโหลด…</div>';loadGallery();}if(name==='reports')b.innerHTML=reportsPanel();if(name==='backup')b.innerHTML=backupPanel();if(name==='vehicles')b.innerHTML=vehiclesPanel();if(name==='search')b.innerHTML=searchPanel();if(name==='settings')b.innerHTML=settingsPanel();bindPanel();}
-function familyPanel(){return user?`<div class="card"><div class="user-card"><img src="${esc(user.photoURL||'icon-192.png')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName||user.email)}</b><small>${esc(user.email)}</small></div></div><div class="panel-actions" style="margin-top:12px"><button class="secondary" id="signOutBtn">ออกจากระบบ</button><button class="primary" id="syncBtn">ซิงก์รถนี้</button></div></div><div class="card"><h2>สมาชิก</h2><div id="membersBody" class="muted">กำลังโหลด…</div></div><div class="card"><h2>สร้างรหัสเชิญ</h2><input id="inviteEmail" type="email" placeholder="Gmail สมาชิก"><select id="inviteRole"><option value="editor">Editor — เพิ่มและแก้ไข</option><option value="viewer">Viewer — ดูอย่างเดียว</option></select><button class="primary" id="inviteBtn" style="margin-top:8px">สร้างรหัส</button><div id="inviteResult" class="muted"></div></div><div class="card"><h2>เข้าร่วมรถ</h2><input id="joinCode" maxlength="8" placeholder="รหัสเชิญ 8 ตัว"><button class="primary" id="joinBtn" style="margin-top:8px">เข้าร่วม</button></div>`:`<div class="card"><h2>แชร์รถกับครอบครัว</h2><p class="muted">ใช้บัญชี Google เดียวสำหรับ Firebase, Firestore และ Storage ไม่ต้องล็อกอิน Google Drive แยก</p><button class="google-btn" id="loginBtn"><b style="color:#4285f4">G</b> เข้าสู่ระบบด้วย Google</button><div id="authMessage" class="muted"></div></div>`;}
+function familyPanel(){return user?`<div class="card"><div class="user-card"><img src="${esc(user.photoURL||'icon-192.png')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName||user.email)}</b><small>${esc(user.email)}</small></div></div><div class="panel-actions" style="margin-top:12px"><button class="secondary" id="signOutBtn">ออกจากระบบ</button><button class="primary" id="syncBtn">ซิงก์ข้อมูลยานพาหนะ</button></div></div><div class="card"><h2>สมาชิก</h2><div id="membersBody" class="muted">กำลังโหลด…</div></div><div class="card"><h2>สร้างรหัสเชิญ</h2><input id="inviteEmail" type="email" placeholder="Gmail สมาชิก"><select id="inviteRole"><option value="editor">Editor — เพิ่มและแก้ไข</option><option value="viewer">Viewer — ดูอย่างเดียว</option></select><button class="primary" id="inviteBtn" style="margin-top:8px">สร้างรหัส</button><div id="inviteResult" class="muted"></div></div><div class="card"><h2>เข้าร่วมรถ</h2><input id="joinCode" maxlength="8" placeholder="รหัสเชิญ 8 ตัว"><button class="primary" id="joinBtn" style="margin-top:8px">เข้าร่วม</button></div>`:`<div class="card"><h2>แชร์รถกับครอบครัว</h2><p class="muted">ใช้บัญชี Google เดียวสำหรับ Firebase, Firestore และ Storage ไม่ต้องล็อกอิน Google Drive แยก</p><button class="google-btn" id="loginBtn"><b style="color:#4285f4">G</b> เข้าสู่ระบบด้วย Google</button><div id="authMessage" class="muted"></div></div>`;}
 function tripsPanel(){const arr=trips(),sum=arr.reduce((s,x)=>s+(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0),0);return `<div class="metric-grid">${metric('จำนวนทริป',fmt(arr.length),'')}${metric('ต้นทุนรวม',money(sum),'')}</div><div class="card"><h2>บันทึกระยะทางด้วย GPS</h2><div class="panel-actions"><button class="primary" id="gpsStartBtn" style="${gpsTrack?'display:none':''}">▶ เริ่มติดตาม</button><button class="secondary" id="gpsStopBtn" style="${gpsTrack?'':'display:none'}">■ หยุดและบันทึกระยะทาง</button></div><div id="gpsStatus" class="muted" style="margin-top:6px;">${gpsTrack?'กำลังติดตามตำแหน่ง…':'กด "เริ่มติดตาม" ก่อนออกเดินทาง ระบบจะคำนวณระยะทางจาก GPS ให้อัตโนมัติ'}</div><div id="gpsDistance" class="muted">${gpsTrack?fmtDist(gpsTrack.distanceKm,2):''}</div></div><div class="card"><h2>เพิ่มทริป</h2><input id="tripName" placeholder="ชื่องาน/ปลายทาง"><input id="tripDate" type="date" value="${today()}"><input id="tripDistance" type="number" step=".01" placeholder="ระยะทาง (${distUnit()}) — ถ้ากด GPS ไว้จะใส่ให้อัตโนมัติ" value="${gpsTrack?dispDistVal(gpsTrack.distanceKm):''}"><div class="form-grid"><input id="tripFuel" type="number" placeholder="ค่าน้ำมัน"><input id="tripToll" type="number" placeholder="ทางด่วน"><input id="tripParking" type="number" placeholder="ที่จอด"><input id="tripFood" type="number" placeholder="อาหาร/ที่พัก"><input id="tripOther" type="number" placeholder="อื่น ๆ"></div><button class="primary" id="saveTripBtn" style="margin-top:8px">บันทึกทริป</button></div><div class="card">${arr.map(x=>{const t=(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0);return `<div class="list-row"><div><b>${esc(x.name)}</b><small>${x.date}${x.distance?' • '+fmtDist(x.distance):''}</small></div><b>${money(t)}</b></div>`}).join('')||'<div class="empty">ยังไม่มีทริป</div>'}</div>`;}
 
 function startGpsTrip(){
@@ -312,7 +344,16 @@ function vehiclesPanel(){return `<div class="card"><div id="vehicleManage">${sta
 
 async function login(){await requireFirebase();const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});try{await signInWithPopup(auth,p);}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))await signInWithRedirect(auth,p);else $('#authMessage').textContent=e.message;}}
 async function ensureUser(){await requireFirebase();if(!user)throw new Error('กรุณาเข้าสู่ระบบ');await setDoc(doc(db,'users',user.uid),{email:user.email,emailLower:user.email.toLowerCase(),displayName:user.displayName||'',photoURL:user.photoURL||'',updatedAt:serverTimestamp()},{merge:true});}
-async function ensureCloudVehicle(){await ensureUser();const vr=doc(db,'vehicles',state.currentVehicleId),s=await getDoc(vr);if(!s.exists())await setDoc(vr,{name:vehicle().name,ownerUid:user.uid,members:{[user.uid]:{role:'owner',email:user.email,displayName:user.displayName||''}},createdAt:serverTimestamp()});return getDoc(vr);}
+async function ensureCloudVehicle(){
+  await ensureUser();
+  const vr=doc(db,'vehicles',state.currentVehicleId);
+  let s=null;
+  try{ s=await getDoc(vr); }catch(e){ s=null; } // a not-yet-created vehicle doc reads as permission-denied under the rules, not as "doesn't exist" — treat that as "needs creating"
+  if(!s||!s.exists()){
+    await setDoc(vr,{name:vehicle().name,ownerUid:user.uid,members:{[user.uid]:{role:'owner',email:user.email,displayName:user.displayName||''}},createdAt:serverTimestamp()});
+  }
+  return getDoc(vr);
+}
 async function syncVehicle(){await ensureCloudVehicle();const batch=writeBatch(db);for(const [name,arr] of [['entries',entries()],['expenses',expenses()],['reminders',reminders()],['trips',trips()]])for(const item of arr)batch.set(doc(db,'vehicles',state.currentVehicleId,name,item.id),{...item,updatedBy:user.uid,updatedAt:serverTimestamp()},{merge:true});await batch.commit();toast('ซิงก์แล้ว');}
 async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const x=d.data();map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
 async function loadMembers(){const box=$('#membersBody');if(!box||!user)return;const s=await getDoc(doc(db,'vehicles',state.currentVehicleId));if(!s.exists()){box.innerHTML='รถคันนี้ยังไม่ขึ้น Cloud';return;}const d=s.data();box.innerHTML=Object.values(d.members||{}).map(m=>`<div class="list-row"><div><b>${esc(m.displayName||m.email)}</b><small>${esc(m.email||'')}</small></div><b>${esc(m.role)}</b></div>`).join('');}
@@ -572,7 +613,7 @@ async function importFile(file){
     alert(`นำเข้าไม่สำเร็จ: ${e.message}`);
   }
 }
-function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){$('#stationInput').value=st.dataset.station;}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshNearby').onclick=autoNearby;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.body.classList.toggle('light',state.theme==='light');save();};}
+function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel'){renderFuel();refreshFuelNearby();}if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();if(x.dataset.nav==='home')refreshHomeNearby();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){const si=$('#stationInput');if(si){si.value=st.dataset.station;}else{showForm('fuel',{station:st.dataset.station});}}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#formCloseX').onclick=()=>$('#formDialog').close();$('#formCancelBtn').onclick=()=>$('#formDialog').close();$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshNearby').onclick=refreshFuelNearby;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.body.classList.toggle('light',state.theme==='light');save();};}
 
 function boot(){
   try{
@@ -582,6 +623,7 @@ function boot(){
     renderAll();
     renderNav('home');
     loadTodayPrices();
+    refreshHomeNearby();
     document.documentElement.dataset.appReady = 'true';
   }catch(err){
     console.error('FuelLog boot failed:', err);

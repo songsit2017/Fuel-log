@@ -20,7 +20,8 @@
 - [x] Native Google sign-in UI and manual Firestore sync.
 - [x] Conflict-safe sync: local-only uploads, Cloud-only downloads, divergent IDs never overwrite.
 - [x] Legacy fixed vehicle ID is transactionally replaced by a UUID before Cloud upload.
-- [ ] User-visible conflict resolution and deletion tombstones.
+- [x] Persistent user-visible conflict list with explicit Local/Cloud resolution.
+- [ ] Deletion tombstones.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

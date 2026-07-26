@@ -32,6 +32,7 @@ const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/
 const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalBackupRepository.kt', import.meta.url), 'utf8');
 const nativeCloudSync = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreSyncRepository.kt', import.meta.url), 'utf8');
 const nativeSyncDecision = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/SyncDecision.kt', import.meta.url), 'utf8');
+const nativeConflictDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/SyncConflictDao.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -316,7 +317,10 @@ test('native backup is versioned, complete and restores without deleting local d
 
 test('native Cloud sync never overwrites divergent records automatically', () => {
   assert.match(nativeSyncDecision, /localExists && cloudExists -> SyncDecision\.CONFLICT/);
-  assert.match(nativeCloudSync, /SyncDecision\.CONFLICT -> conflicts\+\+/);
+  assert.match(
+    nativeCloudSync,
+    /SyncDecision\.CONFLICT -> \{[\s\S]*?conflicts\+\+[\s\S]*?recordConflict/,
+  );
   assert.match(nativeCloudSync, /whereEqualTo\("ownerUid", uid\)/);
   assert.match(nativeCloudSync, /whereArrayContains\("memberUids", uid\)/);
   for (const collection of ['entries', 'expenses', 'reminders', 'trips']) {
@@ -328,6 +332,22 @@ test('native Cloud sync never overwrites divergent records automatically', () =>
   assert.match(nativeCloudSync, /database\.withTransaction/);
   assert.match(nativeFuelApp, /ระบบยังไม่เขียนทับทั้งสองฝั่ง/);
   assert.match(nativeMain, /default_web_client_id/);
+});
+
+test('native Cloud conflicts persist until the user chooses a side', () => {
+  assert.match(nativeFuelDatabase, /SyncConflictEntity::class/);
+  assert.match(nativeFuelDatabase, /Migration\(6, 7\)/);
+  assert.match(nativeConflictDao, /fun observeAll\(\): Flow<List<SyncConflictEntity>>/);
+  assert.match(nativeCloudSync, /recordConflict/);
+  assert.match(nativeCloudSync, /suspend fun resolveConflict/);
+  assert.match(nativeCloudSync, /vehicleEditableCloudMap/);
+  assert.match(
+    nativeCloudSync,
+    /private fun vehicleEditableCloudMap[\s\S]*?"name" to item\.name[\s\S]*?"registration" to item\.registration[\s\S]*?"fuelType" to item\.fuelType/,
+  );
+  assert.match(nativeFuelApp, /ใช้ข้อมูลในเครื่อง/);
+  assert.match(nativeFuelApp, /ใช้ข้อมูล Cloud/);
+  assert.match(nativeMain, /cloudRepository\.resolveConflict/);
 });
 
 test('home has one vehicle selector', () => {

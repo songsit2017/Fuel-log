@@ -16,6 +16,9 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance_tasks")
     suspend fun getAll(): List<MaintenanceEntity>
 
+    @Query("SELECT * FROM maintenance_tasks WHERE id = :id")
+    suspend fun getById(id: String): MaintenanceEntity?
+
     @Upsert
     suspend fun upsert(task: MaintenanceEntity)
 

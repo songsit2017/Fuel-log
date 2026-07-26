@@ -14,8 +14,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExpenseEntity::class,
         MaintenanceEntity::class,
         TripEntity::class,
+        SyncConflictEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun tripDao(): TripDao
+    abstract fun syncConflictDao(): SyncConflictDao
 
     companion object {
         @Volatile private var instance: FuelLogDatabase? = null
@@ -118,6 +120,21 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 )
             }
         }
+        private val migration6To7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS sync_conflicts (
+                        `key` TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        collectionName TEXT NOT NULL,
+                        recordId TEXT NOT NULL,
+                        detectedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -131,6 +148,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration3To4,
                     migration4To5,
                     migration5To6,
+                    migration6To7,
                 )
                     .build()
                     .also { instance = it }

@@ -47,6 +47,7 @@ import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
 import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.domain.model.Trip
 import com.songsit.fuellogpro.domain.model.totalCost
+import com.songsit.fuellogpro.data.local.SyncConflictEntity
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -62,7 +63,6 @@ data class CloudUiState(
     val email: String? = null,
     val syncing: Boolean = false,
     val message: String? = null,
-    val conflicts: Int = 0,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,6 +84,8 @@ fun FuelLogApp(
     onGoogleSignIn: () -> Unit,
     onCloudSync: () -> Unit,
     onSignOut: () -> Unit,
+    syncConflicts: List<SyncConflictEntity>,
+    onResolveConflict: (String, Boolean) -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -172,6 +174,8 @@ fun FuelLogApp(
                     onGoogleSignIn = onGoogleSignIn,
                     onCloudSync = onCloudSync,
                     onSignOut = onSignOut,
+                    syncConflicts = syncConflicts,
+                    onResolveConflict = onResolveConflict,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -555,6 +559,8 @@ private fun VehicleList(
     onGoogleSignIn: () -> Unit,
     onCloudSync: () -> Unit,
     onSignOut: () -> Unit,
+    syncConflicts: List<SyncConflictEntity>,
+    onResolveConflict: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -581,12 +587,32 @@ private fun VehicleList(
                         }
                     }
                     cloudState.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    if (cloudState.conflicts > 0) {
+                    if (syncConflicts.isNotEmpty()) {
                         Text(
-                            "พบ ${cloudState.conflicts} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
+                            "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        syncConflicts.take(5).forEach { conflict ->
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text(
+                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, true) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text("ใช้ข้อมูลในเครื่อง") }
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, false) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text("ใช้ข้อมูล Cloud") }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

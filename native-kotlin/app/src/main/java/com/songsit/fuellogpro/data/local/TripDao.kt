@@ -13,6 +13,9 @@ interface TripDao {
     @Query("SELECT * FROM trips")
     suspend fun getAll(): List<TripEntity>
 
+    @Query("SELECT * FROM trips WHERE id = :id")
+    suspend fun getById(id: String): TripEntity?
+
     @Upsert
     suspend fun upsert(trip: TripEntity)
 

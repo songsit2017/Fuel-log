@@ -13,6 +13,9 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles ORDER BY createdAt ASC")
     suspend fun getAll(): List<VehicleEntity>
 
+    @Query("SELECT * FROM vehicles WHERE id = :id")
+    suspend fun getById(id: String): VehicleEntity?
+
     @Upsert
     suspend fun upsert(vehicle: VehicleEntity)
 

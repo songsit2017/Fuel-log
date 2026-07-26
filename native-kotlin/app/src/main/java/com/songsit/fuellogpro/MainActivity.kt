@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
             val composeScope = rememberCoroutineScope()
+            val syncConflicts by database.syncConflictDao().observeAll().collectAsState(emptyList())
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
                     fuelRepository,
@@ -157,7 +158,7 @@ class MainActivity : ComponentActivity() {
                         cloudState = cloudState.copy(message = "กรุณาเข้าสู่ระบบก่อน")
                     } else {
                         composeScope.launch {
-                            cloudState = cloudState.copy(syncing = true, message = null, conflicts = 0)
+                            cloudState = cloudState.copy(syncing = true, message = null)
                             runCatching {
                                 cloudRepository.sync(
                                     uid,
@@ -167,7 +168,6 @@ class MainActivity : ComponentActivity() {
                             }.onSuccess { result ->
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    conflicts = result.conflicts,
                                     message = "อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",
                                 )
                             }.onFailure {
@@ -182,6 +182,25 @@ class MainActivity : ComponentActivity() {
                 onSignOut = {
                     authRepository.signOut()
                     cloudState = CloudUiState(message = "ออกจากระบบแล้ว ข้อมูลในเครื่องยังอยู่ครบ")
+                },
+                syncConflicts = syncConflicts,
+                onResolveConflict = { key, useLocal ->
+                    composeScope.launch {
+                        cloudState = cloudState.copy(syncing = true, message = null)
+                        runCatching { cloudRepository.resolveConflict(key, useLocal) }
+                            .onSuccess {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = if (useLocal) "ใช้ข้อมูลในเครื่องแล้ว" else "ใช้ข้อมูล Cloud แล้ว",
+                                )
+                            }
+                            .onFailure {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = it.message ?: "แก้รายการขัดแย้งไม่สำเร็จ",
+                                )
+                            }
+                    }
                 },
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,

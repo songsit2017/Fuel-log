@@ -12,6 +12,7 @@ import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.data.local.MaintenanceEntity
 import com.songsit.fuellogpro.data.local.TripEntity
 import com.songsit.fuellogpro.data.local.VehicleEntity
+import com.songsit.fuellogpro.data.local.SyncConflictEntity
 import kotlinx.coroutines.tasks.await
 import com.songsit.fuellogpro.domain.SyncDecision
 import com.songsit.fuellogpro.domain.decideSync
@@ -46,9 +47,13 @@ class FirestoreSyncRepository(
                         SetOptions.merge(),
                     ).await()
                     uploaded++
+                    clearConflict(VEHICLES_COLLECTION, id, id)
                 }
-                SyncDecision.CONFLICT -> conflicts++
-                else -> Unit
+                SyncDecision.CONFLICT -> {
+                    conflicts++
+                    recordConflict(id, VEHICLES_COLLECTION, id)
+                }
+                else -> clearConflict(VEHICLES_COLLECTION, id, id)
             }
         }
         val cloudOnlyVehicles = cloudVehicles
@@ -57,6 +62,7 @@ class FirestoreSyncRepository(
             .map(::parseVehicle)
         if (cloudOnlyVehicles.isNotEmpty()) {
             database.vehicleDao().upsertAll(cloudOnlyVehicles)
+            cloudOnlyVehicles.forEach { clearConflict(VEHICLES_COLLECTION, it.id, it.id) }
             downloaded += cloudOnlyVehicles.size
         }
 
@@ -118,6 +124,55 @@ class FirestoreSyncRepository(
         return CloudSyncResult(uploaded, downloaded, conflicts, vehicleIds.size)
     }
 
+    suspend fun resolveConflict(key: String, useLocal: Boolean) {
+        val conflict = database.syncConflictDao().getByKey(key)
+            ?: error("ไม่พบรายการขัดแย้งนี้แล้ว")
+        if (conflict.collectionName == VEHICLES_COLLECTION) {
+            val reference = firestore.collection("vehicles").document(conflict.recordId)
+            if (useLocal) {
+                val local = database.vehicleDao().getById(conflict.recordId)
+                    ?: error("ไม่พบข้อมูลรถในเครื่อง")
+                reference.set(
+                    vehicleEditableCloudMap(local) + ("updatedAt" to FieldValue.serverTimestamp()),
+                    SetOptions.merge(),
+                ).await()
+            } else {
+                val cloud = reference.get().await()
+                require(cloud.exists()) { "ไม่พบข้อมูลรถบน Cloud" }
+                database.vehicleDao().upsert(parseVehicle(cloud))
+            }
+            database.syncConflictDao().deleteByKey(key)
+            return
+        }
+
+        val reference = firestore.collection("vehicles").document(conflict.vehicleId)
+            .collection(conflict.collectionName).document(conflict.recordId)
+        if (useLocal) {
+            val payload = when (conflict.collectionName) {
+                "entries" -> database.fuelEntryDao().getById(conflict.recordId)?.let(::fuelCloudMap)
+                "expenses" -> database.expenseDao().getById(conflict.recordId)?.let(::expenseCloudMap)
+                "reminders" -> database.maintenanceDao().getById(conflict.recordId)?.let(::maintenanceCloudMap)
+                "trips" -> database.tripDao().getById(conflict.recordId)?.let(::tripCloudMap)
+                else -> error("ไม่รู้จักประเภทข้อมูล ${conflict.collectionName}")
+            } ?: error("ไม่พบข้อมูลในเครื่อง")
+            reference.set(
+                payload + ("updatedAt" to FieldValue.serverTimestamp()),
+                SetOptions.merge(),
+            ).await()
+        } else {
+            val cloud = reference.get().await()
+            require(cloud.exists()) { "ไม่พบข้อมูลบน Cloud" }
+            when (conflict.collectionName) {
+                "entries" -> database.fuelEntryDao().upsert(parseFuel(conflict.vehicleId, cloud))
+                "expenses" -> database.expenseDao().upsert(parseExpense(conflict.vehicleId, cloud))
+                "reminders" -> database.maintenanceDao().upsert(parseMaintenance(conflict.vehicleId, cloud))
+                "trips" -> database.tripDao().upsert(parseTrip(conflict.vehicleId, cloud))
+                else -> error("ไม่รู้จักประเภทข้อมูล ${conflict.collectionName}")
+            }
+        }
+        database.syncConflictDao().deleteByKey(key)
+    }
+
     private suspend fun normalizeLegacyVehicleId() {
         val legacy = database.vehicleDao().getAll().firstOrNull { it.id == LEGACY_VEHICLE_ID } ?: return
         val newId = UUID.randomUUID().toString()
@@ -158,6 +213,7 @@ class FirestoreSyncRepository(
 
     companion object {
         private const val LEGACY_VEHICLE_ID = "local-default"
+        private const val VEHICLES_COLLECTION = "vehicles"
     }
 
     private suspend fun <T> syncCollection(
@@ -188,20 +244,44 @@ class FirestoreSyncRepository(
                     firestore.collection("vehicles").document(vehicleId).collection(collection)
                         .document(id).set(upload, SetOptions.merge()).await()
                     uploaded++
+                    clearConflict(collection, vehicleId, id)
                 }
-                SyncDecision.CONFLICT -> conflicts++
-                else -> Unit
+                SyncDecision.CONFLICT -> {
+                    conflicts++
+                    recordConflict(vehicleId, collection, id)
+                }
+                else -> clearConflict(collection, vehicleId, id)
             }
         }
         for ((id, cloudDocument) in cloudById) {
             if (id !in localById) {
-                runCatching { decode(cloudDocument) }
-                    .onSuccess(imported::add)
-                    .onFailure { conflicts++ }
+                try {
+                    imported.add(decode(cloudDocument))
+                    clearConflict(collection, vehicleId, id)
+                } catch (_: Exception) {
+                    conflicts++
+                    recordConflict(vehicleId, collection, id)
+                }
             }
         }
         if (imported.isNotEmpty()) database.withTransaction { upsert(imported) }
         return RecordSyncCount(uploaded, imported.size, conflicts)
+    }
+
+    private suspend fun recordConflict(vehicleId: String, collection: String, recordId: String) {
+        database.syncConflictDao().upsert(
+            SyncConflictEntity(
+                key = conflictKey(collection, vehicleId, recordId),
+                vehicleId = vehicleId,
+                collectionName = collection,
+                recordId = recordId,
+                detectedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    private suspend fun clearConflict(collection: String, vehicleId: String, recordId: String) {
+        database.syncConflictDao().deleteByKey(conflictKey(collection, vehicleId, recordId))
     }
 }
 
@@ -226,6 +306,15 @@ private fun vehicleCloudMap(
 
 private fun vehicleCanonical(item: VehicleEntity) =
     listOf(item.name, item.registration, item.fuelType)
+
+private fun vehicleEditableCloudMap(item: VehicleEntity): Map<String, Any?> = mapOf(
+    "name" to item.name,
+    "registration" to item.registration,
+    "fuelType" to item.fuelType,
+)
+
+private fun conflictKey(collection: String, vehicleId: String, recordId: String) =
+    "$collection|$vehicleId|$recordId"
 
 private fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "id" to item.id,

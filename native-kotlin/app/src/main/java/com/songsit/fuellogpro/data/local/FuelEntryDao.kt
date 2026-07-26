@@ -13,6 +13,9 @@ interface FuelEntryDao {
     @Query("SELECT * FROM fuel_entries")
     suspend fun getAll(): List<FuelEntryEntity>
 
+    @Query("SELECT * FROM fuel_entries WHERE id = :id")
+    suspend fun getById(id: String): FuelEntryEntity?
+
     @Upsert
     suspend fun upsert(entry: FuelEntryEntity)
 

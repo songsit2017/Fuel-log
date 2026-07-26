@@ -55,7 +55,7 @@ async function requireFirebase(){
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '6.7.0';
+const APP_VERSION = '6.8.0';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -117,6 +117,8 @@ function load(){
   state.currentVehicleId ||= state.vehicles[0].id;
   state.units ||= {distance:'km',volume:'liters'};
   if(!state.themeMigratedAuto){ state.theme='auto'; state.themeMigratedAuto=true; }
+  state.homeCards ||= {nearby:true,todayPrice:true,chart:true,latest:true,due:true};
+  state.fontFamily ||= 'system';
   // Compatibility: old records only had total. New records keep grossTotal + discount,
   // while total remains the actual net amount used by all cost/km calculations.
   state.entries = state.entries.map(x=>{
@@ -168,10 +170,43 @@ function watchSystemTheme(){
   else if(systemThemeMedia.addListener) systemThemeMedia.addListener(handler); // older WebView fallback
 }
 
+// ---------- Home page: which cards to show ----------
+function applyHomeCardVisibility(){
+  const c = state.homeCards || {};
+  const map = { nearby:'homeNearbyCard', todayPrice:'todayPriceCard', chart:'chartCard', latest:'latestCard', due:'dueCard' };
+  Object.entries(map).forEach(([key,id])=>{
+    const el = $('#'+id);
+    if(el) el.style.display = (c[key]===false) ? 'none' : '';
+  });
+}
+
+// ---------- Font family ----------
+const FONT_OPTIONS = {
+  system: { label:'ระบบ (ค่าเริ่มต้น)', stack:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", google:null },
+  sarabun: { label:'Sarabun', stack:"'Sarabun',-apple-system,sans-serif", google:'Sarabun:wght@400;600;700' },
+  kanit: { label:'Kanit', stack:"'Kanit',-apple-system,sans-serif", google:'Kanit:wght@400;600;700' },
+  prompt: { label:'Prompt', stack:"'Prompt',-apple-system,sans-serif", google:'Prompt:wght@400;600;700' },
+};
+function loadGoogleFontIfNeeded(key){
+  const opt = FONT_OPTIONS[key];
+  if(!opt || !opt.google) return;
+  const id = 'gfont-'+key;
+  if(document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id; link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${opt.google}&display=swap`;
+  document.head.appendChild(link);
+}
+function applyFont(){
+  const key = FONT_OPTIONS[state.fontFamily] ? state.fontFamily : 'system';
+  loadGoogleFontIfNeeded(key);
+  document.body.style.fontFamily = FONT_OPTIONS[key].stack;
+}
+
 function renderNav(page='home'){$$('.page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===page||(page==='reports'&&x.dataset.nav==='more')));const names={home:'ภาพรวม',fuel:'เติมน้ำมัน',expense:'ค่าใช้จ่าย',maintenance:'บำรุงรักษา',more:'เพิ่มเติม',reports:'รายงาน'};$('#pageTitle').textContent=names[page];$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';$('#reportsBackBtn').style.display=page==='reports'?'':'none';}
 function metric(label,val,sub=''){return `<article class="metric"><small>${label}</small><b>${val}</b><em>${sub}</em></article>`;}
 function renderVehicleStrip(){ $('#vehicleStrip').innerHTML=state.vehicles.map(v=>`<button class="vehicle-chip ${v.id===state.currentVehicleId?'active':''}" data-vehicle="${v.id}">${esc(v.name)}</button>`).join(''); }
-function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:'⛽',title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';}
+function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:'⛽',title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';applyHomeCardVisibility();}
 function rowHtml(x){return `<article class="record"><div class="ico">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><div class="amount">${x.amount}</div></article>`;}
 function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.max(1,...data.map(x=>x.value)),w=320,h=115,p=15;const pts=data.map((x,i)=>[p+i*((w-p*2)/(Math.max(1,data.length-1))),h-p-(x.value/max)*(h-p*2)]);svg.innerHTML=`<path d="${pts.map((q,i)=>(i?'L':'M')+q.join(' ')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M${pts[0]?.[0]||0} ${h-p} ${pts.map(q=>'L'+q.join(' ')).join(' ')} L${pts.at(-1)?.[0]||0} ${h-p}Z" fill="rgba(244,168,59,.10)"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="var(--accent)"/><text x="${q[0]}" y="128" fill="var(--muted)" font-size="9" text-anchor="middle">${data[i].label}</text>`).join('')}`;const a=data.at(-2)?.value||0,b=data.at(-1)?.value||0;$('#trendText').textContent=a?`${b>=a?'▲':'▼'} ${fmt(Math.abs((b-a)/a*100))}%`:' ';}
 function renderFuel(){
@@ -791,7 +826,18 @@ function runGlobalSearch(){
 
 // ---------- Settings: display units ----------
 function settingsPanel(){
-  return `<div class="card"><h2>หน่วยที่ใช้แสดงผล</h2>
+  const hc = state.homeCards || {};
+  return `<div class="card"><h2>รูปแบบและลักษณะ</h2>
+    <div class="field"><label>แบบอักษร (Font)</label><select id="fontFamily">${Object.entries(FONT_OPTIONS).map(([k,v])=>`<option value="${k}" ${state.fontFamily===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+    <p class="muted">แบบอักษรนอกจาก "ระบบ" จะโหลดจาก Google Fonts ครั้งแรกที่เลือก (ต้องมีอินเทอร์เน็ต) หลังจากนั้นเบราว์เซอร์จะจำไว้ให้</p>
+    <h3 style="font-size:13px;margin:16px 0 6px;color:var(--text)">การ์ดในหน้าแรก</h3>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>📍 ปั๊มน้ำมันใกล้เคียง</span><input type="checkbox" id="homeCardNearby" ${hc.nearby!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>⛽ ราคาน้ำมันวันนี้</span><input type="checkbox" id="homeCardTodayPrice" ${hc.todayPrice!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>📈 กราฟค่าใช้จ่าย 6 เดือน</span><input type="checkbox" id="homeCardChart" ${hc.chart!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>🧾 รายการล่าสุด</span><input type="checkbox" id="homeCardLatest" ${hc.latest!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>🔧 ใกล้ถึงกำหนดบำรุงรักษา</span><input type="checkbox" id="homeCardDue" ${hc.due!==false?'checked':''}></label>
+    <p class="muted">ปิดการ์ดที่ไม่ได้ใช้เพื่อให้หน้าแรกดูโล่งและเลื่อนถึงข้อมูลที่สำคัญเร็วขึ้น</p></div>
+  <div class="card"><h2>หน่วยที่ใช้แสดงผล</h2>
     <div class="field"><label>ระยะทาง</label><select id="unitDistance"><option value="km" ${state.units?.distance!=='mi'?'selected':''}>กิโลเมตร (กม.)</option><option value="mi" ${state.units?.distance==='mi'?'selected':''}>ไมล์ (mi)</option></select></div>
     <div class="field"><label>ปริมาตรน้ำมัน</label><select id="unitVolume"><option value="liters" ${state.units?.volume!=='gal'?'selected':''}>ลิตร (L)</option><option value="gal" ${state.units?.volume==='gal'?'selected':''}>แกลลอน (US gal)</option></select></div>
     <p class="muted">ข้อมูลจะยังเก็บเป็นกิโลเมตร/ลิตรอยู่เบื้องหลังเสมอ (เผื่อย้ายเครื่องหรือประเทศ) แค่แสดงผลเป็นหน่วยที่เลือกไว้เท่านั้น เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม</p></div>
@@ -799,6 +845,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>6.8</b> — เลือกฟอนต์ของแอปได้ (Sarabun/Kanit/Prompt/ระบบ), ปิด/เปิดการ์ดในหน้าแรกได้เอง</li>
       <li><b>6.7</b> — เพิ่มหน้า "ข้อมูล" ในตั้งค่า (เวอร์ชัน, ประวัติอัปเดต, สิทธิ์การใช้งาน, นโยบายความเป็นส่วนตัว)</li>
       <li><b>6.6</b> — ธีมสลับตามระบบโทรศัพท์อัตโนมัติ, ตัดปั๊มใกล้ฉันออกจากหน้าเติมน้ำมัน (เหลือหน้าแรก/ฟอร์มเพิ่มรายการ)</li>
       <li><b>6.5</b> — หน้า "รายงาน" เปลี่ยนเป็นหน้าเต็มจอแยก ไม่ใช่หน้าต่างป๊อปอัพ</li>
@@ -962,7 +1009,7 @@ async function join(){
 async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
-function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});if(user)loadMembers();}
+function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
@@ -1231,6 +1278,7 @@ function boot(){
     load();
     applyTheme();
     watchSystemTheme();
+    applyFont();
     bind();
     renderAll();
     renderNav('home');
@@ -1244,7 +1292,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.7.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.8.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

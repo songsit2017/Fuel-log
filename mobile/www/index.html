@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=6.7.0">
+  <link rel="stylesheet" href="styles.css?v=6.8.0">
 </head>
 <body>
   <header class="topbar">
@@ -25,7 +25,7 @@
   <main id="app">
     <section class="page active" data-page="home">
       <div class="vehicle-strip" id="vehicleStrip"></div>
-      <article class="hero-card">
+      <article class="hero-card" id="heroCard">
         <div>
           <span>อัตราสิ้นเปลืองเฉลี่ย</span>
           <strong id="avgKml">—</strong><em id="kmlUnit">กม./ลิตร</em>
@@ -35,12 +35,12 @@
       <div class="metric-grid" id="homeMetrics"></div>
       <article class="card compact" id="homeNearbyCard"><div class="card-head"><h2>📍 ปั๊มน้ำมันใกล้เคียง</h2><button class="text-btn" id="refreshHomeNearby">ค้นหา</button></div><div id="homeNearbyList" class="muted">แตะ "ค้นหา" เพื่อดูปั๊มใกล้ตัวคุณ พร้อมราคาล่าสุดที่คุณเคยเติม</div></article>
       <article class="card compact" id="todayPriceCard"><div class="card-head"><h2>⛽ ราคาน้ำมันวันนี้</h2><button class="text-btn" id="refreshTodayPrice">โหลดราคา</button></div><div id="todayPriceList" class="muted">กำลังโหลดราคาน้ำมันทั่วประเทศ…</div></article>
-      <article class="card">
+      <article class="card" id="chartCard">
         <div class="card-head"><h2>ค่าใช้จ่าย 6 เดือน</h2><span id="trendText"></span></div>
         <svg id="monthlyChart" viewBox="0 0 320 130" aria-label="กราฟค่าใช้จ่าย"></svg>
       </article>
-      <article class="card"><div class="card-head"><h2>รายการล่าสุด</h2><button class="text-btn" data-go="fuel">ดูทั้งหมด</button></div><div id="latestList"></div></article>
-      <article class="card"><div class="card-head"><h2>ใกล้ถึงกำหนด</h2><button class="text-btn" data-go="maintenance">จัดการ</button></div><div id="dueList"></div></article>
+      <article class="card" id="latestCard"><div class="card-head"><h2>รายการล่าสุด</h2><button class="text-btn" data-go="fuel">ดูทั้งหมด</button></div><div id="latestList"></div></article>
+      <article class="card" id="dueCard"><div class="card-head"><h2>ใกล้ถึงกำหนด</h2><button class="text-btn" data-go="maintenance">จัดการ</button></div><div id="dueList"></div></article>
     </section>
 
     <section class="page" data-page="fuel">
@@ -102,6 +102,6 @@
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=6.7.0"></script>
+  <script type="module" src="app.js?v=6.8.0"></script>
 </body>
 </html>

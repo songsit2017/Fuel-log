@@ -1,0 +1,10 @@
+node_modules/
+mobile/node_modules/
+mobile/android/
+mobile/release-keystore.jks
+*.jks
+*.keystore
+*.apk
+*.aab
+.gradle/
+local.properties

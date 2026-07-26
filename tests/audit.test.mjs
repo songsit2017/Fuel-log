@@ -8,6 +8,8 @@ const weather = await readFile(new URL('../modules/weather.js', import.meta.url)
 const functions = await readFile(new URL('../functions/index.js', import.meta.url), 'utf8');
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+const androidWorkflow = await readFile(new URL('../.github/workflows/build-android.yml', import.meta.url), 'utf8');
+const androidConfigScript = await readFile(new URL('../mobile/scripts/configure-android.mjs', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -133,6 +135,18 @@ test('Android installed PWA actively replaces stale application caches', () => {
   assert.match(app, /controllerchange/);
   assert.match(app, /function refreshInstalledApp\(\)/);
   assert.match(app, /CLEAR_APP_CACHE/);
+});
+
+test('GitHub builds downloadable signed APK and future Play Store AAB safely', () => {
+  assert.match(androidWorkflow, /npx cap add android/);
+  assert.match(androidWorkflow, /\.\/gradlew assembleRelease bundleRelease/);
+  assert.match(androidWorkflow, /APK_KEYSTORE_BASE64/);
+  assert.match(androidWorkflow, /gh release create/);
+  assert.match(androidWorkflow, /actions\/upload-artifact@v4/);
+  assert.doesNotMatch(androidWorkflow, /storePassword\s+["'][^$]/);
+  assert.match(androidConfigScript, /System\.getenv\("FUELLOG_KEYSTORE_PASSWORD"\)/);
+  assert.match(androidConfigScript, /versionCode/);
+  assert.match(androidConfigScript, /versionName/);
 });
 
 test('home has one vehicle selector', () => {

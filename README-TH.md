@@ -50,6 +50,15 @@ API key จะอยู่ใน Firebase Secret เท่านั้น ไม
 
 OCR และ Firebase ต้องทดสอบบนเว็บจริง เพราะต้องใช้ CDN, สิทธิ์บัญชี, กล้อง และเครือข่ายภายนอก
 
+## Android APK Beta และ GitHub Releases
+
+- Workflow `.github/workflows/build-android.yml` สร้าง APK ผ่าน Capacitor 7.6.4
+- กด Run workflow เพื่อรับ TEST APK จากหน้า Actions
+- เมื่อตั้ง GitHub Actions signing secrets แล้ว การ push tag `v*` จะสร้าง signed APK และ AAB พร้อม GitHub Release
+- อ่านขั้นตอนสร้าง keystore และตั้ง Secret ที่ `mobile/README-ANDROID-TH.md`
+- ห้าม commit ไฟล์ `.jks`, `.keystore`, `.apk`, `.aab` หรือรหัส signing
+- ก่อนขึ้น Play Store ต้องเปลี่ยน Google Login เป็น Native Firebase Authentication และทดสอบฟังก์ชันบน Android จริง
+
 
 ## v6.0.1
 - เพิ่มปุ่มลบในหน้าแก้ไขรายการเติมน้ำมัน ค่าใช้จ่าย และรายการเตือน

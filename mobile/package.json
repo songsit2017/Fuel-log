@@ -1,6 +1,6 @@
 {
   "name": "fuellog-pro-mobile",
-  "version": "6.1.0",
+  "version": "8.0.0-beta.1",
   "private": true,
   "description": "FuelLog Pro Android wrapper",
   "scripts": {
@@ -9,13 +9,15 @@
     "android:sync": "npm run web:sync && npx cap sync android",
     "android:open": "npx cap open android",
     "android:build:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
-    "android:build:release": "npm run android:sync && cd android && ./gradlew bundleRelease"
+    "android:configure": "node scripts/configure-android.mjs",
+    "android:build:release-apk": "npm run android:sync && npm run android:configure && cd android && ./gradlew assembleRelease",
+    "android:build:release-aab": "npm run android:sync && npm run android:configure && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
-    "@capacitor/android": "^7.0.0",
-    "@capacitor/core": "^7.0.0"
+    "@capacitor/android": "7.6.4",
+    "@capacitor/core": "7.6.4"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.0"
+    "@capacitor/cli": "7.6.4"
   }
 }

@@ -11,7 +11,8 @@
 - [x] Offline multiple-vehicle selection and vehicle-scoped fuel records.
 - [x] Fuel records and full/partial-tank metrics.
 - [x] Offline vehicle-scoped expense records and totals.
-- [ ] Maintenance records and reminders.
+- [x] Offline maintenance records with date/odometer due status and recurrence.
+- [ ] Android notification scheduling for maintenance reminders.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

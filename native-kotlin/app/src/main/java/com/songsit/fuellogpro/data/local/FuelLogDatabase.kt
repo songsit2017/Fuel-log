@@ -8,14 +8,20 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FuelEntryEntity::class, VehicleEntity::class, ExpenseEntity::class],
-    version = 3,
+    entities = [
+        FuelEntryEntity::class,
+        VehicleEntity::class,
+        ExpenseEntity::class,
+        MaintenanceEntity::class,
+    ],
+    version = 4,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun fuelEntryDao(): FuelEntryDao
     abstract fun vehicleDao(): VehicleDao
     abstract fun expenseDao(): ExpenseDao
+    abstract fun maintenanceDao(): MaintenanceDao
 
     companion object {
         @Volatile private var instance: FuelLogDatabase? = null
@@ -58,6 +64,30 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 )
             }
         }
+        private val migration3To4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS maintenance_tasks (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        nextDate TEXT,
+                        nextOdometerKm REAL,
+                        warningDays INTEGER NOT NULL,
+                        warningOdometerKm REAL NOT NULL,
+                        repeatMonths INTEGER,
+                        repeatOdometerKm REAL,
+                        provider TEXT NOT NULL,
+                        referenceNumber TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -65,7 +95,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     context.applicationContext,
                     FuelLogDatabase::class.java,
                     "fuellog-native.db",
-                ).addMigrations(migration1To2, migration2To3)
+                ).addMigrations(migration1To2, migration2To3, migration3To4)
                     .build()
                     .also { instance = it }
             }

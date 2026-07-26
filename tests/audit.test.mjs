@@ -24,6 +24,8 @@ const nativePreviewWorkflow = await readFile(new URL('../.github/workflows/build
 const nativeFuelApp = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/FuelLogApp.kt', import.meta.url), 'utf8');
 const nativeFuelDatabase = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/FuelLogDatabase.kt', import.meta.url), 'utf8');
 const nativeExpenseDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/ExpenseDao.kt', import.meta.url), 'utf8');
+const nativeMaintenanceDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/MaintenanceDao.kt', import.meta.url), 'utf8');
+const nativeMaintenanceStatus = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/MaintenanceStatus.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -242,12 +244,23 @@ test('native Kotlin source does not contain mojibake text', () => {
 });
 
 test('native expenses are offline, vehicle-scoped and migration-safe', () => {
-  assert.match(nativeFuelDatabase, /entities = \[FuelEntryEntity::class, VehicleEntity::class, ExpenseEntity::class\]/);
+  assert.match(nativeFuelDatabase, /ExpenseEntity::class/);
   assert.match(nativeFuelDatabase, /Migration\(2, 3\)/);
   assert.match(nativeFuelDatabase, /CREATE TABLE IF NOT EXISTS expenses/);
   assert.match(nativeExpenseDao, /WHERE vehicleId = :vehicleId/);
   assert.match(nativeFuelApp, /AddExpenseDialog/);
   assert.match(nativeFuelApp, /ExpenseList/);
+});
+
+test('native maintenance reminders are offline and evaluate date plus odometer', () => {
+  assert.match(nativeFuelDatabase, /MaintenanceEntity::class/);
+  assert.match(nativeFuelDatabase, /Migration\(3, 4\)/);
+  assert.match(nativeFuelDatabase, /CREATE TABLE IF NOT EXISTS maintenance_tasks/);
+  assert.match(nativeMaintenanceDao, /WHERE vehicleId = :vehicleId/);
+  assert.match(nativeMaintenanceStatus, /DueLevel\.OVERDUE/);
+  assert.match(nativeMaintenanceStatus, /warningOdometerKm/);
+  assert.match(nativeFuelApp, /AddMaintenanceDialog/);
+  assert.match(nativeFuelApp, /MaintenanceList/);
 });
 
 test('home has one vehicle selector', () => {

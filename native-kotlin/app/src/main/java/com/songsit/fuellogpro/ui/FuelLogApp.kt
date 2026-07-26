@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
+import com.songsit.fuellogpro.domain.DueLevel
+import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
+import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -60,6 +63,9 @@ fun FuelLogApp(
     onDeleteFuel: (String) -> Unit,
     onAddExpense: (String, String, String, Double, Double?, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
+    onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
+    onCompleteMaintenance: (String) -> Unit,
+    onDeleteMaintenance: (String) -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -69,7 +75,8 @@ fun FuelLogApp(
     var showAddFuel by remember { mutableStateOf(false) }
     var showAddVehicle by remember { mutableStateOf(false) }
     var showAddExpense by remember { mutableStateOf(false) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "ค่าใช้จ่าย", "รถของฉัน")
+    var showAddMaintenance by remember { mutableStateOf(false) }
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "ค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน")
 
     FuelLogTheme {
         Scaffold(
@@ -87,11 +94,11 @@ fun FuelLogApp(
             },
             bottomBar = {
                 NavigationBar {
-                    listOf("หน้าหลัก", "น้ำมัน", "ค่าใช้จ่าย", "รถ").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "ค่าใช้จ่าย", "ดูแลรถ", "รถ").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
-                            icon = { Text(listOf("⌂", "⛽", "฿", "●")[index]) },
+                            icon = { Text(listOf("⌂", "⛽", "฿", "✓", "●")[index]) },
                             label = { Text(label) },
                         )
                     }
@@ -105,7 +112,10 @@ fun FuelLogApp(
                     2 -> FloatingActionButton(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddExpense = true },
                     ) { Text("+") }
-                    3 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
+                    3 -> FloatingActionButton(
+                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddMaintenance = true },
+                    ) { Text("+") }
+                    4 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
                 }
             },
         ) { padding ->
@@ -113,6 +123,13 @@ fun FuelLogApp(
                 0 -> Dashboard(state, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
                 2 -> ExpenseList(state.expenses, state.totalExpenses, onDeleteExpense, Modifier.padding(padding))
+                3 -> MaintenanceList(
+                    tasks = state.maintenanceTasks,
+                    currentOdometerKm = state.summary.latestOdometerKm,
+                    onComplete = onCompleteMaintenance,
+                    onDelete = onDeleteMaintenance,
+                    modifier = Modifier.padding(padding),
+                )
                 else -> VehicleList(
                     vehicles = state.vehicles,
                     selectedVehicleId = state.selectedVehicle?.id,
@@ -143,6 +160,14 @@ fun FuelLogApp(
                 latestOdometer = state.summary.latestOdometerKm,
                 onDismiss = { showAddExpense = false },
                 onSave = onAddExpense,
+            )
+        }
+        if (showAddMaintenance) {
+            AddMaintenanceDialog(
+                saving = state.saving,
+                latestOdometer = state.summary.latestOdometerKm,
+                onDismiss = { showAddMaintenance = false },
+                onSave = onAddMaintenance,
             )
         }
         state.errorMessage?.let { message ->
@@ -277,6 +302,64 @@ private fun ExpenseList(
                     }
                     Text(thaiCurrency.format(expense.amount), fontWeight = FontWeight.Bold)
                     TextButton(onClick = { onDelete(expense.id) }) { Text("ลบ") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaintenanceList(
+    tasks: List<MaintenanceTask>,
+    currentOdometerKm: Double?,
+    onComplete: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val sortedTasks = tasks.sortedBy { calculateMaintenanceStatus(it, currentOdometerKm).level.ordinal }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (sortedTasks.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ยังไม่มีรายการดูแลรถ", fontWeight = FontWeight.Bold)
+                        Text("แตะ + เพื่อเพิ่มภาษี ประกัน หรืองานบำรุงรักษา")
+                    }
+                }
+            }
+        }
+        items(sortedTasks, key = { it.id }) { task ->
+            val status = calculateMaintenanceStatus(task, currentOdometerKm)
+            val containerColor = when (status.level) {
+                DueLevel.OVERDUE -> MaterialTheme.colorScheme.errorContainer
+                DueLevel.DUE_SOON -> MaterialTheme.colorScheme.tertiaryContainer
+                DueLevel.OK -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = containerColor),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(task.name, fontWeight = FontWeight.Bold)
+                            Text(task.category, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(status.label, fontWeight = FontWeight.SemiBold)
+                    }
+                    val due = listOfNotNull(
+                        task.nextDate?.let { "วันที่ $it" },
+                        task.nextOdometerKm?.let { "ที่ ${number.format(it)} กม." },
+                    ).joinToString(" • ")
+                    if (due.isNotBlank()) Text(due, style = MaterialTheme.typography.bodySmall)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { onDelete(task.id) }) { Text("ลบ") }
+                        Button(onClick = { onComplete(task.id) }) { Text("เสร็จแล้ว") }
+                    }
                 }
             }
         }
@@ -491,6 +574,60 @@ private fun AddExpenseDialog(
                         description,
                         amount.toDoubleOrNull() ?: 0.0,
                         odometer.toDoubleOrNull(),
+                        onDismiss,
+                    )
+                },
+            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+}
+
+@Composable
+private fun AddMaintenanceDialog(
+    saving: Boolean,
+    latestOdometer: Double?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
+) {
+    var name by remember { mutableStateOf("เปลี่ยนน้ำมันเครื่อง") }
+    var category by remember { mutableStateOf("บำรุงรักษา") }
+    var nextDate by remember { mutableStateOf("") }
+    var nextOdometer by remember {
+        mutableStateOf(latestOdometer?.let { "%.0f".format(Locale.US, it + 10_000) } ?: "")
+    }
+    var warningDays by remember { mutableStateOf("30") }
+    var warningOdometer by remember { mutableStateOf("1000") }
+    var repeatMonths by remember { mutableStateOf("12") }
+    var repeatOdometer by remember { mutableStateOf("10000") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("เพิ่มรายการดูแลรถ") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedTextField(name, { name = it }, label = { Text("รายการ") }, singleLine = true) }
+                item { OutlinedTextField(category, { category = it }, label = { Text("ประเภท") }, singleLine = true) }
+                item { OutlinedTextField(nextDate, { nextDate = it }, label = { Text("กำหนดวันที่ (ไม่บังคับ)") }, singleLine = true) }
+                item { OutlinedTextField(nextOdometer, { nextOdometer = it }, label = { Text("กำหนดเลขไมล์ (ไม่บังคับ)") }, singleLine = true) }
+                item { OutlinedTextField(warningDays, { warningDays = it }, label = { Text("เตือนล่วงหน้า (วัน)") }, singleLine = true) }
+                item { OutlinedTextField(warningOdometer, { warningOdometer = it }, label = { Text("เตือนก่อนถึงระยะ (กม.)") }, singleLine = true) }
+                item { OutlinedTextField(repeatMonths, { repeatMonths = it }, label = { Text("ทำซ้ำทุก (เดือน)") }, singleLine = true) }
+                item { OutlinedTextField(repeatOdometer, { repeatOdometer = it }, label = { Text("ทำซ้ำทุก (กม.)") }, singleLine = true) }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !saving,
+                onClick = {
+                    onSave(
+                        name,
+                        category,
+                        nextDate.takeIf(String::isNotBlank),
+                        nextOdometer.toDoubleOrNull(),
+                        warningDays.toIntOrNull() ?: 30,
+                        warningOdometer.toDoubleOrNull() ?: 1_000.0,
+                        repeatMonths.toIntOrNull(),
+                        repeatOdometer.toDoubleOrNull(),
                         onDismiss,
                     )
                 },

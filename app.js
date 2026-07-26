@@ -9,7 +9,7 @@ const APP_VERSION = '7.8.3';
 // can never disable navigation, forms, theme switching, or local records.
 const FIREBASE_SDK_VERSION = '12.13.0';
 let app = null, auth = null, db = null, storage = null, functions = null;
-let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+let GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, getRedirectResult,
     signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
     doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
     ref, uploadBytes, getDownloadURL, httpsCallable;
@@ -36,14 +36,14 @@ async function initFirebase(){
     storage = storageMod.getStorage(app);
     functions = functionsMod.getFunctions(app, 'asia-southeast1');
 
-    ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+    ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, getRedirectResult,
       signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
     ({doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
     ({ref, uploadBytes, getDownloadURL} = storageMod);
     ({httpsCallable} = functionsMod);
 
     await setPersistence(auth, browserLocalPersistence).catch(console.warn);
-    getRedirectResult(auth).catch(console.warn);
+    if(!isNativeApp()) getRedirectResult(auth).catch(console.warn);
     onAuthStateChanged(auth, async u=>{
       user = u;
       if(u) await ensureUser().catch(console.warn);
@@ -1290,7 +1290,37 @@ function settingsPanel(){
 function backupPanel(){return `<div class="card"><h2>สำรองข้อมูล</h2><p class="muted">ข้อมูลใช้งานร่วมกันซิงก์ผ่าน Firebase ส่วนไฟล์สำรองใช้สำหรับเก็บฉุกเฉิน</p><div class="panel-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="importBtn">นำเข้า JSON / Fuelio</button><input hidden type="file" id="importFile" accept=".json,.csv,.fuelio,.zip"></div></div>`;}
 function vehiclesPanel(){return `<div class="card"><div id="vehicleManage">${state.vehicles.map(v=>`<div class="list-row"><input data-rename-vehicle="${v.id}" value="${esc(v.name)}"><button class="secondary" data-delete-vehicle="${v.id}">ลบ</button></div>`).join('')}</div><button class="primary" id="addVehicleBtn">＋ เพิ่มรถ</button></div>`;}
 
-async function login(){await requireFirebase();const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});try{await signInWithPopup(auth,p);}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))await signInWithRedirect(auth,p);else $('#authMessage').textContent=e.message;}}
+function isNativeApp(){
+  return Boolean(window.Capacitor?.isNativePlatform?.());
+}
+
+async function login(){
+  await requireFirebase();
+  try{
+    if(isNativeApp()){
+      const nativeAuth=window.Capacitor?.registerPlugin?.('FirebaseAuthentication')
+        || window.Capacitor?.Plugins?.FirebaseAuthentication;
+      if(!nativeAuth?.signInWithGoogle) throw new Error('ไม่พบ Native Google Login กรุณาติดตั้ง APK รุ่นล่าสุด');
+      const result=await nativeAuth.signInWithGoogle({skipNativeAuth:true});
+      const idToken=result?.credential?.idToken;
+      const accessToken=result?.credential?.accessToken;
+      if(!idToken) throw new Error('Google ไม่ได้ส่ง ID token กรุณาตรวจ SHA-1 และ google-services.json');
+      await signInWithCredential(auth,GoogleAuthProvider.credential(idToken,accessToken||undefined));
+      return;
+    }
+    const p=new GoogleAuthProvider();
+    p.setCustomParameters({prompt:'select_account'});
+    try{await signInWithPopup(auth,p);}
+    catch(e){
+      if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code)) await signInWithRedirect(auth,p);
+      else throw e;
+    }
+  }catch(e){
+    console.error('FuelLog Google login failed:',e);
+    const message=e?.message||String(e);
+    if($('#authMessage')) $('#authMessage').textContent=message;
+  }
+}
 async function ensureUser(){await requireFirebase();if(!user)throw new Error('กรุณาเข้าสู่ระบบ');await setDoc(doc(db,'users',user.uid),{email:user.email,emailLower:user.email.toLowerCase(),displayName:user.displayName||'',photoURL:user.photoURL||'',updatedAt:serverTimestamp()},{merge:true});}
 async function ensureCloudVehicle(){
   await ensureUser();

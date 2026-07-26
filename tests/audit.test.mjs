@@ -10,6 +10,8 @@ const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
 const androidWorkflow = await readFile(new URL('../.github/workflows/build-android.yml', import.meta.url), 'utf8');
 const androidConfigScript = await readFile(new URL('../mobile/scripts/configure-android.mjs', import.meta.url), 'utf8');
+const mobilePackage = await readFile(new URL('../mobile/package.json', import.meta.url), 'utf8');
+const capacitorConfig = await readFile(new URL('../mobile/capacitor.config.json', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -143,10 +145,22 @@ test('GitHub builds downloadable signed APK and future Play Store AAB safely', (
   assert.match(androidWorkflow, /APK_KEYSTORE_BASE64/);
   assert.match(androidWorkflow, /gh release create/);
   assert.match(androidWorkflow, /actions\/upload-artifact@v4/);
+  assert.doesNotMatch(androidWorkflow, /cache:\s*gradle/);
   assert.doesNotMatch(androidWorkflow, /storePassword\s+["'][^$]/);
   assert.match(androidConfigScript, /System\.getenv\("FUELLOG_KEYSTORE_PASSWORD"\)/);
   assert.match(androidConfigScript, /versionCode/);
   assert.match(androidConfigScript, /versionName/);
+});
+
+test('Android APK uses native Google authentication without a browser redirect', () => {
+  assert.match(mobilePackage, /"@capacitor-firebase\/authentication": "7\.3\.0"/);
+  assert.match(capacitorConfig, /"skipNativeAuth": true/);
+  assert.match(capacitorConfig, /"google\.com"/);
+  assert.match(app, /nativeAuth\.signInWithGoogle/);
+  assert.match(app, /signInWithCredential\(auth,GoogleAuthProvider\.credential/);
+  assert.match(androidWorkflow, /FIREBASE_ANDROID_CONFIG_BASE64/);
+  assert.match(androidWorkflow, /android\/app\/google-services\.json/);
+  assert.match(androidWorkflow, /SHA1:\|SHA256:/);
 });
 
 test('home has one vehicle selector', () => {

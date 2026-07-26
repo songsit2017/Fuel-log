@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const here=dirname(fileURLToPath(import.meta.url));
 const mobile=resolve(here,'..');
 const gradleFile=resolve(mobile,'android','app','build.gradle');
+const variablesFile=resolve(mobile,'android','variables.gradle');
 await access(gradleFile);
 
 const versionName=process.env.FUELLOG_VERSION_NAME||'8.0.0-beta.1';
@@ -31,4 +32,13 @@ if(process.env.FUELLOG_KEYSTORE_FILE){
 }
 
 await writeFile(gradleFile,gradle,'utf8');
+
+let variables=await readFile(variablesFile,'utf8');
+if(!variables.includes('rgcfaIncludeGoogle')){
+  variables=variables.replace(
+    /ext\s*\{/,
+    `ext {\n    rgcfaIncludeGoogle = true\n    androidxCredentialsVersion = '1.3.0'`
+  );
+  await writeFile(variablesFile,variables,'utf8');
+}
 console.log(`Android configured: versionName=${versionName}, versionCode=${versionCode}, signed=${!!process.env.FUELLOG_KEYSTORE_FILE}`);

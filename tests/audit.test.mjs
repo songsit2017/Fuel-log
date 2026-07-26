@@ -23,9 +23,9 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.8.2', 'app.js?v=7.8.2', 'firebase-config.js?v=7.8.2']) {
-    assert.ok(sw.includes(asset), `missing cached ${asset}`);
-  }
+  assert.match(sw, /const VERSION = '7\.8\.3'/);
+  for (const asset of ['styles.css','app.js','firebase-config.js'])
+    assert.ok(sw.includes('`./'+asset+'?v=${VERSION}`'),`missing versioned cached ${asset}`);
 });
 
 test('OCR canonical liters and price per liter are converted for display', () => {
@@ -121,6 +121,18 @@ test('generic fuel pump icon is a consistent vector rather than a colorful emoji
   assert.match(index, /data-nav="fuel"><span><svg class="fuel-pump-icon"/);
   assert.doesNotMatch(index, /data-nav="fuel"><span>⛽/);
   assert.match(styles, /\.fuel-pump-icon\{[^}]*stroke:currentColor/);
+});
+
+test('Android installed PWA actively replaces stale application caches', () => {
+  assert.match(sw, /const VERSION = '7\.8\.3'/);
+  assert.match(sw, /cache:'reload'/);
+  assert.match(sw, /cache:'no-store'/);
+  assert.match(sw, /self\.skipWaiting\(\)/);
+  assert.match(sw, /self\.clients\.claim\(\)/);
+  assert.match(app, /updateViaCache:'none'/);
+  assert.match(app, /controllerchange/);
+  assert.match(app, /function refreshInstalledApp\(\)/);
+  assert.match(app, /CLEAR_APP_CACHE/);
 });
 
 test('home has one vehicle selector', () => {

@@ -3,7 +3,7 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.8.2';
+const APP_VERSION = '7.8.3';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -1212,10 +1212,15 @@ function settingsPanel(){
     <div class="field"><label>ระยะทาง</label><select id="unitDistance"><option value="km" ${state.units?.distance!=='mi'?'selected':''}>กิโลเมตร (กม.)</option><option value="mi" ${state.units?.distance==='mi'?'selected':''}>ไมล์ (mi)</option></select></div>
     <div class="field"><label>ปริมาตรน้ำมัน</label><select id="unitVolume"><option value="liters" ${state.units?.volume!=='gal'?'selected':''}>ลิตร (L)</option><option value="gal" ${state.units?.volume==='gal'?'selected':''}>แกลลอน (US gal)</option></select></div>
     <p class="muted">ข้อมูลจะยังเก็บเป็นกิโลเมตร/ลิตรอยู่เบื้องหลังเสมอ (เผื่อย้ายเครื่องหรือประเทศ) แค่แสดงผลเป็นหน่วยที่เลือกไว้เท่านั้น เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม</p></div>
+  <div class="card"><h2>อัปเดตแอป</h2>
+    <p class="muted">หากไอคอนที่เพิ่มไว้หน้าแรกยังแสดงรุ่นเก่า ให้กดปุ่มนี้เพื่อล้างเฉพาะไฟล์แคชของแอป ข้อมูลการเติมน้ำมันและการตั้งค่าจะไม่ถูกลบ</p>
+    <button class="primary" id="refreshAppBtn">ตรวจอัปเดตและล้างแคช</button>
+    <div id="updateAppStatus" class="muted"></div></div>
   <div class="card"><h2>ข้อมูล</h2><div class="about-list">
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.8.3</b> — แก้ PWA บน Android ค้างแคชเก่า พร้อมระบบอัปเดตทันทีและปุ่มล้างแคชโดยไม่ลบข้อมูล</li>
       <li><b>7.8.2</b> — ปรับตรา PTT/OR, Bangchak, PT, SUSCO และ Pure ให้ใช้รูปทรงและสีใกล้ตราแบรนด์จริงมากขึ้น</li>
       <li><b>7.8.1</b> — เปลี่ยนไอคอนปั๊มน้ำมันจากอีโมจิเป็นเวกเตอร์เส้นคม และคงโลโก้แบรนด์จริงในรายการ</li>
       <li><b>7.8.0</b> — ปรับ app bar, navigation, รายการ และปุ่มเพิ่มให้มีลักษณะเป็นแอปมือถือมากขึ้น</li>
@@ -1406,6 +1411,27 @@ async function loadGallery(){const box=$('#galleryBody');await initFirebase();if
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
 function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#currency')?.addEventListener('change',e=>{state.settings.currency=e.target.value;save();renderAll();renderPanel('settings');});$('#decimals')?.addEventListener('change',e=>{state.settings.decimals=Number(e.target.value);save();renderAll();renderPanel('settings');});$('#themeMode')?.addEventListener('change',e=>{state.theme=e.target.value;applyTheme();save();});$('#weatherEnabled')?.addEventListener('change',e=>{state.settings.weatherEnabled=e.target.checked;save();});$('#autoOcrEnabled')?.addEventListener('change',e=>{state.settings.autoOcrEnabled=e.target.checked;save();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});if(user)loadMembers();}
+async function refreshInstalledApp(){
+  const status=$('#updateAppStatus');
+  if(status)status.textContent='กำลังตรวจรุ่นใหม่และล้างไฟล์แคช…';
+  try{
+    if('serviceWorker' in navigator){
+      const registration=await navigator.serviceWorker.getRegistration();
+      await registration?.update();
+      const worker=registration?.waiting||registration?.installing||registration?.active;
+      worker?.postMessage({type:'SKIP_WAITING'});
+      navigator.serviceWorker.controller?.postMessage({type:'CLEAR_APP_CACHE'});
+    }
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.filter(key=>key.startsWith('fuellog-')).map(key=>caches.delete(key)));
+    }
+    if(status)status.textContent='เรียบร้อย กำลังเปิดแอปรุ่นล่าสุด…';
+    setTimeout(()=>location.replace(`${location.pathname}?app=${APP_VERSION}&refresh=${Date.now()}`),350);
+  }catch(error){
+    if(status)status.textContent=`อัปเดตไม่สำเร็จ: ${error.message}`;
+  }
+}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:7,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
@@ -1758,6 +1784,7 @@ $('#mediaCancelBtn')?.addEventListener('click',closeMediaPicker);
 $('#mediaPickerDialog')?.addEventListener('click',e=>{if(e.target.id==='mediaPickerDialog')closeMediaPicker();});
 $('#globalVehicleSelect')?.addEventListener('change',e=>switchVehicle(e.target.value));
 document.addEventListener('click',e=>{
+  if(e.target.closest('#refreshAppBtn'))refreshInstalledApp();
   if(e.target.closest('#routeUseLocationBtn'))useRouteLocation();
   if(e.target.closest('#routeOpenBtn'))openFuelRoute();
   const routeToggle=e.target.closest('[data-open-route]');if(routeToggle)toggleStationRoutePlanner(routeToggle);
@@ -1785,7 +1812,24 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.8.2').catch(console.warn);
+  if('serviceWorker' in navigator){
+    let reloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(reloading||sessionStorage.getItem(`fuellog-sw-reloaded-${APP_VERSION}`))return;
+      reloading=true;
+      sessionStorage.setItem(`fuellog-sw-reloaded-${APP_VERSION}`,'1');
+      location.reload();
+    });
+    navigator.serviceWorker.addEventListener('message',event=>{
+      if(event.data?.type==='APP_UPDATED')toast(`อัปเดต FuelLog Pro ${event.data.version} แล้ว`);
+    });
+    navigator.serviceWorker.register(`./sw.js?v=${APP_VERSION}`,{updateViaCache:'none'})
+      .then(registration=>{
+        registration.update();
+        registration.waiting?.postMessage({type:'SKIP_WAITING'});
+      })
+      .catch(console.warn);
+  }
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

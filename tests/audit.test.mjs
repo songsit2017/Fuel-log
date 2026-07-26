@@ -6,6 +6,7 @@ const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const sw = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 const weather = await readFile(new URL('../modules/weather.js', import.meta.url), 'utf8');
 const functions = await readFile(new URL('../functions/index.js', import.meta.url), 'utf8');
+const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -21,7 +22,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.1.1', 'app.js?v=7.1.1', 'firebase-config.js?v=7.1.1']) {
+  for (const asset of ['styles.css?v=7.1.3', 'app.js?v=7.1.3', 'firebase-config.js?v=7.1.3']) {
     assert.ok(sw.includes(asset), `missing cached ${asset}`);
   }
 });
@@ -41,4 +42,16 @@ test('all previously missing WMO weather codes are described', () => {
 test('rate limiter periodically removes expired user windows', () => {
   assert.match(functions, /requestWindows\.delete\(key\)/);
   assert.match(functions, /now - lastRateLimitSweep >= 60_000/);
+});
+
+test('compact editor previews legacy images and uses a native driver select', () => {
+  assert.match(app, /function isImageAttachment/);
+  assert.match(app, /class="selected-photo-preview"/);
+  assert.match(app, /<select name="driver" id="driverSelect"/);
+  assert.doesNotMatch(app, /list="driverOptions"/);
+});
+
+test('top bar has no visible theme toggle button', () => {
+  assert.doesNotMatch(index, /<button[^>]+id="themeBtn"/);
+  assert.match(index, /id="themeBtn" hidden/);
 });

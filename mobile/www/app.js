@@ -2,7 +2,7 @@ import { CURRENCIES, formatCurrency, migrateSettings, resolveLightTheme } from '
 import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 
-const APP_VERSION = '7.1.1';
+const APP_VERSION = '7.1.3';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -46,6 +46,7 @@ async function initFirebase(){
       user = u;
       if(u) await ensureUser().catch(console.warn);
       if(currentPanel==='family' && $('.page[data-page="panel"]')?.classList.contains('active')) renderPanel('family');
+      if($('#formDialog')?.open && $('#formDialog').dataset.type==='fuel') loadFamilyDriverOptions();
     });
     firebaseLoadError = null;
     return true;
@@ -299,6 +300,13 @@ function bindMediaPickerForForm(){
     const input=document.getElementById(inputId),status=document.getElementById(statusId);
     if(input)input.onchange=()=>{
       if(input.files?.[0]&&status)status.textContent=input.files[0].name||'เลือกรูปแล้ว';
+      const preview=document.getElementById(kindForInput(inputId)==='receipt'?'receiptPreview':'odoPreview');
+      if(input.files?.[0]&&preview){
+        if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);
+        preview.dataset.objectUrl=URL.createObjectURL(input.files[0]);
+        preview.src=preview.dataset.objectUrl;
+        preview.hidden=false;
+      }
       if(kindForInput(inputId)==='receipt'&&state.settings?.autoOcrEnabled&&input.files?.[0]) scanReceipt(input.files[0],'fuel');
     };
   });
@@ -307,35 +315,48 @@ function kindForInput(inputId){return inputId.startsWith('receipt')?'receipt':'o
 
 function cachedDriverNames(){
   const members=familyMembersCache[state.currentVehicleId]||[];
-  const names=[user?.displayName,user?.email,...members.flatMap(m=>[m.displayName,m.email])];
+  const previous=state.entries.filter(entry=>entry.vehicleId===state.currentVehicleId).map(entry=>entry.driver);
+  const names=[user?.displayName,user?.email,...members.map(m=>m.displayName||m.email),...previous];
   return [...new Set(names.map(x=>String(x||'').trim()).filter(Boolean))];
 }
 function renderDriverOptions(){
-  const list=$('#driverOptions'); if(!list)return;
-  list.innerHTML=cachedDriverNames().map(name=>`<option value="${esc(name)}"></option>`).join('');
+  const select=$('#driverSelect'); if(!select)return;
+  const selected=select.value||select.dataset.selected||'';
+  const names=cachedDriverNames();
+  if(selected&&!names.includes(selected))names.unshift(selected);
+  select.innerHTML=`<option value="">เลือกผู้ขับขี่</option>${names.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}<option value="__add_driver__">＋ เพิ่มชื่อผู้ขับขี่…</option>`;
+  select.value=selected;
+  select.onchange=()=>{
+    if(select.value!=='__add_driver__')return;
+    const name=prompt('ชื่อผู้ขับขี่');
+    if(name?.trim()){
+      const option=document.createElement('option');option.value=name.trim();option.textContent=name.trim();
+      select.insertBefore(option,select.lastElementChild);select.value=name.trim();
+    }else select.value='';
+  };
 }
 async function loadFamilyDriverOptions(){
-  if(!user)return;
   try{
     await requireFirebase();
+    user=user||auth?.currentUser||null;
+    if(!user){renderDriverOptions();return;}
     const snap=await getDoc(doc(db,'vehicles',state.currentVehicleId));
-    if(!snap.exists())return;
-    familyMembersCache[state.currentVehicleId]=Object.values(snap.data().members||{});
+    if(snap.exists())familyMembersCache[state.currentVehicleId]=Object.values(snap.data().members||{});
     renderDriverOptions();
   }catch(error){ console.warn('Family driver options load failed:',error); }
 }
 
 function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#formTitle').textContent=type==='fuel'?(obj.id?'แก้ไขการเติมน้ำมัน':'เพิ่มรายการเติมน้ำมัน'):type==='expense'?(obj.id?'แก้ไขค่าใช้จ่าย':'เพิ่มค่าใช้จ่าย'):'ตั้งเตือนบำรุงรักษา';d.dataset.type=type;d.dataset.id=obj.id||'';
- if(type==='fuel')b.innerHTML=`<section class="fuel-form-hero"><span>⛽</span><div><b>${obj.id?'แก้ไขข้อมูลการเติม':'บันทึกการเติมครั้งใหม่'}</b><small>กรอกระยะทาง ปริมาณ และยอดชำระ ระบบจะคำนวณให้ทันที</small></div></section><h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid media-actions">
-<button type="button" class="photo-pick" data-media-picker="receipt">🧾 เพิ่มรูปใบเสร็จ<small id="receiptFileStatus">กล้องหรือแกลเลอรี</small></button>
-<button type="button" class="photo-pick" data-media-picker="odometer">🔢 เพิ่มรูปเรือนไมล์<small id="odoFileStatus">กล้องหรือแกลเลอรี</small></button>
-<label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
+ if(type==='fuel')b.innerHTML=`<section class="fuel-form-hero"><span>⛽</span><div><b>${obj.id?'แก้ไขข้อมูลการเติม':'บันทึกการเติมครั้งใหม่'}</b><small>กรอกระยะทาง ปริมาณ และยอดชำระ ระบบจะคำนวณให้ทันที</small></div></section><h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid media-actions compact-media-actions">
+<button type="button" class="photo-pick" data-media-picker="receipt"><img id="receiptPreview" class="selected-photo-preview" alt="" hidden><span>🧾 ใบเสร็จ</span><small id="receiptFileStatus">เพิ่มรูป</small></button>
+<button type="button" class="photo-pick" data-media-picker="odometer"><img id="odoPreview" class="selected-photo-preview" alt="" hidden><span>🔢 เรือนไมล์</span><small id="odoFileStatus">เพิ่มรูป</small></button>
+<label class="photo-pick"><span>✨ OCR</span><small>สแกนบิล</small><input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
 <input hidden type="file" id="receiptCameraFile" accept="image/*" capture="environment">
 <input hidden type="file" id="receiptGalleryFile" accept="image/*">
 <input hidden type="file" id="odoCameraFile" accept="image/*" capture="environment">
 <input hidden type="file" id="odoGalleryFile" accept="image/*">
-</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div>
-<div class="existing-photos-card"><div class="card-head"><b>🖼️ รูปที่บันทึกไว้กับรายการนี้</b><small>${obj.id?'โหลดจาก Cloud และข้อมูลในเครื่อง':'จะปรากฏหลังบันทึก'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>'}</div></div>
+</div><div id="ocrStatus" class="muted compact-status"></div>
+<div class="existing-photos-card ${obj.id?'':'is-empty'}"><div class="card-head"><b>🖼️ รูปในรายการ</b><small>${obj.id?'แตะรูปเพื่อเปิด':'ยังไม่มีรูป'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">รูปที่เลือกจะแสดงด้านบน</span>'}</div></div>
 <h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
 <div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
 <div class="field"><label>ส่วนลด (${state.settings.currency})</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
@@ -348,7 +369,7 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
 ].includes(obj.fuelType)?`<option value="${esc(obj.fuelType)}" selected>${esc(obj.fuelType)}</option>`:''}</select></div><div class="field full"><label>ปั๊ม</label><input id="stationInput" name="station" value="${esc(obj.station||'')}" placeholder="กำลังค้นหาปั๊มใกล้ฉัน…"><div id="formNearby" class="nearby-options"></div></div>
-<div class="field"><label>ผู้ขับขี่</label><input name="driver" list="driverOptions" value="${esc(obj.driver||'')}" placeholder="เลือกสมาชิกครอบครัวหรือพิมพ์ชื่อ"><datalist id="driverOptions">${cachedDriverNames().map(name=>`<option value="${esc(name)}"></option>`).join('')}</datalist></div>
+<div class="field"><label>ผู้ขับขี่</label><select name="driver" id="driverSelect" data-selected="${esc(obj.driver||'')}"><option value="">กำลังโหลดผู้ขับขี่…</option></select></div>
 <div class="field"><label>วิธีการชำระเงิน</label><select name="paymentMethod">
 ${['เงินสด','บัตรเครดิต','บัตรเดบิต','โอน/QR','บัตรน้ำมัน','Wallet','บริษัทจ่าย','อื่นๆ'].map(x=>`<option value="${x}" ${obj.paymentMethod===x?'selected':''}>${x}</option>`).join('')}
 ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','บัตรเดบิต','โอน/QR','บัตรน้ำมัน','Wallet','บริษัทจ่าย','อื่นๆ'].includes(obj.paymentMethod)?`<option value="${esc(obj.paymentMethod)}" selected>${esc(obj.paymentMethod)}</option>`:''}
@@ -367,6 +388,7 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
  $('#fuelOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'fuel'));
  $('#expenseOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'expense'));
  if(type==='fuel'){
+   renderDriverOptions();
    loadFamilyDriverOptions();
    const recalc=()=>{
      const liters=+$('[name="liters"]')?.value||0;
@@ -718,6 +740,18 @@ async function uploadAttachedPhotos(logId){
   return uploaded;
 }
 
+function attachmentUrl(photo){
+  return photo?.url||photo?.downloadURL||photo?.photoUrl||photo?.storageUrl||'';
+}
+function isImageAttachment(photo){
+  const contentType=String(photo?.contentType||photo?.mimeType||'').toLowerCase();
+  if(contentType.startsWith('image/'))return true;
+  if(contentType==='application/pdf')return false;
+  const source=decodeURIComponent(String(photo?.name||photo?.path||attachmentUrl(photo)).split('?')[0]).toLowerCase();
+  if(/\.(?:jpe?g|png|webp|gif|heic|heif|bmp)$/i.test(source))return true;
+  return ['receipt','odometer','fuel','image','photo'].includes(String(photo?.type||'').toLowerCase());
+}
+
 async function loadExistingLogPhotos(logId){
   const box=$('#existingLogPhotos');
   if(!box)return;
@@ -725,7 +759,8 @@ async function loadExistingLogPhotos(logId){
   const aliases=[logId,currentEntry?._uniqueId,currentEntry?.uniqueId,currentEntry?.fuelioId].filter(Boolean).map(String);
   const local=currentEntry?.photos||[];
   const render=photos=>{
-    box.innerHTML=photos.length?photos.map(photo=>`<a class="log-photo-thumb" href="${esc(photo.url)}" target="_blank" rel="noopener">${String(photo.contentType||'').startsWith('image/')?`<img src="${esc(photo.url)}" alt="${esc(photo.name||photo.type||'รูปแนบ')}">`:'<span>📄</span>'}<small>${esc(photo.name||photo.type||'ไฟล์แนบ')}</small></a>`).join(''):'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>';
+    box.innerHTML=photos.length?photos.map(photo=>{const url=attachmentUrl(photo);return `<a class="log-photo-thumb" href="${esc(url)}" target="_blank" rel="noopener">${isImageAttachment(photo)?`<img src="${esc(url)}" alt="${esc(photo.name||photo.type||'รูปแนบ')}" loading="lazy">`:'<span>📄</span>'}<small>${esc(photo.name||photo.type||'ไฟล์แนบ')}</small></a>`}).join(''):'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>';
+    box.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{const fallback=document.createElement('span');fallback.textContent='🖼️';img.replaceWith(fallback);},{once:true}));
   };
   if(local.length)render(local);
   if(!user){if(!local.length)box.innerHTML='<span class="muted">เข้าสู่ระบบเพื่อโหลดรูปเดิมจาก Cloud</span>';return;}
@@ -739,7 +774,7 @@ async function loadExistingLogPhotos(logId){
       const pathMatch=aliases.some(alias=>path.includes(`/fuel/${alias}/`));
       return direct||pathMatch;
     });
-    const merged=[...local,...cloud].filter((photo,index,all)=>photo?.url&&all.findIndex(item=>item.url===photo.url)===index);
+    const merged=[...local,...cloud].map(photo=>({...photo,url:attachmentUrl(photo)})).filter((photo,index,all)=>photo.url&&all.findIndex(item=>item.url===photo.url)===index);
     const entry=state.entries.find(item=>item.id===logId);
     if(entry&&merged.length){entry.photos=merged;save();}
     render(merged);
@@ -1059,6 +1094,8 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.1.3</b> — นำปุ่มเปลี่ยนธีมออกจากแถบด้านบน ให้จัดการธีมจากหน้าการตั้งค่าเพียงจุดเดียว</li>
+      <li><b>7.1.2</b> — จัดฟอร์มเติมน้ำมันให้กระชับ แสดง preview รูปเก่า และเปลี่ยนสมาชิกครอบครัวเป็นตัวเลือกผู้ขับขี่แบบ native</li>
       <li><b>7.1.1</b> — แก้จำนวนรายการ, สกุลเงิน, cache Firebase, OCR หน่วยแกลลอน, รหัส Weather และ rate limiter ตามผล audit</li>
       <li><b>7.1.0</b> — เมนูเพิ่มเติมเป็นหน้าเต็ม, Fuelio อัปเดตรายการเดิมโดยจับคู่วัน/เวลา/เลขไมล์ และเลือกผู้ขับขี่จากสมาชิกครอบครัว</li>
       <li><b>7.0.3</b> — เปรียบเทียบราคาจริงจากบางจาก, OR/ปตท. และสถานีเชลล์ทางการ พร้อมข้อมูลสำรองแบบ same-origin</li>
@@ -1556,7 +1593,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.1.1').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.1.3').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

@@ -33,7 +33,7 @@ for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.ph
 for (const legacyPhotoKey of ['photo.entryId','photo.targetId','photo.target_id','/fuel/${alias}/']) {
   if (!app.includes(legacyPhotoKey)) throw new Error(`V7.0.2 legacy photo check failed: ${legacyPhotoKey}`);
 }
-for (const required of ['data-page="panel"', 'findMatchingFuelEntry', 'mergeFuelioEntry', 'loadFamilyDriverOptions', 'driverOptions']) {
+for (const required of ['data-page="panel"', 'findMatchingFuelEntry', 'mergeFuelioEntry', 'loadFamilyDriverOptions', 'driverSelect']) {
   const source = required === 'data-page="panel"' ? await readFile(new URL('../index.html', import.meta.url), 'utf8') : app;
   if (!source.includes(required)) throw new Error(`V7.1.0 feature check failed: ${required}`);
 }

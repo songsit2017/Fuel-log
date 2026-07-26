@@ -38,6 +38,36 @@ body.light{--bg:#f5f6f8;--surface:#fff;--surface2:#eef0f3;--text:#1a1d22;--muted
 @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @media(min-width:700px){.bottom-sheet{left:50%;right:auto;width:min(480px,calc(100% - 32px));transform:translateX(-50%);bottom:18px;border-radius:24px}.bottom-sheet-dialog[open] .bottom-sheet{animation:sheetUpDesktop .22s ease-out}@keyframes sheetUpDesktop{from{transform:translate(-50%,100%)}to{transform:translate(-50%,0)}}}
 
+/* v7.1.2 compact fuel editor and reliable photo previews */
+#dynamicForm{padding:13px}
+#dynamicForm header{margin-bottom:9px}
+#dynamicForm header h2{font-size:21px}
+.fuel-form-hero{padding:9px 11px;margin:0 0 10px}
+.fuel-form-hero>span{width:38px;height:38px;border-radius:11px;font-size:20px}
+.form-section-title{margin:11px 0 7px}
+.compact-media-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.compact-media-actions .photo-pick{position:relative;display:flex;min-width:0;min-height:68px;padding:8px 5px;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.compact-media-actions .photo-pick>span{font-size:13px;font-weight:700;white-space:nowrap}
+.compact-media-actions .photo-pick small{font-size:9.5px;max-width:100%}
+.selected-photo-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.3}
+.compact-status{min-height:0;margin:5px 0;padding:0}
+.compact-status:empty{display:none}
+.existing-photos-card{margin:7px 0 10px;padding:8px 9px}
+.existing-photos-card.is-empty{display:none}
+.existing-photos-card .card-head{align-items:center;margin-bottom:2px}
+.existing-photos-card .card-head b{font-size:12px}
+.log-photo-strip{gap:7px;padding:3px 0}
+.log-photo-thumb{flex-basis:72px;border-radius:9px}
+.log-photo-thumb img,.log-photo-thumb>span{height:50px;font-size:21px}
+.log-photo-thumb small{padding:4px 5px;font-size:8px}
+.form-grid>label.field.full{display:flex;align-items:center;gap:9px;padding:7px 2px;color:var(--text)}
+.form-grid>label.field.full input[type=checkbox]{flex:0 0 19px;width:19px;height:19px;margin:0;accent-color:var(--accent)}
+#dynamicForm footer{margin-top:10px}
+@media(max-width:430px){
+  dialog{width:min(100% - 12px,540px)}
+  dialog form{max-height:91vh}
+}
+
 /* ---- Fuelio-style detailed report cards (always light, regardless of app theme) ---- */
 .freport{--fr-bg:#eef1fb;--fr-card:#ffffff;--fr-navy:#28345c;--fr-blue:#33448a;--fr-muted:#8890a8;--fr-green:#2e9e5b;--fr-red:#e0533f;--fr-line:#e4e8f5;background:var(--fr-bg);margin:-16px;padding:16px;border-radius:20px;color:var(--fr-navy)}
 .freport-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}

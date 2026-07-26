@@ -14,6 +14,7 @@ const mobilePackage = await readFile(new URL('../mobile/package.json', import.me
 const capacitorConfig = await readFile(new URL('../mobile/capacitor.config.json', import.meta.url), 'utf8');
 const nativeVehiclesViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/vehicles/VehiclesViewModel.kt', import.meta.url), 'utf8');
 const nativeVehicleRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/VehicleRepository.kt', import.meta.url), 'utf8');
+const kotlinPolicy = await readFile(new URL('../native-kotlin/KOTLIN-POLICY.md', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -152,6 +153,8 @@ test('GitHub builds downloadable signed APK and future Play Store AAB safely', (
   assert.match(androidConfigScript, /System\.getenv\("FUELLOG_KEYSTORE_PASSWORD"\)/);
   assert.match(androidConfigScript, /versionCode/);
   assert.match(androidConfigScript, /versionName/);
+  assert.match(androidWorkflow, /format\('8\.0\.0-beta\.\{0\}', github\.run_number\)/);
+  assert.match(androidWorkflow, /FuelLog-Pro-\$\{FUELLOG_VERSION_NAME\}\.apk/);
 });
 
 test('Android APK uses native Google authentication without a browser redirect', () => {
@@ -185,6 +188,8 @@ test('parallel Kotlin migration starts with repository and ViewModel boundaries'
   assert.match(nativeVehiclesViewModel, /class VehiclesViewModel/);
   assert.match(nativeVehiclesViewModel, /fun onSignedIn\(uid: String\)/);
   assert.match(nativeVehiclesViewModel, /StateFlow<VehiclesUiState>/);
+  assert.match(kotlinPolicy, /Kotlin-first and Kotlin-only/);
+  assert.match(kotlinPolicy, /Do not add application-owned `\.java` files/);
 });
 
 test('home has one vehicle selector', () => {

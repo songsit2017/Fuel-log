@@ -4,6 +4,8 @@ This directory is the parallel native Android implementation. The current
 Capacitor APK remains the production fallback until each native feature passes
 data-parity tests.
 
+All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
+
 ## Phase 1 included
 
 - Domain models matching the existing Firestore schema.
@@ -23,4 +25,3 @@ data-parity tests.
 The native app must use the existing Firebase project, package
 `com.songsit.fuellogpro`, release keystore and Firestore document IDs. Never
 create a second production schema.
-

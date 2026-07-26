@@ -7,11 +7,20 @@ service cloud.firestore {
     function member(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
     function editor(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
     function owner(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.ownerUid == request.auth.uid; }
+    function canReadVehicleResource() {
+      return signedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.members[request.auth.uid].role in ['owner','editor','viewer'] ||
+        (resource.data.memberUids is list && request.auth.uid in resource.data.memberUids)
+      );
+    }
 
     match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
     match /vehicles/{vid} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.members[request.auth.uid].role == 'owner';
-      allow read: if member(vid);
+      // Resource-field checks allow Firestore to prove ownerUid == uid and
+      // memberUids array-contains uid queries without exposing other vehicles.
+      allow read: if canReadVehicleResource();
       allow delete: if owner(vid);
       allow update: if owner(vid) || (signedIn() && request.resource.data.lastJoinCode is string && exists(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)) && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.vehicleId == vid && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.emailLower == request.auth.token.email && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.expiresAt > request.time.toMillis());
       match /{document=**} {

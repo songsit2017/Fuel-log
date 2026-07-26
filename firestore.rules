@@ -2,10 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function vehicleExists(vid) { return exists(/databases/$(database)/documents/vehicles/$(vid)); }
     function vehicleDoc(vid) { return get(/databases/$(database)/documents/vehicles/$(vid)); }
-    function member(vid) { return signedIn() && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
-    function editor(vid) { return signedIn() && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
-    function owner(vid) { return signedIn() && vehicleDoc(vid).data.ownerUid == request.auth.uid; }
+    function member(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
+    function editor(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
+    function owner(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.ownerUid == request.auth.uid; }
 
     match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
     match /vehicles/{vid} {

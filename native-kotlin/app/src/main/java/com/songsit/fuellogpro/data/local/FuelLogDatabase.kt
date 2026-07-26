@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [FuelEntryEntity::class],
     version = 1,
-    exportSchema = true,
+    exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun fuelEntryDao(): FuelEntryDao

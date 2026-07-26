@@ -85,7 +85,7 @@ function stationBadge(stationName){
   return `<div class="ico">⛽</div>`;
 }
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '7.0.0';
+const APP_VERSION = '7.0.1';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -328,6 +328,7 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <div class="field full"><label>เหตุผล / วัตถุประสงค์</label><input name="reason" value="${esc(obj.reason||'')}" placeholder="เช่น เดินทางไปงาน, ใช้งานส่วนตัว, เติมก่อนออกต่างจังหวัด"></div>
 <label class="field full"><input name="previousFillMissed" type="checkbox" ${obj.previousFillMissed?'checked':''}> พลาดการบันทึกการเติมครั้งก่อนหน้า</label>
 <div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
+<div class="field full"><label>รูปที่แนบกับรายการนี้</label><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังโหลดรูปเดิม…</span>':'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>'}</div></div>
 <div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
 <label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label>
 <div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
@@ -349,6 +350,7 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
    };
    ['liters','pricePerLiter','grossTotal','discount'].forEach(n=>$(`[name="${n}"]`)?.addEventListener('input',recalc));
    recalc();
+   if(obj.id) loadExistingLogPhotos(obj.id);
  }
  if(type==='fuel'&&!obj.station)setTimeout(autoNearby,150);}
 
@@ -510,7 +512,9 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
        if(status)status.textContent='ใช้ตำแหน่งไม่ได้ จึงบันทึกรายการโดยไม่มีข้อมูลอากาศ';
      }
    }else if(oldRecord?.weather)data.weather=oldRecord.weather;
-   old>=0?state.entries[old]={...oldRecord,...data}:state.entries.push(data);await uploadAttachedPhotos(idv);
+   const uploadedPhotos=await uploadAttachedPhotos(idv);
+   data.photos=[...(oldRecord?.photos||[]),...uploadedPhotos].filter((photo,index,all)=>photo?.url&&all.findIndex(item=>item.url===photo.url)===index);
+   old>=0?state.entries[old]={...oldRecord,...data}:state.entries.push(data);
  }
  if(type==='expense'){
    if(!(+data.amount>0)){ alert('กรอกจำนวนเงินให้ครบก่อนบันทึก'); return; }
@@ -585,6 +589,9 @@ function gradeRow(label, grades){
   if(grades.diesel_b7) parts.push(`ดีเซล B7 ฿${grades.diesel_b7.toFixed(2)}`);
   return parts.length ? `<div class="list-row"><b>${esc(label)}</b><span>${parts.join(' · ')}</span></div>` : '';
 }
+function unavailableGradeRow(label, message='แหล่งข้อมูลยังไม่ส่งราคา'){
+  return `<div class="list-row oil-row-unavailable"><b>${esc(label)}</b><span class="muted">${esc(message)}</span></div>`;
+}
 async function fetchBangchakLocal(){
   try{
     const res = await fetch(`./oil-prices.json?v=${Date.now()}`,{cache:'no-store'});
@@ -616,15 +623,28 @@ async function loadTodayPrices(){
   box.innerHTML='<div class="muted">กำลังโหลดราคาน้ำมัน…</div>';
   try{
     const [bangchak, aggregator] = await Promise.all([fetchBangchakLocal(), fetchAggregatorPrices()]);
-    const rows = [];
-    if(bangchak?.grades) rows.push(gradeRow('บางจาก (ทางการ)', bangchak.grades));
-    else if(aggregator?.stations?.bcp) rows.push(gradeRow('บางจาก', normalizeAggregatorStation(aggregator.stations.bcp)));
-    if(aggregator?.stations?.ptt) rows.push(gradeRow('ปตท.', normalizeAggregatorStation(aggregator.stations.ptt)));
-    if(aggregator?.stations?.shell) rows.push(gradeRow('เชลล์', normalizeAggregatorStation(aggregator.stations.shell)));
+    const previous=JSON.parse(store.getItem('fuellog-oil-brand-cache')||'{}');
+    const bcpGrades=bangchak?.grades||normalizeAggregatorStation(aggregator?.stations?.bcp)||previous.bcp||null;
+    const pttLive=normalizeAggregatorStation(aggregator?.stations?.ptt);
+    const shellLive=normalizeAggregatorStation(aggregator?.stations?.shell);
+    const hasPrice=grades=>grades&&Object.values(grades).some(Boolean);
+    const pttGrades=hasPrice(pttLive)?pttLive:previous.ptt||null;
+    const shellGrades=hasPrice(shellLive)?shellLive:previous.shell||null;
+    if(hasPrice(pttLive)||hasPrice(shellLive)) store.setItem('fuellog-oil-brand-cache',JSON.stringify({
+      bcp:hasPrice(bcpGrades)?bcpGrades:previous.bcp,
+      ptt:hasPrice(pttLive)?pttLive:previous.ptt,
+      shell:hasPrice(shellLive)?shellLive:previous.shell,
+      time:Date.now()
+    }));
+    const rows = [
+      hasPrice(bcpGrades)?gradeRow(bangchak?.grades?'บางจาก (ทางการ)':'บางจาก',bcpGrades):unavailableGradeRow('บางจาก'),
+      hasPrice(pttGrades)?gradeRow('ปตท.',pttGrades):unavailableGradeRow('ปตท.','API ต้นทางยังไม่ส่งราคา'),
+      hasPrice(shellGrades)?gradeRow('เชลล์',shellGrades):unavailableGradeRow('เชลล์','API ต้นทางยังไม่ส่งราคา')
+    ];
     const html = rows.filter(Boolean).join('');
     if(html){
       const dateLine = bangchak?.dateLabel ? `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(bangchak.dateLabel)}</div>` : '';
-      const note = !aggregator ? `<div class="muted" style="margin-top:6px;font-size:10px;">เทียบกับ ปตท./เชลล์ ไม่ได้ตอนนี้ (โหลดไม่สำเร็จ)</div>` : '';
+      const note = (!hasPrice(pttGrades)||!hasPrice(shellGrades)) ? `<div class="muted" style="margin-top:6px;font-size:10px;">แสดงครบทั้ง 3 แบรนด์เสมอ และจะเติมราคาปตท./เชลล์ทันทีเมื่อ API ต้นทางกลับมาส่งข้อมูล โดยไม่ใช้ค่าประมาณ</div>` : '';
       const full = dateLine+html+note;
       box.innerHTML = full;
       store.setItem('fuellog-oil-cache', JSON.stringify({html:dateLine+html,time:Date.now()}));
@@ -642,18 +662,46 @@ async function loadTodayPrices(){
 }
 
 async function uploadAttachedPhotos(logId){
-  if(!user)return;
+  if(!user)return [];
   try{ await ensureCloudVehicle(); }catch(e){ /* if this fails, the upload below will too, surfaced naturally */ }
   const receipt=$('#receiptCameraFile')?.files[0]||$('#receiptGalleryFile')?.files[0];
   const odometer=$('#odoCameraFile')?.files[0]||$('#odoGalleryFile')?.files[0];
   const attachment=$('#extraAttachmentFile')?.files[0];
   const files=[['receipt',receipt],['odometer',odometer],['attachment',attachment]].filter(x=>x[1]);
+  const uploaded=[];
   for(const [type,file] of files){
     const path=`vehicles/${state.currentVehicleId}/fuel/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;
     const sr=ref(storage,path);
     await uploadBytes(sr,file,{contentType:file.type,customMetadata:{uploadedBy:user.uid}});
     const url=await getDownloadURL(sr);
-    await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{type,path,url,name:file.name,logId,uploadedBy:user.uid,createdAt:serverTimestamp()});
+    const photoId=uid();
+    const metadata={id:photoId,type,path,url,name:file.name,logId,contentType:file.type,uploadedBy:user.uid};
+    await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',photoId),{...metadata,createdAt:serverTimestamp()});
+    uploaded.push(metadata);
+  }
+  return uploaded;
+}
+
+async function loadExistingLogPhotos(logId){
+  const box=$('#existingLogPhotos');
+  if(!box)return;
+  const local=state.entries.find(entry=>entry.id===logId)?.photos||[];
+  const render=photos=>{
+    box.innerHTML=photos.length?photos.map(photo=>`<a class="log-photo-thumb" href="${esc(photo.url)}" target="_blank" rel="noopener">${String(photo.contentType||'').startsWith('image/')?`<img src="${esc(photo.url)}" alt="${esc(photo.name||photo.type||'รูปแนบ')}">`:'<span>📄</span>'}<small>${esc(photo.name||photo.type||'ไฟล์แนบ')}</small></a>`).join(''):'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>';
+  };
+  if(local.length)render(local);
+  if(!user){if(!local.length)box.innerHTML='<span class="muted">เข้าสู่ระบบเพื่อโหลดรูปเดิมจาก Cloud</span>';return;}
+  try{
+    await requireFirebase();
+    const snapshot=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos'));
+    const cloud=snapshot.docs.map(item=>({id:item.id,...item.data()})).filter(photo=>photo.logId===logId);
+    const merged=[...local,...cloud].filter((photo,index,all)=>photo?.url&&all.findIndex(item=>item.url===photo.url)===index);
+    const entry=state.entries.find(item=>item.id===logId);
+    if(entry&&merged.length){entry.photos=merged;save();}
+    render(merged);
+  }catch(error){
+    console.warn('Attached photos load failed:',error);
+    if(!local.length)box.innerHTML='<span class="muted">โหลดรูปเดิมไม่สำเร็จ กรุณาลองใหม่หลังซิงก์</span>';
   }
 }
 
@@ -967,6 +1015,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.0.1</b> — รูปเดิมกลับมาแสดงในรายการและไม่ถูกเขียนทับเมื่อแก้ไข, ตารางราคาขึ้นครบ บางจาก/ปตท./เชลล์พร้อมสถานะแหล่งข้อมูล</li>
       <li><b>7.0</b> — แยก Settings/Weather/OCR เป็นโมดูล, เพิ่มสกุลเงิน ทศนิยม 0–3 ธีม 4 แบบ, Open-Meteo และ Claude OCR ผ่าน backend ที่ปลอดภัย</li>
       <li><b>6.10</b> — รายการเติมน้ำมันแยกเป็นกลุ่มตามเดือน พร้อมไอคอนสีตามยี่ห้อปั๊ม, แก้ช่องติ๊กเลือกการ์ดหน้าแรกในตั้งค่าที่เคยเรียงเพี้ยน</li>
       <li><b>6.9</b> — เทียบราคาน้ำมัน ปตท./เชลล์ กับบางจากในหน้าแรก, เพิ่มตัวเลือกสแกนบิลด้วย Claude AI (แม่นยำกว่าตัวอ่านฟรี)</li>

@@ -1,5 +1,5 @@
 {
-  "build": "7.0.0",
+  "build": "7.0.1",
   "target_branch": "main",
   "node_check": true,
   "checks": {

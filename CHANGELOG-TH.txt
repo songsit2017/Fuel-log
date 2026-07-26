@@ -13,3 +13,8 @@ FuelLog Pro V7.0
 - ย้าย Claude OCR ไป Firebase Functions Secret พร้อม Auth และ rate limit
 - ปรับฟอร์มเติมน้ำมันเป็น guided flow พร้อม sticky save action
 - คง Google Login, Family Sharing, Fuelio Import, local OCR, ราคาน้ำมัน, Sync และ Export
+FuelLog Pro V7.0.1
+- แสดงรูปเดิมของรายการเติมน้ำมันจาก metadata ในรายการและ photos collection
+- รักษา photo references เดิมเมื่อแก้ไข พร้อมเพิ่มรูปใหม่โดยไม่เขียนทับ
+- ตารางราคาแสดง บางจาก ปตท. และเชลล์ครบเสมอ พร้อม cache แยกรายแบรนด์
+- ไม่สร้างราคาประมาณเมื่อ API ต้นทางไม่ส่งข้อมูล

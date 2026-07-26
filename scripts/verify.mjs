@@ -27,4 +27,7 @@ if (failures.length) throw new Error(`Regression checks failed: ${failures.join(
 const forbidden = ['anthropic-dangerous-direct-browser-access', "fetch('https://api.anthropic.com", 'firebase-dev'];
 const found = forbidden.filter(needle => app.includes(needle));
 if (found.length) throw new Error(`Forbidden client/branch references: ${found.join(', ')}`);
+for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.photos||[])', "unavailableGradeRow('ปตท.'", "unavailableGradeRow('เชลล์'"]) {
+  if (!app.includes(required)) throw new Error(`V7.0.1 regression check failed: ${required}`);
+}
 console.log(`FuelLog Pro V7 verification passed (${Object.keys(checks).length} feature groups).`);

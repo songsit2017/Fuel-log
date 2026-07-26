@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-07-26T21:36:25.026861+00:00",
+  "fetchedAt": "2026-07-26T22:40:45.225257+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -33,7 +33,7 @@
     },
     "shell": {
       "source": "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH",
-      "updatedAt": "2026-07-27T04:36:24",
+      "updatedAt": "2026-07-27T05:36:36",
       "station": "CO WUTTHIPAN B1 SAI MAI 31 BKK",
       "grades": {
         "gasohol_95": null,

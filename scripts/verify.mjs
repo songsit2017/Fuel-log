@@ -3,7 +3,7 @@ import { readFile, access } from 'node:fs/promises';
 const requiredFiles = [
   'index.html', 'app.js', 'styles.css', 'firebase-config.js', 'firestore.rules',
   'storage.rules', 'oil-prices.json', 'modules/settings.js', 'modules/weather.js',
-  'modules/ocr-client.js', 'functions/index.js'
+  'modules/ocr-client.js', 'modules/fuel-metrics.js', 'functions/index.js'
 ];
 await Promise.all(requiredFiles.map(file => access(new URL(`../${file}`, import.meta.url))));
 

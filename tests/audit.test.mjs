@@ -7,6 +7,7 @@ const sw = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 const weather = await readFile(new URL('../modules/weather.js', import.meta.url), 'utf8');
 const functions = await readFile(new URL('../functions/index.js', import.meta.url), 'utf8');
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -22,7 +23,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.1.3', 'app.js?v=7.1.3', 'firebase-config.js?v=7.1.3']) {
+  for (const asset of ['styles.css?v=7.2.1', 'app.js?v=7.2.1', 'firebase-config.js?v=7.2.1']) {
     assert.ok(sw.includes(asset), `missing cached ${asset}`);
   }
 });
@@ -54,4 +55,16 @@ test('compact editor previews legacy images and uses a native driver select', ()
 test('top bar has no visible theme toggle button', () => {
   assert.doesNotMatch(index, /<button[^>]+id="themeBtn"/);
   assert.match(index, /id="themeBtn" hidden/);
+});
+
+test('report page follows the resolved app theme', () => {
+  assert.match(styles, /\.freport\{--fr-bg:#0f1115/);
+  assert.match(styles, /body\.light \.freport\{--fr-bg:#eef1fb/);
+});
+
+test('fuel metrics module is cached offline and full tank control is near fuel inputs', () => {
+  assert.match(sw, /\.\/modules\/fuel-metrics\.js/);
+  assert.match(app, /class="field full fuel-toggle-row"/);
+  assert.match(app, /calculateFuelIntervals\(entries\(\)/);
+  assert.match(app, /deleteDoc\(doc\(db,'vehicles'/);
 });

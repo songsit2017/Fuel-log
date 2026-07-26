@@ -1,8 +1,9 @@
 import { CURRENCIES, formatCurrency, migrateSettings, resolveLightTheme } from './modules/settings.js';
 import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
+import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.1.3';
+const APP_VERSION = '7.2.1';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -10,7 +11,7 @@ const FIREBASE_SDK_VERSION = '12.13.0';
 let app = null, auth = null, db = null, storage = null, functions = null;
 let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
     signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
-    doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
+    doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
     ref, uploadBytes, getDownloadURL, httpsCallable;
 let firebaseReadyPromise = null;
 let firebaseLoadError = null;
@@ -36,7 +37,7 @@ async function initFirebase(){
 
     ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
       signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
-    ({doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
+    ({doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
     ({ref, uploadBytes, getDownloadURL} = storageMod);
     ({httpsCallable} = functionsMod);
 
@@ -156,27 +157,23 @@ function load(){
   migrateSettings(state);
   state.homeCards ||= {nearby:true,todayPrice:true,chart:true,latest:true,due:true};
   state.fontFamily ||= 'system';
-  // Compatibility: old records only had total. New records keep grossTotal + discount,
-  // while total remains the actual net amount used by all cost/km calculations.
-  state.entries = state.entries.map(x=>{
-    const discount=Math.max(0,Number(x.discount)||0);
-    const net=Number(x.total)||0;
-    const gross=Number(x.grossTotal);
-    return {...x,discount,grossTotal:Number.isFinite(gross)&&gross>0?gross:net+discount,total:net};
-  });
+  state.entries = state.entries.map(normalizeFuelEntry);
   save();
 }
 function save(){ store.setItem(KEY,JSON.stringify(state)); }
 const vehicle = () => state.vehicles.find(v=>v.id===state.currentVehicleId) || state.vehicles[0];
-const entries = () => state.entries.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>new Date(a.date)-new Date(b.date)||(+a.odometer)-(+b.odometer));
+const entries = () => state.entries.filter(x=>x.vehicleId===state.currentVehicleId).map(normalizeFuelEntry).sort(compareFuelEntries);
 const expenses = () => state.expenses.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>new Date(b.date)-new Date(a.date));
 const reminders = () => state.reminders.filter(x=>x.vehicleId===state.currentVehicleId);
 const trips = () => state.trips.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 const currentOdo = () => Math.max(0,...entries().map(x=>+x.odometer||0),...expenses().map(x=>+x.odometer||0));
 function metrics(list=entries()){
-  let dist=0,lit=0,valid=[];
-  for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],d=(+b.odometer)-(+a.odometer);if(a.full&&b.full&&!b.previousFillMissed&&d>0&&+b.liters>0){const k=d/(+b.liters);if(k>2&&k<80){dist+=d;lit+=+b.liters;valid.push({...b,kml:k,distance:d});}}}
-  const spent=list.reduce((s,x)=>s+(+x.total||0),0); return {dist,lit,spent,kml:lit?dist/lit:0,costKm:dist?spent/dist:0,valid};
+  const intervals=calculateFuelIntervals(list,{minEfficiency:1,maxEfficiency:100});
+  const dist=intervals.reduce((sum,item)=>sum+item.distance,0);
+  const lit=intervals.reduce((sum,item)=>sum+item.liters,0);
+  const validCost=intervals.reduce((sum,item)=>sum+item.cost,0);
+  const spent=list.reduce((sum,item)=>sum+(+item.total||0),0);
+  return {dist,lit,spent,validCost,kml:lit?dist/lit:0,costKm:dist?validCost/dist:0,valid:intervals};
 }
 function monthKey(v){return String(v||'').slice(0,7)}
 function withinPeriod(date,p){if(p==='all')return true;const d=new Date(date),n=new Date();if(p==='month')return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();return d.getFullYear()===n.getFullYear();}
@@ -247,6 +244,7 @@ function rowHtml(x){return `<article class="record"><div class="ico">${x.icon}</
 function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.max(1,...data.map(x=>x.value)),w=320,h=115,p=15;const pts=data.map((x,i)=>[p+i*((w-p*2)/(Math.max(1,data.length-1))),h-p-(x.value/max)*(h-p*2)]);svg.innerHTML=`<path d="${pts.map((q,i)=>(i?'L':'M')+q.join(' ')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M${pts[0]?.[0]||0} ${h-p} ${pts.map(q=>'L'+q.join(' ')).join(' ')} L${pts.at(-1)?.[0]||0} ${h-p}Z" fill="rgba(244,168,59,.10)"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="var(--accent)"/><text x="${q[0]}" y="128" fill="var(--muted)" font-size="9" text-anchor="middle">${data[i].label}</text>`).join('')}`;const a=data.at(-2)?.value||0,b=data.at(-1)?.value||0;$('#trendText').textContent=a?`${b>=a?'▲':'▼'} ${fmt(Math.abs((b-a)/a*100))}%`:' ';}
 function renderFuel(){
   const q=$('#fuelSearch').value.toLowerCase(),p=$('#fuelPeriod').value;
+  const intervalById=new Map(calculateFuelIntervals(entries(),{minEfficiency:1,maxEfficiency:100}).map(item=>[item.id,item]));
   const arr=entries().slice().reverse().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));
   if(!arr.length){ $('#fuelList').innerHTML='<div class="empty">ไม่พบรายการ</div>'; return; }
   let html='', lastMonthKey=null;
@@ -260,7 +258,9 @@ function renderFuel(){
     const metaLine=meta?`<small>${meta}</small>`:'';
     const weatherLine=x.weather?`<small>🌦️ ${esc(weatherSummary(x.weather))}</small>`:'';
     const missedLine=x.previousFillMissed?`<small style="color:var(--accent)">⚠ พลาดการบันทึกครั้งก่อน</small>`:'';
-    html+=`<article class="record" data-edit-fuel="${x.id}">${stationBadge(x.station)}<div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${weatherLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?money(toDisplayPricePerVol(x.pricePerLiter))+'/'+volUnit():''}</small></div></article>`;
+    const interval=intervalById.get(x.id);
+    const efficiencyLine=interval?`<small style="color:var(--green)">✓ เต็มถัง • ${fmt(toDisplayEfficiency(interval.kml),2)} ${efficiencyUnit()}${interval.partialFillCount?` • รวมเติมบางส่วน ${fmtCount(interval.partialFillCount)} ครั้ง`:''}</small>`:(x.full?'<small style="color:var(--green)">✓ เติมเต็มถัง</small>':'<small>เติมบางส่วน</small>');
+    html+=`<article class="record" data-edit-fuel="${x.id}">${stationBadge(x.station)}<div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${efficiencyLine}${discountLine}${metaLine}${weatherLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?money(toDisplayPricePerVol(x.pricePerLiter))+'/'+volUnit():''}</small></div></article>`;
   }
   $('#fuelList').innerHTML=html;
 }
@@ -358,6 +358,7 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
 </div><div id="ocrStatus" class="muted compact-status"></div>
 <div class="existing-photos-card ${obj.id?'':'is-empty'}"><div class="card-head"><b>🖼️ รูปในรายการ</b><small>${obj.id?'แตะรูปเพื่อเปิด':'ยังไม่มีรูป'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">รูปที่เลือกจะแสดงด้านบน</span>'}</div></div>
 <h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
+<label class="field full fuel-toggle-row"><span><b>⛽ เติมเต็มถัง</b><small>ใช้คำนวณอัตราสิ้นเปลืองเมื่อถึงการเติมเต็มถังครั้งถัดไป</small></span><input name="full" type="checkbox" ${normalizeBoolean(obj.full,true)?'checked':''}></label>
 <div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
 <div class="field"><label>ส่วนลด (${state.settings.currency})</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
 <div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณ ${state.settings.currency}/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
@@ -378,7 +379,6 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <label class="field full"><input name="previousFillMissed" type="checkbox" ${obj.previousFillMissed?'checked':''}> พลาดการบันทึกการเติมครั้งก่อนหน้า</label>
 <div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
 <div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
-<label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label>
 <div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
  if(type==='expense')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label></div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
@@ -527,6 +527,7 @@ function configureDeleteButton(type,obj){
   btn.onclick=()=>{
     const labels={fuel:'รายการเติมน้ำมัน',expense:'ค่าใช้จ่าย',reminder:'รายการเตือน'};
     if(!confirm(`ลบ${labels[type]||'รายการ'}นี้ถาวร?`)) return;
+    const vehicleId=obj.vehicleId||state.currentVehicleId;
     if(type==='fuel') state.entries=state.entries.filter(x=>x.id!==obj.id);
     if(type==='expense') state.expenses=state.expenses.filter(x=>x.id!==obj.id);
     if(type==='reminder') state.reminders=state.reminders.filter(x=>x.id!==obj.id);
@@ -534,7 +535,13 @@ function configureDeleteButton(type,obj){
     $('#formDialog')?.close();
     renderAll();
     toast('ลบรายการแล้ว');
-    if(user) syncVehicle().catch(console.warn);
+    if(user){
+      const collectionName={fuel:'entries',expense:'expenses',reminder:'reminders'}[type];
+      requireFirebase().then(()=>deleteDoc(doc(db,'vehicles',vehicleId,collectionName,obj.id))).catch(error=>{
+        console.warn('Cloud delete failed:',error);
+        toast('ลบในเครื่องแล้ว แต่ลบจาก Cloud ไม่สำเร็จ');
+      });
+    }
   };
 }
 
@@ -904,15 +911,7 @@ function distanceInRange(arr,inRangeFn){
   return Math.max(0,endOdo-startOdo);
 }
 function fillupIntervals(){
-  const arr=entries(); const out=[];
-  for(let i=1;i<arr.length;i++){
-    const a=arr[i-1],b=arr[i],d=(+b.odometer)-(+a.odometer);
-    if(a.full&&b.full&&!b.previousFillMissed&&d>0&&+b.liters>0){
-      const k=d/(+b.liters);
-      if(k>2&&k<80) out.push({distance:d,liters:+b.liters,kml:k,cost:+b.total||0,costPerKm:d>0?(+b.total||0)/d:0,date:b.date});
-    }
-  }
-  return out;
+  return calculateFuelIntervals(entries(),{minEfficiency:1,maxEfficiency:100});
 }
 function fillupsReport(){
   const arr=entries(), litersOf=x=>+x.liters||0, litersVals=arr.map(litersOf).filter(v=>v>0);
@@ -941,7 +940,7 @@ function costReport(){
     lastMonth:arr.filter(x=>isLastMonth(x.date)).reduce((s,x)=>s+totalOf(x),0),
     minBill:totals.length?Math.min(...totals):0, maxBill:totals.length?Math.max(...totals):0,
     bestPrice:prices.length?Math.min(...prices):0, worstPrice:prices.length?Math.max(...prices):0,
-    costPerKm:m.dist?m.spent/m.dist:0,
+    costPerKm:m.costKm,
     bestCostPerKm:cpkVals.length?Math.min(...cpkVals):0, worstCostPerKm:cpkVals.length?Math.max(...cpkVals):0,
     avgPerDay:total/ds, avgPerMonth:(total/ds)*30.44,
   };
@@ -1094,6 +1093,8 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.2.1</b> — หน้ารายงานเปลี่ยนสีตามธีมมืด สว่าง ตามระบบ และอัตโนมัติ</li>
+      <li><b>7.2.0</b> — แก้สูตรเต็มถัง/เติมบางส่วนและข้อมูลเก่า ย้ายปุ่มเต็มถังขึ้น ลดส่วนหัว แสดงประสิทธิภาพรายช่วง และแก้การลบ Cloud</li>
       <li><b>7.1.3</b> — นำปุ่มเปลี่ยนธีมออกจากแถบด้านบน ให้จัดการธีมจากหน้าการตั้งค่าเพียงจุดเดียว</li>
       <li><b>7.1.2</b> — จัดฟอร์มเติมน้ำมันให้กระชับ แสดง preview รูปเก่า และเปลี่ยนสมาชิกครอบครัวเป็นตัวเลือกผู้ขับขี่แบบ native</li>
       <li><b>7.1.1</b> — แก้จำนวนรายการ, สกุลเงิน, cache Firebase, OCR หน่วยแกลลอน, รหัส Weather และ rate limiter ตามผล audit</li>
@@ -1199,7 +1200,7 @@ async function syncVehicleWithStatus(){
     if(status) status.textContent=`ซิงก์ไม่สำเร็จ: ${e.message||e}`;
   }
 }
-async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const x=d.data();map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
+async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const raw=d.data(),x=name==='entries'?normalizeFuelEntry(raw):raw;map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
 async function loadMembers(){const box=$('#membersBody');if(!box||!user)return;const s=await getDoc(doc(db,'vehicles',state.currentVehicleId));if(!s.exists()){box.innerHTML='รถคันนี้ยังไม่ขึ้น Cloud';return;}const d=s.data(),members=Object.values(d.members||{});familyMembersCache[state.currentVehicleId]=members;box.innerHTML=members.map(m=>`<div class="list-row"><div><b>${esc(m.displayName||m.email)}</b><small>${esc(m.email||'')}</small></div><b>${esc(m.role)}</b></div>`).join('');}
 async function invite(){try{const email=$('#inviteEmail').value.trim().toLowerCase(),role=$('#inviteRole').value,s=await ensureCloudVehicle();if(s.data().ownerUid!==user.uid)throw new Error('เฉพาะ Owner สร้างคำเชิญได้');const code=Math.random().toString(36).slice(2,10).toUpperCase();await setDoc(doc(db,'invites',code),{vehicleId:state.currentVehicleId,vehicleName:vehicle().name,emailLower:email,role,ownerUid:user.uid,expiresAt:Date.now()+7*864e5,createdAt:serverTimestamp()});$('#inviteResult').innerHTML=`รหัสเชิญ: <b>${code}</b> (7 วัน)`;}catch(e){alert(e.message)}}
 async function join(){
@@ -1274,9 +1275,9 @@ function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOu
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:7,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
-  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note','weatherDescription','temperatureC','humidityPercent','latitude','longitude']];
-  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'',x.weather?.description||'',x.weather?.temperatureC??'',x.weather?.humidityPercent??'',x.weather?.latitude??'',x.weather?.longitude??'']));
-  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'','','','','','']));
+  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note','weatherDescription','temperatureC','humidityPercent','latitude','longitude','time','full']];
+  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'',x.weather?.description||'',x.weather?.temperatureC??'',x.weather?.humidityPercent??'',x.weather?.latitude??'',x.weather?.longitude??'',x.time||'',normalizeBoolean(x.full,true)?'yes':'no']));
+  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'','','','','','','','']));
   download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
 }
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}
@@ -1346,12 +1347,11 @@ function parseFuelioCSV(text){
     if(isFuelioSectionMarker(trimmed)) break;
     const cols=splitFuelioCsvLine(raw,delim);
     if(cols.length<=Math.max(idxDate,idxOdo,idxFuel)){ skipped++; continue; }
-    if(idxMissed>-1&&(cols[idxMissed]||'').trim()==='1'){ skipped++; continue; }
     let odo=parseFuelioNum(cols[idxOdo]), liters=parseFuelioNum(cols[idxFuel]);
     if(isNaN(odo)||isNaN(liters)){ skipped++; continue; }
     if(odoIsMiles) odo*=1.60934;
     if(fuelIsGallons) liters*=3.78541;
-    const full=(cols[idxFull]||'').toString().trim()==='1';
+    const full=idxFull===-1?true:normalizeBoolean(cols[idxFull],false);
     let total=idxPrice>-1?parseFuelioNum(cols[idxPrice]):NaN; if(isNaN(total)) total=0;
     const pricePerLiter=(liters>0&&total>0)?total/liters:0;
     results.push({
@@ -1365,6 +1365,7 @@ function parseFuelioCSV(text){
       discount: 0,
       total: Math.round(total*100)/100,
       full, fuelType:'',
+      previousFillMissed: idxMissed>-1?normalizeBoolean(cols[idxMissed],false):false,
       station: idxStation>-1?(cols[idxStation]||'').trim():'',
       note: idxNote>-1?(cols[idxNote]||'').trim():'',
       _uniqueId: idxUniqueId>-1?(cols[idxUniqueId]||'').trim():'',
@@ -1593,7 +1594,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.1.3').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.2.1').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

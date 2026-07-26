@@ -15,7 +15,7 @@ BANGCHAK_URL = "https://oil-price.bangchak.co.th/ApiOilPrice2/th"
 PTT_URL = "https://orapiweb.pttor.com/oilservice/OilPrice.asmx"
 SHELL_URL = "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH"
 OUT = Path(__file__).resolve().parents[1] / "oil-prices.json"
-HEADERS = {"User-Agent": "FuelLog-Pro/7.1.3 (+GitHub Actions)"}
+HEADERS = {"User-Agent": "FuelLog-Pro/7.2.1 (+GitHub Actions)"}
 
 
 def read_url(url: str, *, data: bytes | None = None, headers: dict | None = None) -> bytes:

@@ -39,6 +39,9 @@ body.light{--bg:#f5f6f8;--surface:#fff;--surface2:#eef0f3;--text:#1a1d22;--muted
 @media(min-width:700px){.bottom-sheet{left:50%;right:auto;width:min(480px,calc(100% - 32px));transform:translateX(-50%);bottom:18px;border-radius:24px}.bottom-sheet-dialog[open] .bottom-sheet{animation:sheetUpDesktop .22s ease-out}@keyframes sheetUpDesktop{from{transform:translate(-50%,100%)}to{transform:translate(-50%,0)}}}
 
 /* v7.1.2 compact fuel editor and reliable photo previews */
+.topbar{padding:8px 16px 7px;min-height:50px}
+.topbar h1{font-size:20px;line-height:1.15}
+.topbar .eyebrow{font-size:10px;line-height:1.2;margin-bottom:2px}
 #dynamicForm{padding:13px}
 #dynamicForm header{margin-bottom:9px}
 #dynamicForm header h2{font-size:21px}
@@ -62,14 +65,21 @@ body.light{--bg:#f5f6f8;--surface:#fff;--surface2:#eef0f3;--text:#1a1d22;--muted
 .log-photo-thumb small{padding:4px 5px;font-size:8px}
 .form-grid>label.field.full{display:flex;align-items:center;gap:9px;padding:7px 2px;color:var(--text)}
 .form-grid>label.field.full input[type=checkbox]{flex:0 0 19px;width:19px;height:19px;margin:0;accent-color:var(--accent)}
+.form-grid>label.fuel-toggle-row{justify-content:space-between;margin:1px 0;padding:9px 11px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--accent) 9%,var(--surface2))}
+.fuel-toggle-row span{min-width:0}
+.fuel-toggle-row b,.fuel-toggle-row small{display:block}
+.fuel-toggle-row b{font-size:13px;color:var(--text)}
+.fuel-toggle-row small{margin-top:2px;color:var(--muted);font-size:9.5px;line-height:1.35}
+.form-grid>label.fuel-toggle-row input[type=checkbox]{width:22px;height:22px;flex-basis:22px}
 #dynamicForm footer{margin-top:10px}
 @media(max-width:430px){
   dialog{width:min(100% - 12px,540px)}
   dialog form{max-height:91vh}
 }
 
-/* ---- Fuelio-style detailed report cards (always light, regardless of app theme) ---- */
-.freport{--fr-bg:#eef1fb;--fr-card:#ffffff;--fr-navy:#28345c;--fr-blue:#33448a;--fr-muted:#8890a8;--fr-green:#2e9e5b;--fr-red:#e0533f;--fr-line:#e4e8f5;background:var(--fr-bg);margin:-16px;padding:16px;border-radius:20px;color:var(--fr-navy)}
+/* ---- Fuelio-style detailed report cards that follow the active app theme ---- */
+.freport{--fr-bg:#0f1115;--fr-card:#191c23;--fr-navy:#f3f4f7;--fr-blue:#f4a83b;--fr-muted:#9ca3b2;--fr-green:#58d0a9;--fr-red:#ff796b;--fr-line:#30343e;background:var(--fr-bg);margin:-16px;padding:16px;border-radius:20px;color:var(--fr-navy)}
+body.light .freport{--fr-bg:#eef1fb;--fr-card:#ffffff;--fr-navy:#28345c;--fr-blue:#33448a;--fr-muted:#8890a8;--fr-green:#2e9e5b;--fr-red:#e0533f;--fr-line:#e4e8f5}
 .freport-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}
 .freport-tabs::-webkit-scrollbar{display:none}
 .freport-tab{flex:0 0 auto;border:0;background:transparent;color:var(--fr-muted);font-weight:700;font-size:12.5px;padding:8px 10px;border-bottom:3px solid transparent;white-space:nowrap}

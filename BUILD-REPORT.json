@@ -1,5 +1,5 @@
 {
-  "build": "7.1.3",
+  "build": "7.2.1",
   "target_branch": "main",
   "node_check": true,
   "checks": {
@@ -13,7 +13,10 @@
     "family": true,
     "settings": true,
     "weather": true,
-    "secure_claude_ocr": true
+    "secure_claude_ocr": true,
+    "full_tank_partial_fill_metrics": true,
+    "cloud_delete": true,
+    "offline_metrics_module": true
   },
   "file_count": 30
 }

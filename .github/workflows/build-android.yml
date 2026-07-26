@@ -1,0 +1,101 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      FUELLOG_VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '8.0.0-beta.1' }}
+      FUELLOG_VERSION_CODE: ${{ github.run_number }}
+      FUELLOG_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+      FUELLOG_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+      FUELLOG_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout main source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Test web application
+        run: npm test
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: |
+          npm run web:sync
+          npx cap add android
+
+      - name: Restore release keystore
+        working-directory: mobile
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$APK_KEYSTORE_BASE64" ]; then
+            echo "$APK_KEYSTORE_BASE64" | base64 --decode > release-keystore.jks
+            echo "FUELLOG_KEYSTORE_FILE=$PWD/release-keystore.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: Require signing key for GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$APK_KEYSTORE_BASE64" || (echo "::error::Set APK signing secrets before creating a v* tag" && exit 1)
+
+      - name: Configure Android version and signing
+        working-directory: mobile
+        run: npm run android:configure
+
+      - name: Build Android package
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          if [ -n "${FUELLOG_KEYSTORE_FILE:-}" ]; then
+            ./gradlew assembleRelease bundleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk ../../FuelLog-Pro-${FUELLOG_VERSION_NAME}.apk
+            cp app/build/outputs/bundle/release/app-release.aab ../../FuelLog-Pro-${FUELLOG_VERSION_NAME}.aab
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../../FuelLog-Pro-${FUELLOG_VERSION_NAME}-TEST.apk
+          fi
+
+      - name: Upload APK/AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FuelLog-Pro-Android-${{ env.FUELLOG_VERSION_NAME }}
+          path: |
+            FuelLog-Pro-*.apk
+            FuelLog-Pro-*.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish files to GitHub Releases
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" FuelLog-Pro-*.apk FuelLog-Pro-*.aab --title "FuelLog Pro $GITHUB_REF_NAME" --generate-notes

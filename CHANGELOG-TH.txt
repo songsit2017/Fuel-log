@@ -1,8 +1,8 @@
-FuelLog Pro v6.0.0 Main Complete
-- รวมฐาน main และแก้ไขทั้งหมดไว้ในชุดเดียว
-- เพิ่มส่วนลดในรายการเติมน้ำมัน
-- แยกยอดก่อนลด/ส่วนลด/ยอดสุทธิ
-- คำนวณต้นทุนจริงจากยอดสุทธิ
-- รวม OCR, ราคาน้ำมัน local-first, Family Join/Sync status
-- รักษา Fuelio multi-vehicle + pictures import
-- อัปเดต Service Worker cache เป็น v6
+FuelLog Pro v6.2 Main Complete
+- Added driver
+- Added payment method
+- Added reason/purpose
+- Added previous fill missed flag
+- Added extra image/PDF attachment
+- Included fields in list view and CSV export
+- Kept Fuelio, OCR, Family, Sync, oil price and Android-ready structure

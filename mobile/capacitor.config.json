@@ -1,0 +1,12 @@
+{
+  "appId": "com.songsit.fuellogpro",
+  "appName": "FuelLog Pro",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

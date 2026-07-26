@@ -134,7 +134,7 @@ const trips = () => state.trips.filter(x=>x.vehicleId===state.currentVehicleId).
 const currentOdo = () => Math.max(0,...entries().map(x=>+x.odometer||0),...expenses().map(x=>+x.odometer||0));
 function metrics(list=entries()){
   let dist=0,lit=0,valid=[];
-  for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],d=(+b.odometer)-(+a.odometer);if(a.full&&b.full&&d>0&&+b.liters>0){const k=d/(+b.liters);if(k>2&&k<80){dist+=d;lit+=+b.liters;valid.push({...b,kml:k,distance:d});}}}
+  for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],d=(+b.odometer)-(+a.odometer);if(a.full&&b.full&&!b.previousFillMissed&&d>0&&+b.liters>0){const k=d/(+b.liters);if(k>2&&k<80){dist+=d;lit+=+b.liters;valid.push({...b,kml:k,distance:d});}}}
   const spent=list.reduce((s,x)=>s+(+x.total||0),0); return {dist,lit,spent,kml:lit?dist/lit:0,costKm:dist?spent/dist:0,valid};
 }
 function monthKey(v){return String(v||'').slice(0,7)}
@@ -487,6 +487,7 @@ async function loadTodayPrices(){
 
 async function uploadAttachedPhotos(logId){
   if(!user)return;
+  try{ await ensureCloudVehicle(); }catch(e){ /* if this fails, the upload below will too, surfaced naturally */ }
   const receipt=$('#receiptCameraFile')?.files[0]||$('#receiptGalleryFile')?.files[0];
   const odometer=$('#odoCameraFile')?.files[0]||$('#odoGalleryFile')?.files[0];
   const attachment=$('#extraAttachmentFile')?.files[0];
@@ -721,7 +722,7 @@ function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version
 function exportCSV(){
   const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note']];
   state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'']));
-  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','','',x.category||'',x.title||'','',x.note||'']));
+  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'']));
   download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
 }
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}

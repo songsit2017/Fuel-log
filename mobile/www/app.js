@@ -134,7 +134,7 @@ const trips = () => state.trips.filter(x=>x.vehicleId===state.currentVehicleId).
 const currentOdo = () => Math.max(0,...entries().map(x=>+x.odometer||0),...expenses().map(x=>+x.odometer||0));
 function metrics(list=entries()){
   let dist=0,lit=0,valid=[];
-  for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],d=(+b.odometer)-(+a.odometer);if(a.full&&b.full&&d>0&&+b.liters>0){const k=d/(+b.liters);if(k>2&&k<80){dist+=d;lit+=+b.liters;valid.push({...b,kml:k,distance:d});}}}
+  for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],d=(+b.odometer)-(+a.odometer);if(a.full&&b.full&&!b.previousFillMissed&&d>0&&+b.liters>0){const k=d/(+b.liters);if(k>2&&k<80){dist+=d;lit+=+b.liters;valid.push({...b,kml:k,distance:d});}}}
   const spent=list.reduce((s,x)=>s+(+x.total||0),0); return {dist,lit,spent,kml:lit?dist/lit:0,costKm:dist?spent/dist:0,valid};
 }
 function monthKey(v){return String(v||'').slice(0,7)}
@@ -156,7 +156,10 @@ function renderFuel(){
     const discount=Number(x.discount)||0;
     const gross=Number(x.grossTotal)||((Number(x.total)||0)+discount);
     const discountLine=discount>0?`<small>ก่อนลด ${money(gross)} • ลด ${money(discount)}</small>`:'';
-    return `<article class="record" data-edit-fuel="${x.id}"><div class="ico">⛽</div><div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
+    const meta=[x.driver,x.paymentMethod,x.reason].filter(Boolean).map(esc).join(' • ');
+    const metaLine=meta?`<small>${meta}</small>`:'';
+    const missedLine=x.previousFillMissed?`<small style="color:var(--accent)">⚠ พลาดการบันทึกครั้งก่อน</small>`:'';
+    return `<article class="record" data-edit-fuel="${x.id}"><div class="ico">⛽</div><div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
   }).join(''):'<div class="empty">ไม่พบรายการ</div>';
 }
 function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.title||x.category)}</b><small>${x.date} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}</small></div><div class="amount">${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
@@ -217,7 +220,17 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
   'แก๊สโซฮอล์ 95','แก๊สโซฮอล์ 91','แก๊สโซฮอล์ E20','แก๊สโซฮอล์ E85',
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
-].includes(obj.fuelType)?`<option value="${esc(obj.fuelType)}" selected>${esc(obj.fuelType)}</option>`:''}</select></div><div class="field full"><label>ปั๊ม</label><input id="stationInput" name="station" value="${esc(obj.station||'')}" placeholder="กำลังค้นหาปั๊มใกล้ฉัน…"><div id="formNearby" class="nearby-options"></div></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div><label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label></div>`;
+].includes(obj.fuelType)?`<option value="${esc(obj.fuelType)}" selected>${esc(obj.fuelType)}</option>`:''}</select></div><div class="field full"><label>ปั๊ม</label><input id="stationInput" name="station" value="${esc(obj.station||'')}" placeholder="กำลังค้นหาปั๊มใกล้ฉัน…"><div id="formNearby" class="nearby-options"></div></div>
+<div class="field"><label>ผู้ขับขี่</label><input name="driver" value="${esc(obj.driver||'')}" placeholder="ชื่อผู้ขับขี่"></div>
+<div class="field"><label>วิธีการชำระเงิน</label><select name="paymentMethod">
+${['เงินสด','บัตรเครดิต','บัตรเดบิต','โอน/QR','บัตรน้ำมัน','Wallet','บริษัทจ่าย','อื่นๆ'].map(x=>`<option value="${x}" ${obj.paymentMethod===x?'selected':''}>${x}</option>`).join('')}
+${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','บัตรเดบิต','โอน/QR','บัตรน้ำมัน','Wallet','บริษัทจ่าย','อื่นๆ'].includes(obj.paymentMethod)?`<option value="${esc(obj.paymentMethod)}" selected>${esc(obj.paymentMethod)}</option>`:''}
+</select></div>
+<div class="field full"><label>เหตุผล / วัตถุประสงค์</label><input name="reason" value="${esc(obj.reason||'')}" placeholder="เช่น เดินทางไปงาน, ใช้งานส่วนตัว, เติมก่อนออกต่างจังหวัด"></div>
+<label class="field full"><input name="previousFillMissed" type="checkbox" ${obj.previousFillMissed?'checked':''}> พลาดการบันทึกการเติมครั้งก่อนหน้า</label>
+<div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
+<div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
+<label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label></div>`;
  if(type==='expense')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label></div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
  d.showModal();
@@ -354,6 +367,7 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
    data.discount=Math.max(0,+data.discount||0);
    data.total=Math.max(0,data.grossTotal-data.discount);
    data.full=$('[name="full"]')?.checked??true;
+   data.previousFillMissed=$('[name="previousFillMissed"]')?.checked??false;
    if(!data.grossTotal&&data.pricePerLiter&&data.liters){data.grossTotal=data.pricePerLiter*data.liters;data.total=Math.max(0,data.grossTotal-data.discount);}
    if(!data.pricePerLiter&&data.grossTotal&&data.liters)data.pricePerLiter=data.grossTotal/data.liters;
    const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);
@@ -473,9 +487,11 @@ async function loadTodayPrices(){
 
 async function uploadAttachedPhotos(logId){
   if(!user)return;
+  try{ await ensureCloudVehicle(); }catch(e){ /* if this fails, the upload below will too, surfaced naturally */ }
   const receipt=$('#receiptCameraFile')?.files[0]||$('#receiptGalleryFile')?.files[0];
   const odometer=$('#odoCameraFile')?.files[0]||$('#odoGalleryFile')?.files[0];
-  const files=[['receipt',receipt],['odometer',odometer]].filter(x=>x[1]);
+  const attachment=$('#extraAttachmentFile')?.files[0];
+  const files=[['receipt',receipt],['odometer',odometer],['attachment',attachment]].filter(x=>x[1]);
   for(const [type,file] of files){
     const path=`vehicles/${state.currentVehicleId}/fuel/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;
     const sr=ref(storage,path);
@@ -704,9 +720,9 @@ function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOu
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
-  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','category','title','station','note']];
-  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,'','',x.station||'',x.note||'']));
-  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,x.category||'',x.title||'','',x.note||'']));
+  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note']];
+  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'']));
+  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'']));
   download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
 }
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}

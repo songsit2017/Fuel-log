@@ -16,6 +16,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Maintenance reminders by date or odometer with overdue/soon status and recurrence.
 - Daily Android notifications for upcoming date-based maintenance.
 - Offline trips with distance, fuel, toll, parking, food and other costs.
+- Versioned JSON backup/restore for every Room collection using Android's file picker.
 - A Thai minimal Compose dashboard and launcher icon.
 - A separate prerelease APK workflow that cannot replace Stable.
 

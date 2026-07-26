@@ -13,8 +13,14 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE reminderDate IS NOT NULL")
     suspend fun getItemsWithReminderDates(): List<ExpenseEntity>
 
+    @Query("SELECT * FROM expenses")
+    suspend fun getAll(): List<ExpenseEntity>
+
     @Upsert
     suspend fun upsert(expense: ExpenseEntity)
+
+    @Upsert
+    suspend fun upsertAll(expenses: List<ExpenseEntity>)
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteById(id: String)

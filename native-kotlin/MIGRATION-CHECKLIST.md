@@ -16,6 +16,7 @@
 - [x] Android notification channel and daily WorkManager scheduling for date reminders.
 - [ ] Odometer-triggered notification refresh and notification settings.
 - [x] Offline trip records with distance and all Stable cost categories.
+- [x] Versioned full JSON backup and non-destructive merge restore through Android file picker.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

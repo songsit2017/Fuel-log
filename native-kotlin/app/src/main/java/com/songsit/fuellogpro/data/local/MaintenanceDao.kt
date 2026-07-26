@@ -13,8 +13,14 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance_tasks WHERE nextDate IS NOT NULL")
     suspend fun getTasksWithDates(): List<MaintenanceEntity>
 
+    @Query("SELECT * FROM maintenance_tasks")
+    suspend fun getAll(): List<MaintenanceEntity>
+
     @Upsert
     suspend fun upsert(task: MaintenanceEntity)
+
+    @Upsert
+    suspend fun upsertAll(tasks: List<MaintenanceEntity>)
 
     @Query("DELETE FROM maintenance_tasks WHERE id = :id")
     suspend fun deleteById(id: String)

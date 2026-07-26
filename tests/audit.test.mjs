@@ -29,6 +29,7 @@ const nativeMaintenanceStatus = await readFile(new URL('../native-kotlin/app/src
 const nativeMaintenanceWorker = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/notifications/MaintenanceReminderWorker.kt', import.meta.url), 'utf8');
 const nativeTripDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/TripDao.kt', import.meta.url), 'utf8');
 const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/TripSummary.kt', import.meta.url), 'utf8');
+const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalBackupRepository.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -293,6 +294,22 @@ test('native trips remain vehicle-scoped and include every stable cost field', (
   assert.match(nativeTripSummary, /costPerKm/);
   assert.match(nativeFuelApp, /RecordsPage/);
   assert.match(nativeFuelApp, /AddTripDialog/);
+});
+
+test('native backup is versioned, complete and restores without deleting local data', () => {
+  assert.match(nativeBackupRepository, /fuellog-native-backup/);
+  for (const collection of ['vehicles', 'fuelEntries', 'expenses', 'maintenanceTasks', 'trips']) {
+    assert.match(nativeBackupRepository, new RegExp(`"${collection}"`));
+  }
+  assert.match(nativeBackupRepository, /database\.withTransaction/);
+  assert.match(nativeBackupRepository, /upsertAll/);
+  assert.doesNotMatch(nativeBackupRepository, /deleteAll|clearAllTables/);
+  assert.match(nativeBackupRepository, /พบข้อมูลที่อ้างถึงรถซึ่งไม่มีอยู่ในไฟล์สำรอง/);
+  assert.match(nativeMain, /CreateDocument\("application\/json"\)/);
+  assert.match(nativeMain, /ActivityResultContracts\.OpenDocument/);
+  assert.match(nativeMain, /readTextLimited\(20_000_000\)/);
+  assert.match(nativeFuelApp, /สำรองข้อมูล/);
+  assert.match(nativeFuelApp, /นำเข้าข้อมูล/);
 });
 
 test('home has one vehicle selector', () => {

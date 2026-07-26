@@ -70,6 +70,8 @@ fun FuelLogApp(
     onDeleteMaintenance: (String) -> Unit,
     onAddTrip: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onDeleteTrip: (String) -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -152,6 +154,8 @@ fun FuelLogApp(
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
                     onDelete = onDeleteVehicle,
+                    onExportBackup = onExportBackup,
+                    onImportBackup = onImportBackup,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -529,6 +533,8 @@ private fun VehicleList(
     selectedVehicleId: String?,
     onSelect: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -536,6 +542,21 @@ private fun VehicleList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ข้อมูลของฉัน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "สำรองเป็น JSON หรือนำเข้ากลับแบบรวมข้อมูลโดยไม่ลบรายการเดิม",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onExportBackup) { Text("สำรองข้อมูล") }
+                        TextButton(onClick = onImportBackup) { Text("นำเข้าข้อมูล") }
+                    }
+                }
+            }
+        }
         if (vehicles.isEmpty()) {
             item {
                 Card(shape = RoundedCornerShape(20.dp)) {

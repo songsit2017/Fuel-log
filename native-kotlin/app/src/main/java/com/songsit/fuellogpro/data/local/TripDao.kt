@@ -10,8 +10,14 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE vehicleId = :vehicleId ORDER BY date DESC, createdAt DESC")
     fun observeForVehicle(vehicleId: String): Flow<List<TripEntity>>
 
+    @Query("SELECT * FROM trips")
+    suspend fun getAll(): List<TripEntity>
+
     @Upsert
     suspend fun upsert(trip: TripEntity)
+
+    @Upsert
+    suspend fun upsertAll(trips: List<TripEntity>)
 
     @Query("DELETE FROM trips WHERE id = :id")
     suspend fun deleteById(id: String)

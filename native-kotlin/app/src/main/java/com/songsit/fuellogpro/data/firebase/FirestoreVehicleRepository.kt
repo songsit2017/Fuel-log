@@ -23,14 +23,10 @@ class FirestoreVehicleRepository(
             Vehicle(
                 id = document.id,
                 name = document.getString("name") ?: "รถจาก Cloud",
-                ownerUid = document.getString("ownerUid").orEmpty(),
-                memberUids = (document.get("memberUids") as? List<*>)
-                    .orEmpty()
-                    .filterIsInstance<String>()
-                    .toSet(),
+                registration = document.getString("registration").orEmpty(),
+                fuelType = document.getString("fuelType").orEmpty(),
             )
         }
         return vehicles.value.size
     }
 }
-

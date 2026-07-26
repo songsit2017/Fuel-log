@@ -41,6 +41,8 @@ class LocalFuelRepository(
     }
 
     suspend fun delete(id: String) = dao.deleteById(id)
+
+    suspend fun deleteForVehicle(vehicleId: String) = dao.deleteForVehicle(vehicleId)
 }
 
 private fun FuelEntryEntity.toDomain() = FuelEntry(

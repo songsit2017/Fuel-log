@@ -6,13 +6,14 @@ data-parity tests.
 
 All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 
-## Phase 1 included
+## Current preview includes
 
-- Domain models matching the existing Firestore schema.
-- Repository contract that keeps UI code independent from Firebase.
-- Firebase vehicle discovery for records owned by the signed-in UID.
-- A ViewModel with automatic first-session Cloud synchronization.
-- A Compose vehicle screen using unidirectional data flow.
+- Domain models compatible with the existing Firestore direction.
+- Credential Manager and Firebase repository foundations.
+- Room-backed multiple vehicles with a safe v1-to-v2 migration.
+- Vehicle-scoped fuel entry, deletion and full-tank consumption summary.
+- A Thai minimal Compose dashboard and launcher icon.
+- A separate prerelease APK workflow that cannot replace Stable.
 
 ## Migration order
 

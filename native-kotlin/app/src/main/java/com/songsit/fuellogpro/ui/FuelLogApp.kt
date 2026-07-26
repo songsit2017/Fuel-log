@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.Vehicle
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -53,22 +55,17 @@ private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
 @Composable
 fun FuelLogApp(
     state: NativeAppState,
-    onAddFuel: (
-        date: String,
-        time: String,
-        odometerKm: Double,
-        liters: Double,
-        pricePerLiter: Double,
-        fullTank: Boolean,
-        station: String,
-        onSaved: () -> Unit,
-    ) -> Unit,
+    onAddFuel: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
+    onSelectVehicle: (String) -> Unit,
+    onAddVehicle: (String, String, String, () -> Unit) -> Unit,
+    onDeleteVehicle: (String) -> Unit,
     onClearError: () -> Unit,
 ) {
     var tab by remember { mutableIntStateOf(0) }
-    var showAdd by remember { mutableStateOf(false) }
-    val titles = listOf("ภาพรวม", "เติมน้ำมัน", "รถ", "เพิ่มเติม")
+    var showAddFuel by remember { mutableStateOf(false) }
+    var showAddVehicle by remember { mutableStateOf(false) }
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "รถของฉัน", "เพิ่มเติม")
 
     FuelLogTheme {
         Scaffold(
@@ -77,41 +74,64 @@ fun FuelLogApp(
                     title = {
                         Column {
                             Text(titles[tab], fontWeight = FontWeight.SemiBold)
-                            Text(state.vehicleName, style = MaterialTheme.typography.labelSmall)
+                            state.selectedVehicle?.let {
+                                Text(it.name, style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     },
                 )
             },
             bottomBar = {
                 NavigationBar {
-                    listOf("หน้าแรก", "น้ำมัน", "รถ", "อื่นๆ").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "รถ", "อื่น ๆ").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
-                            icon = { Text(listOf("⌂", "⛽", "▣", "•••")[index]) },
+                            icon = { Text(listOf("⌂", "⛽", "●", "•••")[index]) },
                             label = { Text(label) },
                         )
                     }
                 }
             },
             floatingActionButton = {
-                if (tab == 0 || tab == 1) {
-                    FloatingActionButton(onClick = { showAdd = true }) { Text("+") }
+                when (tab) {
+                    0, 1 -> FloatingActionButton(
+                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddFuel = true },
+                    ) { Text("+") }
+                    2 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
                 }
             },
         ) { padding ->
             when (tab) {
                 0 -> Dashboard(state, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
-                2 -> SimplePage("รถของฉัน", "การจัดการรถและ Cloud sync จะตามมาใน Native milestone ถัดไป", Modifier.padding(padding))
-                else -> SimplePage("Native Preview", "กำลังย้ายฟีเจอร์จากแอปตัวเต็มทีละส่วนโดยไม่ทำให้ข้อมูลเดิมเสีย", Modifier.padding(padding))
+                2 -> VehicleList(
+                    vehicles = state.vehicles,
+                    selectedVehicleId = state.selectedVehicle?.id,
+                    onSelect = onSelectVehicle,
+                    onDelete = onDeleteVehicle,
+                    modifier = Modifier.padding(padding),
+                )
+                else -> SimplePage(
+                    "Native Preview",
+                    "กำลังย้ายฟีเจอร์เดิมเข้าสู่ Kotlin ทีละส่วน โดยเก็บข้อมูลไว้ในเครื่องและไม่กระทบ Stable APK",
+                    Modifier.padding(padding),
+                )
             }
         }
-        if (showAdd) {
+        if (showAddFuel) {
             AddFuelDialog(
                 saving = state.saving,
-                onDismiss = { showAdd = false },
+                latestOdometer = state.summary.latestOdometerKm,
+                onDismiss = { showAddFuel = false },
                 onSave = onAddFuel,
+            )
+        }
+        if (showAddVehicle) {
+            AddVehicleDialog(
+                saving = state.saving,
+                onDismiss = { showAddVehicle = false },
+                onSave = onAddVehicle,
             )
         }
         state.errorMessage?.let { message ->
@@ -132,6 +152,17 @@ private fun Dashboard(state: NativeAppState, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (state.selectedVehicle == null) {
+            item {
+                Card(shape = RoundedCornerShape(24.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp)) {
+                        Text("เริ่มต้นด้วยรถของคุณ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("แตะ + เพื่อเพิ่มรถ แล้วจึงบันทึกการเติมน้ำมัน")
+                    }
+                }
+            }
+            return@LazyColumn
+        }
         item {
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -150,7 +181,7 @@ private fun Dashboard(state: NativeAppState, modifier: Modifier = Modifier) {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("จ่ายทั้งหมด", thaiCurrency.format(state.summary.totalSpent), Modifier.weight(1f))
+                MetricCard("ค่าใช้จ่าย", thaiCurrency.format(state.summary.totalSpent), Modifier.weight(1f))
                 MetricCard("น้ำมัน", "${number.format(state.summary.totalLiters)} ลิตร", Modifier.weight(1f))
             }
         }
@@ -161,14 +192,9 @@ private fun Dashboard(state: NativeAppState, modifier: Modifier = Modifier) {
                 Modifier.fillMaxWidth(),
             )
         }
-        item {
-            Text("รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        }
-        if (state.entries.isEmpty()) {
-            item { EmptyState() }
-        } else {
-            items(state.entries.take(3), key = { it.id }) { FuelRow(it) }
-        }
+        item { Text("รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        if (state.entries.isEmpty()) item { EmptyFuelState() }
+        else items(state.entries.take(3), key = { it.id }) { FuelRow(it) }
     }
 }
 
@@ -190,10 +216,8 @@ private fun FuelList(entries: List<FuelEntry>, onDelete: (String) -> Unit, modif
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (entries.isEmpty()) item { EmptyState() }
-        items(entries, key = { it.id }) { entry ->
-            FuelRow(entry, onDelete)
-        }
+        if (entries.isEmpty()) item { EmptyFuelState() }
+        items(entries, key = { it.id }) { FuelRow(it, onDelete) }
     }
 }
 
@@ -223,7 +247,56 @@ private fun FuelRow(entry: FuelEntry, onDelete: ((String) -> Unit)? = null) {
 }
 
 @Composable
-private fun EmptyState() {
+private fun VehicleList(
+    vehicles: List<Vehicle>,
+    selectedVehicleId: String?,
+    onSelect: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (vehicles.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ยังไม่มีรถ", fontWeight = FontWeight.Bold)
+                        Text("แตะ + เพื่อเพิ่มรถคันแรก")
+                    }
+                }
+            }
+        }
+        items(vehicles, key = { it.id }) { vehicle ->
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { onSelect(vehicle.id) },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (vehicle.id == selectedVehicleId) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                ),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(vehicle.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        val detail = listOf(vehicle.registration, vehicle.fuelType).filter(String::isNotBlank).joinToString(" • ")
+                        if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (vehicle.id == selectedVehicleId) Text("กำลังใช้", color = MaterialTheme.colorScheme.primary)
+                    TextButton(onClick = { onDelete(vehicle.id) }) { Text("ลบ") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyFuelState() {
     Card(shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("ยังไม่มีรายการเติมน้ำมัน", fontWeight = FontWeight.SemiBold)
@@ -241,14 +314,43 @@ private fun SimplePage(title: String, body: String, modifier: Modifier = Modifie
 }
 
 @Composable
+private fun AddVehicleDialog(
+    saving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, () -> Unit) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var registration by remember { mutableStateOf("") }
+    var fuelType by remember { mutableStateOf("เบนซิน") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("เพิ่มรถ") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("ชื่อรถ") }, singleLine = true)
+                OutlinedTextField(registration, { registration = it }, label = { Text("ทะเบียน (ไม่บังคับ)") }, singleLine = true)
+                OutlinedTextField(fuelType, { fuelType = it }, label = { Text("ชนิดเชื้อเพลิง") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            Button(enabled = !saving, onClick = { onSave(name, registration, fuelType, onDismiss) }) {
+                Text(if (saving) "กำลังบันทึก…" else "บันทึก")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+}
+
+@Composable
 private fun AddFuelDialog(
     saving: Boolean,
+    latestOdometer: Double?,
     onDismiss: () -> Unit,
     onSave: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
 ) {
     var date by remember { mutableStateOf(LocalDate.now().toString()) }
     var time by remember { mutableStateOf(LocalTime.now().withSecond(0).withNano(0).toString()) }
-    var odometer by remember { mutableStateOf("") }
+    var odometer by remember { mutableStateOf(latestOdometer?.let { "%.0f".format(Locale.US, it) } ?: "") }
     var liters by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var station by remember { mutableStateOf("") }

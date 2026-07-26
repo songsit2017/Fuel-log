@@ -35,10 +35,9 @@ fun VehiclesScreen(
             items(state.vehicles, key = { it.id }) { vehicle ->
                 ListItem(
                     headlineContent = { Text(vehicle.name) },
-                    supportingContent = { Text(vehicle.id) },
+                    supportingContent = { Text(vehicle.registration) },
                 )
             }
         }
     }
 }
-

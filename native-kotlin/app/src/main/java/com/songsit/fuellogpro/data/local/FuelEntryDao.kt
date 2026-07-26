@@ -15,4 +15,7 @@ interface FuelEntryDao {
 
     @Query("DELETE FROM fuel_entries WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM fuel_entries WHERE vehicleId = :vehicleId")
+    suspend fun deleteForVehicle(vehicleId: String)
 }

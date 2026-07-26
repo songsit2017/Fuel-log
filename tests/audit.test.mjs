@@ -23,6 +23,8 @@ const nativeAuth = await readFile(new URL('../native-kotlin/app/src/main/java/co
 const nativePreviewWorkflow = await readFile(new URL('../.github/workflows/build-native-preview.yml', import.meta.url), 'utf8');
 const nativeFuelApp = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/FuelLogApp.kt', import.meta.url), 'utf8');
 const nativeFuelDatabase = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/FuelLogDatabase.kt', import.meta.url), 'utf8');
+const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
+const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -226,6 +228,16 @@ test('native preview stays separate from stable and has an offline fuel core', (
   assert.match(nativeFuelApp, /fun FuelLogApp\(/);
   assert.match(nativeFuelApp, /AddFuelDialog/);
   assert.match(nativeFuelApp, /NavigationBar/);
+});
+
+test('native Kotlin source does not contain mojibake text', () => {
+  for (const [name, source] of [
+    ['FuelLogApp.kt', nativeFuelApp],
+    ['NativeAppViewModel.kt', nativeAppViewModel],
+    ['FirestoreVehicleRepository.kt', nativeFirestoreVehicles],
+  ]) {
+    assert.doesNotMatch(source, /เธ|เน€|โ€|โ|โ–/, `${name} contains mojibake`);
+  }
 });
 
 test('home has one vehicle selector', () => {

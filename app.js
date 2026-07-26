@@ -1405,7 +1405,14 @@ async function discoverCloudVehicles(){
   });
 
   // Owner vehicles work for legacy documents as well.
-  addSnapshot(await getDocs(query(collection(db,'vehicles'),where('ownerUid','==',user.uid))));
+  try{
+    addSnapshot(await getDocs(query(collection(db,'vehicles'),where('ownerUid','==',user.uid))));
+  }catch(error){
+    if(error?.code==='permission-denied'){
+      throw new Error('Firestore Rules ยังไม่อนุญาตให้ค้นหารถ กรุณา deploy firestore.rules รุ่นล่าสุด');
+    }
+    throw error;
+  }
 
   // New/shared documents keep a queryable member list. Older shared vehicles
   // remain accessible through their invitation code and are upgraded on join.

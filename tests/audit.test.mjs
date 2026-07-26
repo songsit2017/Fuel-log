@@ -15,6 +15,11 @@ const capacitorConfig = await readFile(new URL('../mobile/capacitor.config.json'
 const nativeVehiclesViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/vehicles/VehiclesViewModel.kt', import.meta.url), 'utf8');
 const nativeVehicleRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/VehicleRepository.kt', import.meta.url), 'utf8');
 const kotlinPolicy = await readFile(new URL('../native-kotlin/KOTLIN-POLICY.md', import.meta.url), 'utf8');
+const firestoreRules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
+const firebaseJson = await readFile(new URL('../firebase.json', import.meta.url), 'utf8');
+const nativeBuild = await readFile(new URL('../native-kotlin/app/build.gradle.kts', import.meta.url), 'utf8');
+const nativeMain = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/MainActivity.kt', import.meta.url), 'utf8');
+const nativeAuth = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/auth/GoogleAuthRepository.kt', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -174,6 +179,9 @@ test('vehicle sync discovers Cloud vehicles before creating or uploading a local
   assert.match(app, /await pullVehicleById\(cloudVehicle\.id\)/);
   assert.match(app, /if\(cloudVehicles\.length\)/);
   assert.match(app, /memberUids:\[user\.uid\]/);
+  assert.match(firestoreRules, /resource\.data\.ownerUid == request\.auth\.uid/);
+  assert.match(firestoreRules, /request\.auth\.uid in resource\.data\.memberUids/);
+  assert.match(firebaseJson, /"rules": "firestore\.rules"/);
 });
 
 test('first Google session restores Cloud vehicles automatically', () => {
@@ -190,6 +198,11 @@ test('parallel Kotlin migration starts with repository and ViewModel boundaries'
   assert.match(nativeVehiclesViewModel, /StateFlow<VehiclesUiState>/);
   assert.match(kotlinPolicy, /Kotlin-first and Kotlin-only/);
   assert.match(kotlinPolicy, /Do not add application-owned `\.java` files/);
+  assert.match(nativeBuild, /applicationId = "com\.songsit\.fuellogpro"/);
+  assert.match(nativeBuild, /firebase-bom:34\.16\.0/);
+  assert.match(nativeMain, /class MainActivity : ComponentActivity/);
+  assert.match(nativeAuth, /CredentialManager/);
+  assert.match(nativeAuth, /GoogleAuthProvider\.getCredential/);
 });
 
 test('home has one vehicle selector', () => {

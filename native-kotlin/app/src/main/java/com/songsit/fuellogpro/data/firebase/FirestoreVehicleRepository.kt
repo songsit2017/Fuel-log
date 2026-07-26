@@ -1,0 +1,36 @@
+package com.songsit.fuellogpro.data.firebase
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.songsit.fuellogpro.data.VehicleRepository
+import com.songsit.fuellogpro.domain.model.Vehicle
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.tasks.await
+
+class FirestoreVehicleRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+) : VehicleRepository {
+    private val vehicles = MutableStateFlow<List<Vehicle>>(emptyList())
+
+    override fun observeVehicles(): Flow<List<Vehicle>> = vehicles
+
+    override suspend fun restoreOwnedVehicles(uid: String): Int {
+        val snapshot = firestore.collection("vehicles")
+            .whereEqualTo("ownerUid", uid)
+            .get()
+            .await()
+        vehicles.value = snapshot.documents.map { document ->
+            Vehicle(
+                id = document.id,
+                name = document.getString("name") ?: "รถจาก Cloud",
+                ownerUid = document.getString("ownerUid").orEmpty(),
+                memberUids = (document.get("memberUids") as? List<*>)
+                    .orEmpty()
+                    .filterIsInstance<String>()
+                    .toSet(),
+            )
+        }
+        return vehicles.value.size
+    }
+}
+

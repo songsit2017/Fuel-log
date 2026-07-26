@@ -3,7 +3,7 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.6.0';
+const APP_VERSION = '7.7.0';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -20,7 +20,7 @@ async function initFirebase(){
   if(firebaseReadyPromise) return firebaseReadyPromise;
   firebaseReadyPromise = (async()=>{
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-    const [{firebaseConfig}, appMod, authMod, fireMod, storageMod, functionsMod] = await Promise.all([
+    const [configModule, appMod, authMod, fireMod, storageMod, functionsMod] = await Promise.all([
       import(`./firebase-config.js?v=${APP_VERSION}`),
       import(`${base}/firebase-app.js`),
       import(`${base}/firebase-auth.js`),
@@ -28,6 +28,7 @@ async function initFirebase(){
       import(`${base}/firebase-storage.js`),
       import(`${base}/firebase-functions.js`)
     ]);
+    const {firebaseConfig}=configModule;
 
     app = appMod.initializeApp(firebaseConfig);
     auth = authMod.getAuth(app);
@@ -149,7 +150,7 @@ const efficiencyUnit = () => `${distUnit()}/${volUnit()}`;
 const toDisplayEfficiency = kml => (Number(kml)||0)*distFactor()/volFactor();
 
 let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'system', units:{distance:'km',volume:'liters'} };
-let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups', currentPanel = null, serviceMap = null, serviceStations = [], stationView = 'map';
+let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups', currentPanel = null, serviceMap = null, serviceStations = [], stationView = 'map', serviceMapProvider = 'leaflet', serviceMapMarkers = [];
 const familyMembersCache = {};
 
 function seed(){
@@ -252,7 +253,8 @@ function applyFont(){
 function renderNav(page='home'){$$('.page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===page||(['reports','panel'].includes(page)&&x.dataset.nav==='more')));const panelNames={family:'ครอบครัวและ Cloud',trips:'ทริปและหน้างาน',routeFuel:'ปั๊มน้ำมันบนเส้นทาง',stations:'สถานีบริการน้ำมัน',gallery:'รูปและเอกสาร',backup:'สำรองและนำเข้า',vehicles:'จัดการรถ',search:'ค้นหาทุกอย่าง',settings:'การตั้งค่า'};const names={home:'ภาพรวม',fuel:'เติมน้ำมัน',expense:'ค่าใช้จ่าย',maintenance:'บำรุงรักษา',more:'เพิ่มเติม',reports:'รายงาน',panel:panelNames[currentPanel]||'เพิ่มเติม'};$('#pageTitle').textContent=names[page];$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';$('#reportsBackBtn').style.display=['reports','panel'].includes(page)?'':'none';document.body.classList.toggle('station-mode',page==='panel'&&currentPanel==='stations');window.scrollTo({top:0,behavior:'auto'});}
 function metric(label,val,sub=''){if(label==='จำนวนทริป')val=fmtCount(trips().length);return `<article class="metric"><small>${label}</small><b>${val}</b><em>${sub}</em></article>`;}
 function renderVehicleStrip(){
-  $('#vehicleStrip').innerHTML=state.vehicles.map(v=>`<button class="vehicle-chip ${v.id===state.currentVehicleId?'active':''}" data-vehicle="${v.id}">${esc(v.name)}</button>`).join('');
+  const strip=$('#vehicleStrip');
+  if(strip)strip.innerHTML=state.vehicles.map(v=>`<button class="vehicle-chip ${v.id===state.currentVehicleId?'active':''}" data-vehicle="${v.id}">${esc(v.name)}</button>`).join('');
   const select=$('#globalVehicleSelect');
   if(select){
     select.innerHTML=state.vehicles.map(v=>`<option value="${esc(v.id)}" ${v.id===state.currentVehicleId?'selected':''}>${esc(v.name)}</option>`).join('');
@@ -672,17 +674,21 @@ function normalizeAggregatorStation(st){
   const num = v => { const n = parseFloat(v); return Number.isFinite(n) && n>0 ? n : null; };
   return { gasohol_95:num(st.gasohol_95?.price), gasohol_91:num(st.gasohol_91?.price), diesel_b7:num(st.diesel_b7?.price) };
 }
-function gradeRow(label, grades){
-  if(!grades) return '';
-  const parts = [];
-  if(grades.gasohol_95) parts.push(`95 ฿${grades.gasohol_95.toFixed(2)}`);
-  if(grades.gasohol_91) parts.push(`91 ฿${grades.gasohol_91.toFixed(2)}`);
-  if(grades.diesel_b7) parts.push(`ดีเซล B7 ฿${grades.diesel_b7.toFixed(2)}`);
-  if(grades.premium_95) parts.push(`พรีเมียม 95 ฿${grades.premium_95.toFixed(2)}`);
-  return parts.length ? `<div class="list-row"><b>${esc(label)}</b><span>${parts.join(' · ')}</span></div>` : '';
+function oilPriceCell(grades,key){
+  const value=Number(grades?.[key]);
+  return Number.isFinite(value)&&value>0?`฿${value.toFixed(2)}`:'—';
 }
-function unavailableGradeRow(label, message='แหล่งข้อมูลยังไม่ส่งราคา'){
-  return `<div class="list-row oil-row-unavailable"><b>${esc(label)}</b><span class="muted">${esc(message)}</span></div>`;
+function oilComparisonTable(brands){
+  const rows=[
+    ['แก๊สโซฮอล์ 95','gasohol_95'],
+    ['แก๊สโซฮอล์ 91','gasohol_91'],
+    ['ดีเซล B7','diesel_b7'],
+    ['พรีเมียม 95','premium_95']
+  ].filter(([,key])=>brands.some(brand=>Number(brand.grades?.[key])>0));
+  return `<div class="oil-compare" role="table" aria-label="เปรียบเทียบราคาน้ำมัน">
+    <div class="oil-compare-row oil-compare-head" role="row"><span role="columnheader">ชนิดน้ำมัน</span>${brands.map(brand=>`<b role="columnheader">${esc(brand.short)}</b>`).join('')}</div>
+    ${rows.map(([label,key])=>`<div class="oil-compare-row" role="row"><b role="rowheader">${esc(label)}</b>${brands.map(brand=>`<span role="cell" class="${Number(brand.grades?.[key])>0?'has-price':'no-price'}">${oilPriceCell(brand.grades,key)}</span>`).join('')}</div>`).join('')}
+  </div>`;
 }
 async function fetchBangchakLocal(){
   try{
@@ -732,18 +738,18 @@ async function loadTodayPrices(){
       shell:hasPrice(shellLive)?shellLive:previous.shell,
       time:Date.now()
     }));
-    const rows = [
-      hasPrice(bcpGrades)?gradeRow(bangchak?.grades?'บางจาก (ทางการ)':'บางจาก',bcpGrades):unavailableGradeRow('บางจาก'),
-      hasPrice(pttGrades)?gradeRow('ปตท. (OR ทางการ)',pttGrades):unavailableGradeRow('ปตท.','แหล่งข้อมูลทางการยังไม่ส่งราคา'),
-      hasPrice(shellGrades)?gradeRow('เชลล์ (ราคาหน้าสถานี)',shellGrades):unavailableGradeRow('เชลล์','สถานีอ้างอิงยังไม่ส่งราคา')
+    const brands=[
+      {short:'บางจาก',grades:bcpGrades},
+      {short:'PTT',grades:pttGrades},
+      {short:'Shell',grades:shellGrades}
     ];
-    const html = rows.filter(Boolean).join('');
-    if(html){
-      const dateLine = bangchak?.dateLabel ? `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(bangchak.dateLabel)}</div>` : '';
+    if(brands.some(brand=>hasPrice(brand.grades))){
+      const html=oilComparisonTable(brands);
+      const dateLine = bangchak?.dateLabel ? `<div class="oil-price-date">${esc(bangchak.dateLabel)}</div>` : '';
       const shellStation=bangchak?.comparison?.shell?.station;
       const note = shellStation
-        ? `<div class="muted" style="margin-top:6px;font-size:10px;">ราคาเชลล์อ้างอิงจาก ${esc(shellStation)} และแสดงเฉพาะชนิดที่สถานีส่งราคาจริง ราคาแต่ละสถานีอาจต่างกัน</div>`
-        : ((!hasPrice(pttGrades)||!hasPrice(shellGrades)) ? `<div class="muted" style="margin-top:6px;font-size:10px;">แสดงเฉพาะราคาที่แหล่งข้อมูลทางการส่งมา โดยไม่ใช้ค่าประมาณ</div>` : '');
+        ? `<div class="oil-price-note">Shell อ้างอิง ${esc(shellStation)} • เครื่องหมาย — คือไม่มีราคาจากแหล่งข้อมูล</div>`
+        : `<div class="oil-price-note">เครื่องหมาย — คือไม่มีราคาจากแหล่งข้อมูล และไม่มีการใช้ค่าประมาณ</div>`;
       const full = dateLine+html+note;
       box.innerHTML = full;
       store.setItem('fuellog-oil-cache', JSON.stringify({html:dateLine+html,time:Date.now()}));
@@ -841,7 +847,12 @@ function bindReportsPage(){
 function familyPanel(){return user?`<div class="card"><div class="user-card"><img src="${esc(user.photoURL||'icon-192.png')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName||user.email)}</b><small>${esc(user.email)}</small></div></div><div class="panel-actions" style="margin-top:12px"><button class="secondary" id="signOutBtn">ออกจากระบบ</button><button class="primary" id="syncBtn">ซิงก์ข้อมูลยานพาหนะ</button></div><div id="syncResult" class="muted" style="margin-top:10px;min-height:20px;"></div></div><div class="card"><h2>สมาชิก</h2><div id="membersBody" class="muted">กำลังโหลด…</div></div><div class="card"><h2>สร้างรหัสเชิญ</h2><input id="inviteEmail" type="email" placeholder="Gmail สมาชิก"><select id="inviteRole"><option value="editor">Editor — เพิ่มและแก้ไข</option><option value="viewer">Viewer — ดูอย่างเดียว</option></select><button class="primary" id="inviteBtn" style="margin-top:8px">สร้างรหัส</button><div id="inviteResult" class="muted"></div></div><div class="card"><h2>เข้าร่วมรถ</h2><input id="joinCode" maxlength="8" placeholder="รหัสเชิญ 8 ตัว"><button class="primary" id="joinBtn" style="margin-top:8px">เข้าร่วม</button></div>`:`<div class="card"><h2>แชร์รถกับครอบครัว</h2><p class="muted">ใช้บัญชี Google เดียวสำหรับ Firebase, Firestore และ Storage ไม่ต้องล็อกอิน Google Drive แยก</p><button class="google-btn" id="loginBtn"><b style="color:#4285f4">G</b> เข้าสู่ระบบด้วย Google</button><div id="authMessage" class="muted"></div></div>`;}
 function tripsPanel(){const arr=trips(),sum=arr.reduce((s,x)=>s+(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0),0);return `<div class="metric-grid">${metric('จำนวนทริป',fmt(arr.length),'')}${metric('ต้นทุนรวม',money(sum),'')}</div><div class="card"><h2>บันทึกระยะทางด้วย GPS</h2><div class="panel-actions"><button class="primary" id="gpsStartBtn" style="${gpsTrack?'display:none':''}">▶ เริ่มติดตาม</button><button class="secondary" id="gpsStopBtn" style="${gpsTrack?'':'display:none'}">■ หยุดและบันทึกระยะทาง</button></div><div id="gpsStatus" class="muted" style="margin-top:6px;">${gpsTrack?'กำลังติดตามตำแหน่ง…':'กด "เริ่มติดตาม" ก่อนออกเดินทาง ระบบจะคำนวณระยะทางจาก GPS ให้อัตโนมัติ'}</div><div id="gpsDistance" class="muted">${gpsTrack?fmtDist(gpsTrack.distanceKm,2):''}</div></div><div class="card"><h2>เพิ่มทริป</h2><input id="tripName" placeholder="ชื่องาน/ปลายทาง"><input id="tripDate" type="date" value="${today()}"><input id="tripDistance" type="number" step=".01" placeholder="ระยะทาง (${distUnit()}) — ถ้ากด GPS ไว้จะใส่ให้อัตโนมัติ" value="${gpsTrack?dispDistVal(gpsTrack.distanceKm):''}"><div class="form-grid"><input id="tripFuel" type="number" placeholder="ค่าน้ำมัน"><input id="tripToll" type="number" placeholder="ทางด่วน"><input id="tripParking" type="number" placeholder="ที่จอด"><input id="tripFood" type="number" placeholder="อาหาร/ที่พัก"><input id="tripOther" type="number" placeholder="อื่น ๆ"></div><button class="primary" id="saveTripBtn" style="margin-top:8px">บันทึกทริป</button></div><div class="card">${arr.map(x=>{const t=(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0);return `<div class="list-row"><div><b>${esc(x.name)}</b><small>${x.date}${x.distance?' • '+fmtDist(x.distance):''}</small></div><b>${money(t)}</b></div>`}).join('')||'<div class="empty">ยังไม่มีทริป</div>'}</div>`;}
 
-function serviceStationPanel(){return `<section class="station-explorer"><div class="station-filter-bar"><button class="active" data-station-filter="all">⛽ ใกล้ฉัน</button><button data-open-route>🛣️ ปั๊มบนเส้นทาง</button><button data-station-filter="priced">💰 มีราคาล่าสุด</button><button data-station-filter="favorites">★ ชื่นชอบ</button></div><div id="serviceStationMap"></div><div id="serviceStationStatus" class="muted" style="padding:8px 12px">กำลังค้นหาสถานีใกล้คุณ…</div><div id="serviceStationList" class="station-list-panel" hidden></div><div class="station-view-tabs"><button class="active" data-station-view="map"><span>🗺️</span>แผนที่</button><button data-station-view="list"><span>☷</span>รายการ</button><button data-station-view="favorites"><span>★</span>ชื่นชอบ</button></div></section>`;}
+function serviceStationPanel(){return `<section class="station-explorer"><div class="station-filter-bar"><button class="active" data-station-filter="all">⛽ ใกล้ฉัน</button><button data-open-route>🛣️ ปั๊มบนเส้นทาง</button><button data-station-filter="priced">💰 มีราคาล่าสุด</button><button data-station-filter="favorites">★ ชื่นชอบ</button></div><div id="stationRoutePlanner" class="station-route-planner" hidden><div class="field"><label>ต้นทาง</label><input id="routeOrigin" placeholder="ตำแหน่งปัจจุบัน หรือชื่อสถานที่" value="ตำแหน่งปัจจุบัน"></div><div class="field"><label>ปลายทาง</label><input id="routeDestination" placeholder="เช่น เชียงใหม่ หรือชื่อสถานที่"></div><div class="route-actions"><button class="secondary" id="routeUseLocationBtn">📍 ใช้ GPS</button><button class="primary" id="routeOpenBtn">🗺️ เปิดใน Google Maps</button></div><div id="routeFuelStatus" class="muted"></div></div><div id="serviceStationMap"></div><div id="serviceStationStatus" class="muted" style="padding:8px 12px">กำลังค้นหาสถานีใกล้คุณ…</div><div id="serviceStationList" class="station-list-panel" hidden></div><div class="station-view-tabs"><button class="active" data-station-view="map"><span>🗺️</span>แผนที่</button><button data-station-view="list"><span>☷</span>รายการ</button><button data-station-view="favorites"><span>★</span>ชื่นชอบ</button></div></section>`;}
+function toggleStationRoutePlanner(button){
+  const panel=$('#stationRoutePlanner');if(!panel)return;
+  panel.hidden=!panel.hidden;button?.classList.toggle('active',!panel.hidden);
+  if(!panel.hidden)setTimeout(()=>$('#routeDestination')?.focus(),0);
+}
 function stationKey(station){return station.id||`${station.name}|${Number(station.lat).toFixed(5)}|${Number(station.lon).toFixed(5)}`;}
 function stationIsFavorite(station){return state.favoriteStations.includes(stationKey(station));}
 function stationPrice(station){const last=findLastPriceForStation(station.name);return last?.pricePerLiter?{value:toDisplayPricePerVol(last.pricePerLiter),date:last.date}:null;}
@@ -859,19 +870,34 @@ function renderServiceStationList(filter='all'){
   box.innerHTML=stations.length?stations.map(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station),visits=stationVisitCount(station);return `<article class="card station-row"><div class="station-brand-icon">${esc(stationBrandLabel(station))}</div><div><b>${esc(station.name)}</b><small>${fmtDist(station.dist,1)}${visits?` • เยี่ยมชม ${fmtCount(visits)} ครั้ง`:''}</small><small>${esc(station.brand||'สถานีบริการน้ำมัน')}${price?` • บันทึกล่าสุด ${price.date}`:''}</small></div><div class="station-row-price">${price?`${money(price.value)}<small>/${volUnit()}</small>`:'—'}</div><button class="station-favorite ${favorite?'active':''}" data-favorite-station="${esc(stationKey(station))}" aria-label="ชื่นชอบ">★</button><a class="primary station-nav" href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">นำทาง</a></article>`;}).join(''):'<div class="empty">ไม่พบสถานีในตัวกรองนี้</div>';
 }
 function renderServiceStationMarkers(filter='all'){
-  if(!serviceMap||!window.L)return;
+  if(!serviceMap)return;
+  const stations=filteredServiceStations(filter);
+  if(serviceMapProvider==='google'&&window.google?.maps){
+    serviceMapMarkers.forEach(marker=>marker.setMap(null));serviceMapMarkers=[];
+    const bounds=new google.maps.LatLngBounds(),info=new google.maps.InfoWindow();
+    stations.forEach(station=>{const price=stationPrice(station);const marker=new google.maps.Marker({map:serviceMap,position:{lat:station.lat,lng:station.lon},title:station.name,label:price?{text:money(price.value),color:'#17120b',fontWeight:'700'}:undefined});marker.addListener('click',()=>{info.setContent(`<b>${esc(station.name)}</b><br>${price?`${money(price.value)}/${volUnit()} • ${price.date}`:'ยังไม่มีราคาที่คุณเคยเติม'}<br><a href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">เปิดนำทาง</a>`);info.open({map:serviceMap,anchor:marker});});serviceMapMarkers.push(marker);bounds.extend(marker.getPosition());});
+    if(stations.length)serviceMap.fitBounds(bounds);return;
+  }
+  if(!window.L)return;
   serviceMap.eachLayer(layer=>{if(layer.options?.pane==='markerPane')serviceMap.removeLayer(layer);});
-  const stations=filteredServiceStations(filter),bounds=[];
+  const bounds=[];
   stations.forEach(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station);const html=`<div class="station-price-marker ${price?'known':''} ${favorite?'favorite':''}">⛽ ${price?money(price.value):fmtDist(station.dist,1)}</div>`;const icon=L.divIcon({className:'',html,iconSize:[88,32],iconAnchor:[44,28]});L.marker([station.lat,station.lon],{icon}).addTo(serviceMap).bindPopup(`<b>${esc(station.name)}</b><br>${price?`${money(price.value)}/${volUnit()} • ${price.date}`:'ยังไม่มีราคาที่คุณเคยเติม'}<br><a href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">เปิดนำทาง</a>`);bounds.push([station.lat,station.lon]);});
   if(bounds.length)serviceMap.fitBounds(bounds,{padding:[25,25],maxZoom:14});
 }
+async function loadGoogleMaps(){
+  if(window.google?.maps)return true;
+  const {googleMapsConfig={}}=await import(`./firebase-config.js?v=${APP_VERSION}`);
+  const key=String(googleMapsConfig.apiKey||'').trim();if(!key)return false;
+  await new Promise((resolve,reject)=>{const callback=`__fuelLogGoogleMaps${Date.now()}`;window[callback]=()=>{delete window[callback];resolve();};const script=document.createElement('script');script.src=`https://maps.googleapis.com/maps/api/js?${new URLSearchParams({key,callback,v:'weekly'})}`;script.async=true;script.onerror=()=>reject(new Error('Google Maps load failed'));document.head.appendChild(script);});
+  return !!window.google?.maps;
+}
 async function initServiceStations(){
   const mapEl=$('#serviceStationMap'),status=$('#serviceStationStatus');if(!mapEl)return;
-  if(!window.L){status.textContent='โหลดแผนที่ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ต';return;}
-  if(serviceMap){serviceMap.remove();serviceMap=null;}
-  serviceMap=L.map(mapEl,{zoomControl:true}).setView([13.7563,100.5018],11);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(serviceMap);
-  try{serviceStations=await fetchNearbyStations();nearbyCache=serviceStations;status.textContent=`พบ ${fmtCount(serviceStations.length)} สถานีในรัศมี 7 กม. • ราคาเป็นราคาล่าสุดที่คุณเคยบันทึก`;renderServiceStationMarkers('all');renderServiceStationList('all');}
+  if(serviceMap){if(serviceMapProvider==='leaflet')serviceMap.remove();serviceMap=null;}serviceMapMarkers=[];
+  let useGoogle=false;try{useGoogle=await loadGoogleMaps();}catch(error){console.warn(error);}
+  if(useGoogle){serviceMapProvider='google';serviceMap=new google.maps.Map(mapEl,{center:{lat:13.7563,lng:100.5018},zoom:11,mapTypeControl:false,streetViewControl:false,fullscreenControl:false});}
+  else{if(!window.L){status.textContent='โหลดแผนที่ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ต';return;}serviceMapProvider='leaflet';serviceMap=L.map(mapEl,{zoomControl:true}).setView([13.7563,100.5018],11);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(serviceMap);}
+  try{serviceStations=await fetchNearbyStations();nearbyCache=serviceStations;status.textContent=`${useGoogle?'Google Maps':'OpenStreetMap (ยังไม่ได้ตั้ง Google Maps Key)'} • พบ ${fmtCount(serviceStations.length)} สถานีในรัศมี 7 กม. • ราคาเป็นราคาล่าสุดที่คุณเคยบันทึก`;renderServiceStationMarkers('all');renderServiceStationList('all');}
   catch(error){status.textContent='ค้นหาสถานีไม่ได้ กรุณาอนุญาตตำแหน่งและตรวจอินเทอร์เน็ต';renderServiceStationList('all');}
 }
 function setStationView(view){
@@ -879,7 +905,7 @@ function setStationView(view){
   const map=$('#serviceStationMap'),list=$('#serviceStationList');if(!map||!list)return;
   const showList=view!=='map';map.hidden=showList;list.hidden=!showList;
   const filter=view==='favorites'?'favorites':document.querySelector('[data-station-filter].active')?.dataset.stationFilter||'all';
-  renderServiceStationList(filter);if(!showList)setTimeout(()=>serviceMap?.invalidateSize(),0);
+  renderServiceStationList(filter);if(!showList&&serviceMapProvider==='leaflet')setTimeout(()=>serviceMap?.invalidateSize(),0);
 }
 function toggleFavoriteStation(key){
   const index=state.favoriteStations.indexOf(key);index>=0?state.favoriteStations.splice(index,1):state.favoriteStations.push(key);save();
@@ -1189,6 +1215,8 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.7.0</b> — ถอดเมนูสถานีบริการน้ำมันและไลบรารีแผนที่ พร้อมจัดราคาน้ำมันเป็นตารางเปรียบเทียบที่อ่านง่าย</li>
+      <li><b>7.6.1</b> — ปั๊มบนเส้นทางเปิดในหน้าสถานี, ลบตัวเลือกรถซ้ำหน้าแรก และรองรับ Google Maps แบบใช้ Restricted Key</li>
       <li><b>7.6.0</b> — เพิ่มไอคอนแบรนด์ปั๊มในรายการเติมน้ำมัน รองรับ PTT/OR, Bangchak, Shell, Esso, Caltex, PT, Susco และ Pure</li>
       <li><b>7.5.1</b> — แถบสลับแผนที่ รายการ และชื่นชอบติดขอบล่างแบบ Fuelio พร้อมหน้ารายการสถานีแบบเต็มพื้นที่</li>
       <li><b>7.5.0</b> — หน้าสถานีบริการน้ำมันแบบแผนที่ มีหมุด ราคา รายการ ตัวกรอง ชื่นชอบ และเชื่อมปั๊มบนเส้นทาง</li>
@@ -1728,7 +1756,7 @@ $('#globalVehicleSelect')?.addEventListener('change',e=>switchVehicle(e.target.v
 document.addEventListener('click',e=>{
   if(e.target.closest('#routeUseLocationBtn'))useRouteLocation();
   if(e.target.closest('#routeOpenBtn'))openFuelRoute();
-  if(e.target.closest('[data-open-route]'))openPanel('routeFuel');
+  const routeToggle=e.target.closest('[data-open-route]');if(routeToggle)toggleStationRoutePlanner(routeToggle);
   const view=e.target.closest('[data-station-view]');if(view)setStationView(view.dataset.stationView);
   const filter=e.target.closest('[data-station-filter]');if(filter){$$('[data-station-filter]').forEach(button=>button.classList.toggle('active',button===filter));renderServiceStationMarkers(filter.dataset.stationFilter);renderServiceStationList(filter.dataset.stationFilter);}
   const favorite=e.target.closest('[data-favorite-station]');if(favorite)toggleFavoriteStation(favorite.dataset.favoriteStation);
@@ -1753,7 +1781,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.6.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.7.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

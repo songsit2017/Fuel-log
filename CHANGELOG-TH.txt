@@ -6,6 +6,11 @@ FuelLog Pro v6.2 Main Complete
 - Added extra image/PDF attachment
 - Included fields in list view and CSV export
 - Kept Fuelio, OCR, Family, Sync, oil price and Android-ready structure
+FuelLog Pro V7.7.0
+- ถอดเมนูสถานีบริการน้ำมัน หน้าค้นหาเส้นทาง และทรัพยากร Leaflet ออกจากหน้าจอ
+- เก็บฟังก์ชันปั๊มน้ำมันใกล้เคียงบนหน้าแรกไว้ตามเดิม
+- เปลี่ยนราคาน้ำมันวันนี้เป็นตารางชนิดน้ำมัน × บางจาก/PTT/Shell
+- แสดง “—” เมื่อแหล่งข้อมูลไม่มีราคา โดยไม่สร้างค่าประมาณ
 FuelLog Pro V7.0
 - แยก Settings, Weather และ OCR client เป็น ES modules
 - เพิ่มสกุลเงิน, ทศนิยม 0–3, ธีมสว่าง/มืด/ตามระบบ/อัตโนมัติ
@@ -51,6 +56,13 @@ FuelLog Pro V7.2.0
 - แสดงอัตราสิ้นเปลืองของแต่ละช่วงในรายการเติม และใช้ต้นทุนเฉพาะช่วงที่ตรวจสอบได้
 - Fuelio ที่ไม่มีคอลัมน์ Full ใช้ค่าเต็มถังเป็นค่าเริ่มต้น และไม่ทิ้งรายการที่ทำเครื่องหมาย Missed
 - Export CSV เก็บเวลาและสถานะเต็มถัง และการลบรายการลบเอกสารบน Cloud ด้วย
+FuelLog Pro V7.6.1
+
+- แก้ปุ่ม “ปั๊มบนเส้นทาง” ให้เปิดช่องต้นทาง–ปลายทางภายในหน้าสถานี ไม่เด้งไปหน้าอื่นทันที
+- ลบตัวเลือกรถแบบชิปเก่าบนหน้าแรก เหลือเพียงตัวเลือกบนส่วนหัว
+- รองรับ Google Maps JavaScript API ผ่าน googleMapsConfig ใน firebase-config.js
+- ไม่ฝัง Key มาใน ZIP: เมื่อยังไม่ตั้ง Key จะใช้ OpenStreetMap เป็น fallback และแจ้งผู้ใช้ตรงหน้าแผนที่
+
 FuelLog Pro V7.6.0
 
 - เพิ่มไอคอนแบรนด์แบบ SVG ในรายการเติมน้ำมันแทนป้ายตัวอักษรเดิม

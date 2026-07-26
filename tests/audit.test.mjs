@@ -23,7 +23,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.6.0', 'app.js?v=7.6.0', 'firebase-config.js?v=7.6.0']) {
+  for (const asset of ['styles.css?v=7.7.0', 'app.js?v=7.7.0', 'firebase-config.js?v=7.7.0']) {
     assert.ok(sw.includes(asset), `missing cached ${asset}`);
   }
 });
@@ -82,27 +82,19 @@ test('Fuelio expenses retain details, pictures and update matching records', () 
   assert.doesNotMatch(app, /if\(\(cols\[tIdx\]\|\|''\)\.trim\(\)==='1'\)/);
 });
 
-test('vehicle selector is global and route fuel menu requires no embedded map key', () => {
+test('vehicle selector is global and station explorer menu is removed', () => {
   assert.match(index, /id="globalVehicleSelect"/);
-  assert.match(index, /data-panel="stations"/);
+  assert.doesNotMatch(index, /data-panel="stations"/);
+  assert.doesNotMatch(index, /leaflet@/);
   assert.match(app, /function switchVehicle\(vehicleId\)/);
   assert.match(app, /globalVehicleSelect.*addEventListener\('change'/);
-  assert.match(app, /https:\/\/www\.google\.com\/maps\/dir\/\?/);
-  assert.match(app, /function useRouteLocation\(\)/);
-  assert.doesNotMatch(app, /maps\.googleapis\.com\/maps\/api\/js\?key=/);
 });
 
-test('service station explorer provides map, prices, filters, list and favorites', () => {
-  assert.match(index, /leaflet@1\.9\.4/);
-  assert.match(index, /integrity="sha256-20nQCchB9co0qIjJZRGuk2\/Z9VM\+kNiyxNV1lvTlZBo="/);
-  for (const feature of ['serviceStationMap','data-station-filter','data-station-view','stationPrice','toggleFavoriteStation','initServiceStations']) {
-    assert.ok(app.includes(feature), `missing station explorer feature ${feature}`);
-  }
-  assert.match(app, /tile\.openstreetmap\.org/);
-  assert.match(app, /OpenStreetMap contributors/);
-  assert.match(app, /classList\.toggle\('station-mode'/);
-  assert.match(styles, /body\.station-mode>\.bottom-nav\{display:none\}/);
-  assert.match(styles, /\.station-view-tabs\{[^}]*position:fixed/);
+test('today oil prices use a compact brand comparison table', () => {
+  assert.match(app, /function oilComparisonTable\(brands\)/);
+  assert.match(app, /class="oil-compare"/);
+  for (const brand of ['บางจาก','PTT','Shell']) assert.match(app, new RegExp(`short:'${brand}'`));
+  assert.match(styles, /\.oil-compare-row\{[^}]*grid-template-columns/);
 });
 
 test('fuel records render recognizable offline station brand pictograms', () => {
@@ -112,6 +104,11 @@ test('fuel records render recognizable offline station brand pictograms', () => 
   assert.match(app, /BRAND_ICONS\[brand\.key\]/);
   assert.match(styles, /\.record \.ico\.brand-badge svg/);
   assert.doesNotMatch(app, /<img[^>]+(?:logo|brand)/i);
+});
+
+test('home has one vehicle selector', () => {
+  assert.doesNotMatch(index, /id="vehicleStrip"/);
+  assert.equal((index.match(/id="globalVehicleSelect"/g)||[]).length,1);
 });
 
 test('fuel metrics module is cached offline and full tank control is near fuel inputs', () => {

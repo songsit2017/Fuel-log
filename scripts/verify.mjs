@@ -27,7 +27,7 @@ if (failures.length) throw new Error(`Regression checks failed: ${failures.join(
 const forbidden = ['anthropic-dangerous-direct-browser-access', "fetch('https://api.anthropic.com", 'firebase-dev'];
 const found = forbidden.filter(needle => app.includes(needle));
 if (found.length) throw new Error(`Forbidden client/branch references: ${found.join(', ')}`);
-for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.photos||[])', "unavailableGradeRow('ปตท.'", "unavailableGradeRow('เชลล์'"]) {
+for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.photos||[])', 'oilComparisonTable', "short:'PTT'", "short:'Shell'"]) {
   if (!app.includes(required)) throw new Error(`V7.0.1 regression check failed: ${required}`);
 }
 for (const legacyPhotoKey of ['photo.entryId','photo.targetId','photo.target_id','/fuel/${alias}/']) {

@@ -1,8 +1,8 @@
-const CACHE = 'fuellog-main-v7-7600';
+const CACHE = 'fuellog-main-v7-7610';
 const CORE = [
-  './', './index.html', './styles.css?v=7.6.0', './app.js?v=7.6.0',
+  './', './index.html', './styles.css?v=7.7.0', './app.js?v=7.7.0',
   './modules/settings.js', './modules/weather.js', './modules/ocr-client.js', './modules/fuel-metrics.js',
-  './firebase-config.js?v=7.6.0', './manifest.json', './icon-192.png', './icon-512.png'
+  './firebase-config.js?v=7.7.0', './manifest.json', './icon-192.png', './icon-512.png'
 ];
 
 self.addEventListener('install', event => {

@@ -148,17 +148,21 @@ test('Android installed PWA actively replaces stale application caches', () => {
 });
 
 test('GitHub builds downloadable signed APK and future Play Store AAB safely', () => {
-  assert.match(androidWorkflow, /npx cap add android/);
-  assert.match(androidWorkflow, /\.\/gradlew assembleRelease bundleRelease/);
+  assert.match(androidWorkflow, /branches:\s*\n\s*- main/);
+  assert.match(androidWorkflow, /working-directory: native-kotlin/);
+  assert.match(androidWorkflow, /gradle assembleRelease bundleRelease/);
+  assert.doesNotMatch(androidWorkflow, /npx cap add android/);
   assert.match(androidWorkflow, /APK_KEYSTORE_BASE64/);
   assert.match(androidWorkflow, /gh release create/);
+  assert.match(androidWorkflow, /--generate-notes/);
+  assert.match(androidWorkflow, /FuelLog-Pro-\*\.apk/);
   assert.match(androidWorkflow, /actions\/upload-artifact@v4/);
   assert.doesNotMatch(androidWorkflow, /cache:\s*gradle/);
   assert.doesNotMatch(androidWorkflow, /storePassword\s+["'][^$]/);
-  assert.match(androidConfigScript, /System\.getenv\("FUELLOG_KEYSTORE_PASSWORD"\)/);
-  assert.match(androidConfigScript, /versionCode/);
-  assert.match(androidConfigScript, /versionName/);
-  assert.match(androidWorkflow, /format\('8\.0\.0-beta\.\{0\}', github\.run_number\)/);
+  assert.match(nativeBuild, /environmentVariable\("FUELLOG_KEYSTORE_PASSWORD"\)/);
+  assert.match(nativeBuild, /versionCode/);
+  assert.match(nativeBuild, /versionName/);
+  assert.match(androidWorkflow, /format\('9\.0\.0-native-alpha\.\{0\}', github\.run_number\)/);
   assert.match(androidWorkflow, /FuelLog-Pro-\$\{FUELLOG_VERSION_NAME\}\.apk/);
 });
 
@@ -168,8 +172,10 @@ test('Android APK uses native Google authentication without a browser redirect',
   assert.match(capacitorConfig, /"google\.com"/);
   assert.match(app, /nativeAuth\.signInWithGoogle/);
   assert.match(app, /signInWithCredential\(auth,GoogleAuthProvider\.credential/);
+  assert.match(nativeAuth, /CredentialManager/);
+  assert.match(nativeAuth, /GoogleAuthProvider\.getCredential/);
   assert.match(androidWorkflow, /FIREBASE_ANDROID_CONFIG_BASE64/);
-  assert.match(androidWorkflow, /android\/app\/google-services\.json/);
+  assert.match(androidWorkflow, /app\/google-services\.json/);
   assert.match(androidWorkflow, /SHA1:\|SHA256:/);
 });
 

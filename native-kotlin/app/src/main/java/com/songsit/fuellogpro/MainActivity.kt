@@ -13,6 +13,7 @@ import com.songsit.fuellogpro.data.LocalFuelRepository
 import com.songsit.fuellogpro.data.LocalExpenseRepository
 import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.LocalMaintenanceRepository
+import com.songsit.fuellogpro.data.LocalTripRepository
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.ui.FuelLogApp
 import com.songsit.fuellogpro.ui.NativeAppViewModel
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
         val expenseRepository = LocalExpenseRepository(database.expenseDao())
         val vehicleRepository = LocalVehicleRepository(database.vehicleDao())
         val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao())
+        val tripRepository = LocalTripRepository(database.tripDao())
         setContent {
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
@@ -42,6 +44,7 @@ class MainActivity : ComponentActivity() {
                     vehicleRepository,
                     expenseRepository,
                     maintenanceRepository,
+                    tripRepository,
                 ),
             )
             val state by viewModel.state.collectAsState()
@@ -54,6 +57,8 @@ class MainActivity : ComponentActivity() {
                 onAddMaintenance = viewModel::addMaintenance,
                 onCompleteMaintenance = viewModel::completeMaintenance,
                 onDeleteMaintenance = viewModel::deleteMaintenance,
+                onAddTrip = viewModel::addTrip,
+                onDeleteTrip = viewModel::deleteTrip,
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,
                 onDeleteVehicle = viewModel::deleteVehicle,

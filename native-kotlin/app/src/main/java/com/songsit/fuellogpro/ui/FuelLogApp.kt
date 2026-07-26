@@ -45,6 +45,8 @@ import com.songsit.fuellogpro.domain.model.Vehicle
 import com.songsit.fuellogpro.domain.DueLevel
 import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
 import com.songsit.fuellogpro.domain.model.MaintenanceTask
+import com.songsit.fuellogpro.domain.model.Trip
+import com.songsit.fuellogpro.domain.model.totalCost
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -66,6 +68,8 @@ fun FuelLogApp(
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onCompleteMaintenance: (String) -> Unit,
     onDeleteMaintenance: (String) -> Unit,
+    onAddTrip: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
+    onDeleteTrip: (String) -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -76,7 +80,9 @@ fun FuelLogApp(
     var showAddVehicle by remember { mutableStateOf(false) }
     var showAddExpense by remember { mutableStateOf(false) }
     var showAddMaintenance by remember { mutableStateOf(false) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "ค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน")
+    var showAddTrip by remember { mutableStateOf(false) }
+    var recordsMode by remember { mutableIntStateOf(0) }
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึก", "บำรุงรักษา", "รถของฉัน")
 
     FuelLogTheme {
         Scaffold(
@@ -94,7 +100,7 @@ fun FuelLogApp(
             },
             bottomBar = {
                 NavigationBar {
-                    listOf("หน้าหลัก", "น้ำมัน", "ค่าใช้จ่าย", "ดูแลรถ", "รถ").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "บันทึก", "ดูแลรถ", "รถ").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
@@ -110,7 +116,11 @@ fun FuelLogApp(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddFuel = true },
                     ) { Text("+") }
                     2 -> FloatingActionButton(
-                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddExpense = true },
+                        onClick = {
+                            if (state.vehicles.isEmpty()) showAddVehicle = true
+                            else if (recordsMode == 0) showAddExpense = true
+                            else showAddTrip = true
+                        },
                     ) { Text("+") }
                     3 -> FloatingActionButton(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddMaintenance = true },
@@ -122,12 +132,12 @@ fun FuelLogApp(
             when (tab) {
                 0 -> Dashboard(state, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
-                2 -> ExpenseList(
-                    expenses = state.expenses,
-                    totalExpense = state.totalExpenses,
-                    totalIncome = state.totalIncome,
-                    netExpense = state.netExpense,
-                    onDelete = onDeleteExpense,
+                2 -> RecordsPage(
+                    mode = recordsMode,
+                    onModeChange = { recordsMode = it },
+                    state = state,
+                    onDeleteExpense = onDeleteExpense,
+                    onDeleteTrip = onDeleteTrip,
                     modifier = Modifier.padding(padding),
                 )
                 3 -> MaintenanceList(
@@ -175,6 +185,13 @@ fun FuelLogApp(
                 latestOdometer = state.summary.latestOdometerKm,
                 onDismiss = { showAddMaintenance = false },
                 onSave = onAddMaintenance,
+            )
+        }
+        if (showAddTrip) {
+            AddTripDialog(
+                saving = state.saving,
+                onDismiss = { showAddTrip = false },
+                onSave = onAddTrip,
             )
         }
         state.errorMessage?.let { message ->
@@ -323,6 +340,100 @@ private fun ExpenseList(
                         expense.reminderDate?.let { Text("เตือน $it", style = MaterialTheme.typography.labelSmall) }
                     }
                     TextButton(onClick = { onDelete(expense.id) }) { Text("ลบ") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordsPage(
+    mode: Int,
+    onModeChange: (Int) -> Unit,
+    state: NativeAppState,
+    onDeleteExpense: (String) -> Unit,
+    onDeleteTrip: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (mode == 0) Button(onClick = { onModeChange(0) }) { Text("ค่าใช้จ่าย") }
+            else TextButton(onClick = { onModeChange(0) }) { Text("ค่าใช้จ่าย") }
+            if (mode == 1) Button(onClick = { onModeChange(1) }) { Text("ทริป") }
+            else TextButton(onClick = { onModeChange(1) }) { Text("ทริป") }
+        }
+        if (mode == 0) {
+            ExpenseList(
+                expenses = state.expenses,
+                totalExpense = state.totalExpenses,
+                totalIncome = state.totalIncome,
+                netExpense = state.netExpense,
+                onDelete = onDeleteExpense,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            TripList(
+                trips = state.trips,
+                summary = state.tripSummary,
+                onDelete = onDeleteTrip,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TripList(
+    trips: List<Trip>,
+    summary: com.songsit.fuellogpro.domain.TripSummary,
+    onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text("${summary.tripCount} ทริป • ${number.format(summary.totalDistanceKm)} กม.")
+                    Text(
+                        thaiCurrency.format(summary.totalCost),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    summary.costPerKm?.let {
+                        Text("${number.format(it)} บาท/กม.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        if (trips.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(18.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ยังไม่มีทริป", fontWeight = FontWeight.Bold)
+                        Text("แตะ + เพื่อบันทึกการเดินทาง")
+                    }
+                }
+            }
+        }
+        items(trips, key = { it.id }) { trip ->
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(trip.name, fontWeight = FontWeight.Bold)
+                        Text("${trip.date} • ${number.format(trip.distanceKm)} กม.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(thaiCurrency.format(trip.totalCost), fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { onDelete(trip.id) }) { Text("ลบ") }
                 }
             }
         }
@@ -669,6 +780,57 @@ private fun AddMaintenanceDialog(
                         warningOdometer.toDoubleOrNull() ?: 1_000.0,
                         repeatMonths.toIntOrNull(),
                         repeatOdometer.toDoubleOrNull(),
+                        onDismiss,
+                    )
+                },
+            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+}
+
+@Composable
+private fun AddTripDialog(
+    saving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(LocalDate.now().toString()) }
+    var distance by remember { mutableStateOf("") }
+    var fuel by remember { mutableStateOf("") }
+    var toll by remember { mutableStateOf("") }
+    var parking by remember { mutableStateOf("") }
+    var food by remember { mutableStateOf("") }
+    var other by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("เพิ่มทริป") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedTextField(name, { name = it }, label = { Text("ชื่องาน/ปลายทาง") }, singleLine = true) }
+                item { OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true) }
+                item { OutlinedTextField(distance, { distance = it }, label = { Text("ระยะทาง (กม.)") }, singleLine = true) }
+                item { OutlinedTextField(fuel, { fuel = it }, label = { Text("ค่าน้ำมัน") }, singleLine = true) }
+                item { OutlinedTextField(toll, { toll = it }, label = { Text("ค่าทางด่วน") }, singleLine = true) }
+                item { OutlinedTextField(parking, { parking = it }, label = { Text("ค่าที่จอด") }, singleLine = true) }
+                item { OutlinedTextField(food, { food = it }, label = { Text("อาหาร/ที่พัก") }, singleLine = true) }
+                item { OutlinedTextField(other, { other = it }, label = { Text("อื่น ๆ") }, singleLine = true) }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !saving,
+                onClick = {
+                    onSave(
+                        name,
+                        date,
+                        distance.toDoubleOrNull() ?: 0.0,
+                        fuel.toDoubleOrNull() ?: 0.0,
+                        toll.toDoubleOrNull() ?: 0.0,
+                        parking.toDoubleOrNull() ?: 0.0,
+                        food.toDoubleOrNull() ?: 0.0,
+                        other.toDoubleOrNull() ?: 0.0,
                         onDismiss,
                     )
                 },

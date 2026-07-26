@@ -15,6 +15,7 @@
 - [x] Offline maintenance records with date/odometer due status and recurrence.
 - [x] Android notification channel and daily WorkManager scheduling for date reminders.
 - [ ] Odometer-triggered notification refresh and notification settings.
+- [x] Offline trip records with distance and all Stable cost categories.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

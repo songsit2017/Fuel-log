@@ -13,8 +13,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         VehicleEntity::class,
         ExpenseEntity::class,
         MaintenanceEntity::class,
+        TripEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -22,6 +23,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun vehicleDao(): VehicleDao
     abstract fun expenseDao(): ExpenseDao
     abstract fun maintenanceDao(): MaintenanceDao
+    abstract fun tripDao(): TripDao
 
     companion object {
         @Volatile private var instance: FuelLogDatabase? = null
@@ -95,6 +97,27 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE expenses ADD COLUMN reminderDate TEXT")
             }
         }
+        private val migration5To6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS trips (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        distanceKm REAL NOT NULL,
+                        fuelCost REAL NOT NULL,
+                        tollCost REAL NOT NULL,
+                        parkingCost REAL NOT NULL,
+                        foodCost REAL NOT NULL,
+                        otherCost REAL NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -102,7 +125,13 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     context.applicationContext,
                     FuelLogDatabase::class.java,
                     "fuellog-native.db",
-                ).addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
+                ).addMigrations(
+                    migration1To2,
+                    migration2To3,
+                    migration3To4,
+                    migration4To5,
+                    migration5To6,
+                )
                     .build()
                     .also { instance = it }
             }

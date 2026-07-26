@@ -27,6 +27,8 @@ const nativeExpenseDao = await readFile(new URL('../native-kotlin/app/src/main/j
 const nativeMaintenanceDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/MaintenanceDao.kt', import.meta.url), 'utf8');
 const nativeMaintenanceStatus = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/MaintenanceStatus.kt', import.meta.url), 'utf8');
 const nativeMaintenanceWorker = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/notifications/MaintenanceReminderWorker.kt', import.meta.url), 'utf8');
+const nativeTripDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/TripDao.kt', import.meta.url), 'utf8');
+const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/TripSummary.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -279,6 +281,18 @@ test('native maintenance dates schedule Android notifications safely', () => {
   assert.match(nativeMaintenanceWorker, /ExistingPeriodicWorkPolicy\.UPDATE/);
   assert.match(nativeMaintenanceWorker, /Manifest\.permission\.POST_NOTIFICATIONS/);
   assert.match(nativeMaintenanceWorker, /getItemsWithReminderDates/);
+});
+
+test('native trips remain vehicle-scoped and include every stable cost field', () => {
+  assert.match(nativeFuelDatabase, /TripEntity::class/);
+  assert.match(nativeFuelDatabase, /Migration\(5, 6\)/);
+  for (const field of ['fuelCost', 'tollCost', 'parkingCost', 'foodCost', 'otherCost']) {
+    assert.match(nativeFuelDatabase, new RegExp(`${field} REAL NOT NULL`));
+  }
+  assert.match(nativeTripDao, /WHERE vehicleId = :vehicleId/);
+  assert.match(nativeTripSummary, /costPerKm/);
+  assert.match(nativeFuelApp, /RecordsPage/);
+  assert.match(nativeFuelApp, /AddTripDialog/);
 });
 
 test('home has one vehicle selector', () => {

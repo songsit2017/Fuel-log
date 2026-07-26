@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=6.10.0">
+  <link rel="stylesheet" href="styles.css?v=7.1.1">
 </head>
 <body>
   <header class="topbar">
@@ -65,6 +65,10 @@
       <div id="reportsPageBody"></div>
     </section>
 
+    <section class="page" data-page="panel">
+      <div id="panelPageBody"></div>
+    </section>
+
     <section class="page" data-page="more">
       <div class="menu-list">
         <button data-panel="family"><span>👨‍👩‍👧‍👦</span><div><b>ครอบครัวและ Cloud</b><small>ล็อกอิน แชร์รถ และซิงก์ข้อมูล</small></div><i>›</i></button>
@@ -83,7 +87,7 @@
   <nav class="bottom-nav">
     <button class="active" data-nav="home"><span>⌂</span>หน้าหลัก</button>
     <button data-nav="fuel"><span>⛽</span>เติมน้ำมัน</button>
-    <button data-nav="expense"><span>฿</span>ค่าใช้จ่าย</button>
+    <button data-nav="expense"><span id="currencyNavIcon">¤</span>ค่าใช้จ่าย</button>
     <button data-nav="maintenance"><span>🔧</span>บำรุง</button>
     <button data-nav="more"><span>•••</span>เพิ่มเติม</button>
   </nav>
@@ -98,10 +102,9 @@
       <button type="button" id="mediaCancelBtn" class="sheet-cancel">ยกเลิก</button>
     </section>
   </dialog>
-  <dialog id="panelDialog"><div class="dialog-wrap"><header><h2 id="panelTitle"></h2><button class="icon-btn" id="closePanel">×</button></header><div id="panelBody"></div></div></dialog>
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=7.0.3"></script>
+  <script type="module" src="app.js?v=7.1.1"></script>
 </body>
 </html>

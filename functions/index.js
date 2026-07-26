@@ -9,9 +9,16 @@ initializeApp();
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 const allowedMediaTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const requestWindows = new Map();
+let lastRateLimitSweep = 0;
 
 function enforceRateLimit(uid) {
   const now = Date.now();
+  if (now - lastRateLimitSweep >= 60_000) {
+    for (const [key, timestamps] of requestWindows) {
+      if (!timestamps.some(time => now - time < 60_000)) requestWindows.delete(key);
+    }
+    lastRateLimitSweep = now;
+  }
   const recent = (requestWindows.get(uid) || []).filter(time => now - time < 60_000);
   if (recent.length >= 10) throw new HttpsError('resource-exhausted', 'ลองใหม่อีกครั้งใน 1 นาที');
   recent.push(now);
@@ -60,7 +67,7 @@ exports.scanReceipt = onCall({
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-          { type: 'text', text: `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable and convert Buddhist years to Gregorian.` }
+          { type: 'text', text: `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable, convert Buddhist years to Gregorian${isFuel ? ', and normalize fuel volume to liters and unit price to price per liter' : ''}.` }
         ]
       }]
     })

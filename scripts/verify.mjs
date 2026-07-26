@@ -33,4 +33,17 @@ for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.ph
 for (const legacyPhotoKey of ['photo.entryId','photo.targetId','photo.target_id','/fuel/${alias}/']) {
   if (!app.includes(legacyPhotoKey)) throw new Error(`V7.0.2 legacy photo check failed: ${legacyPhotoKey}`);
 }
+for (const required of ['data-page="panel"', 'findMatchingFuelEntry', 'mergeFuelioEntry', 'loadFamilyDriverOptions', 'driverOptions']) {
+  const source = required === 'data-page="panel"' ? await readFile(new URL('../index.html', import.meta.url), 'utf8') : app;
+  if (!source.includes(required)) throw new Error(`V7.1.0 feature check failed: ${required}`);
+}
+for (const auditNeedle of ['fmtCount(r.count)', 'firebase-config.js?v=${APP_VERSION}', 'dispVolVal(parsed.liters)', 'requestWindows.delete(key)']) {
+  const source = auditNeedle === 'requestWindows.delete(key)'
+    ? await readFile(new URL('../functions/index.js', import.meta.url), 'utf8')
+    : app;
+  if (!source.includes(auditNeedle)) throw new Error(`V7.1.1 audit check failed: ${auditNeedle}`);
+}
+if (app.includes("$('#panelDialog')") || app.includes('.showModal();}\nfunction renderPanel')) {
+  throw new Error('V7.1.0 full-page navigation regressed to a panel dialog');
+}
 console.log(`FuelLog Pro V7 verification passed (${Object.keys(checks).length} feature groups).`);

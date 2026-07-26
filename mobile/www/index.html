@@ -8,7 +8,9 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=7.2.1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <link rel="stylesheet" href="styles.css?v=7.6.0">
 </head>
 <body>
   <header class="topbar">
@@ -19,6 +21,10 @@
         <h1 id="pageTitle">ภาพรวม</h1>
       </div>
     </div>
+    <label class="global-vehicle-picker" aria-label="เลือกรถ">
+      <span>🚗</span>
+      <select id="globalVehicleSelect"></select>
+    </label>
     <span id="themeBtn" hidden aria-hidden="true"></span>
   </header>
 
@@ -73,6 +79,7 @@
       <div class="menu-list">
         <button data-panel="family"><span>👨‍👩‍👧‍👦</span><div><b>ครอบครัวและ Cloud</b><small>ล็อกอิน แชร์รถ และซิงก์ข้อมูล</small></div><i>›</i></button>
         <button data-panel="trips"><span>🛣️</span><div><b>ทริปและหน้างาน</b><small>GPS ระยะทาง ค่าน้ำมัน ทางด่วน ที่จอด และต้นทุนงาน</small></div><i>›</i></button>
+        <button data-panel="stations"><span>⛽</span><div><b>สถานีบริการน้ำมัน</b><small>แผนที่ปั๊มใกล้ฉัน ราคา รายการโปรด และปั๊มบนเส้นทาง</small></div><i>›</i></button>
         <button data-panel="gallery"><span>📷</span><div><b>รูปและเอกสาร</b><small>ใบเสร็จ เรือนไมล์ งานซ่อม และเอกสารรถ</small></div><i>›</i></button>
         <button data-page-link="reports"><span>📊</span><div><b>รายงาน</b><small>เติม-เพิ่ม ค่าใช้จ่าย ระยะทาง และสัดส่วนค่าใช้จ่ายตามหมวด</small></div><i>›</i></button>
         <button data-panel="search"><span>🔎</span><div><b>ค้นหาทุกอย่าง</b><small>ค้นในน้ำมัน ค่าใช้จ่าย เตือน และทริปพร้อมกัน</small></div><i>›</i></button>
@@ -105,6 +112,6 @@
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=7.2.1"></script>
+  <script type="module" src="app.js?v=7.6.0"></script>
 </body>
 </html>

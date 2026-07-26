@@ -3,7 +3,7 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.2.1';
+const APP_VERSION = '7.6.0';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -72,20 +72,32 @@ function thaiMonthLabel(dateStr){
   if(isNaN(d.getTime())) return '';
   return `${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
-// Color + initial badges (not a reproduction of any brand's actual logo/trademark) so entries feel recognizable at a glance.
+// Compact brand pictograms for fuel records. They are drawn inline so they work offline
+// and never depend on a third-party logo server.
+const BRAND_ICONS = {
+  ptt:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4C18 12 11 17 11 28a13 13 0 0 0 26 0c0-11-7-16-13-24Z" fill="#1676c4"/><path d="M24 12c-3 6-7 9-7 16a7 7 0 0 0 14 0c0-7-4-10-7-16Z" fill="#e9434b"/><circle cx="24" cy="29" r="3.5" fill="#fff"/></svg>`,
+  bangchak:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 31C12 15 25 7 40 8c-1 16-10 29-27 31" fill="#39a852"/><path d="M11 38c8-10 15-15 27-25M19 31l-1-10m8 4 8 1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`,
+  shell:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 34C7 18 14 8 24 8s17 10 17 26H7Z" fill="#ffd21c" stroke="#d9232e" stroke-width="3"/><path d="M24 10v24M15 14l4 20M33 14l-4 20M9 25h30M8 34h32" fill="none" stroke="#d9232e" stroke-width="2"/></svg>`,
+  esso:`<svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="24" rx="20" ry="14" fill="#fff" stroke="#2463a8" stroke-width="3"/><text x="24" y="29" text-anchor="middle" font-size="13" font-weight="900" fill="#e1262f">ESSO</text></svg>`,
+  caltex:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#1676b8"/><path d="m24 7 4.2 11.7 12.4.4-9.8 7.6 3.5 11.9L24 31.7l-10.3 6.9 3.5-11.9-9.8-7.6 12.4-.4L24 7Z" fill="#fff"/><path d="m24 12 2.8 8 8.5.3-6.7 5.2 2.4 8.1-7-4.7-7 4.7 2.4-8.1-6.7-5.2 8.5-.3 2.8-8Z" fill="#e52b34"/></svg>`,
+  pt:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#ed177d"/><path d="M14 35V13h11c8 0 11 4 11 10s-4 10-12 10h-3v2h-7Zm7-15v7h3c3 0 5-1 5-4s-2-3-5-3h-3Z" fill="#fff"/><path d="M33 9h8v6h-8z" fill="#f59b23"/></svg>`,
+  susco:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#0874b9"/><path d="M35 13c-4-3-17-3-20 3-4 8 17 6 13 13-2 3-10 2-15-1" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M13 34h22" stroke="#f5a623" stroke-width="4"/></svg>`,
+  pure:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#6fbe44"/><path d="M13 34V14h11c8 0 12 4 12 10S32 34 24 34h-4v-7h4c3 0 5-1 5-3s-2-3-5-3h-4v13h-7Z" fill="#fff"/></svg>`
+};
 const STATION_BRANDS = [
-  { match:['ปตท','ptt'], initial:'ป', bg:'#00A19C', fg:'#fff' },
-  { match:['บางจาก','bcp'], initial:'บ', bg:'#00A651', fg:'#fff' },
-  { match:['เชลล์','shell'], initial:'S', bg:'#FBCE07', fg:'#D3242A' },
-  { match:['เอสโซ่','esso'], initial:'E', bg:'#1B4F9C', fg:'#fff' },
-  { match:['คาลเท็กซ์','caltex'], initial:'C', bg:'#DA291C', fg:'#fff' },
-  { match:['พีที'], initial:'P', bg:'#EC008C', fg:'#fff' },
-  { match:['ซัสโก้','susco'], initial:'ซ', bg:'#0072BC', fg:'#fff' },
+  { match:['ปตท','pttor','ptt','or station'], key:'ptt', label:'PTT/OR' },
+  { match:['บางจาก','bcp','bangchak'], key:'bangchak', label:'Bangchak' },
+  { match:['เชลล์','shell'], key:'shell', label:'Shell' },
+  { match:['เอสโซ่','esso'], key:'esso', label:'Esso' },
+  { match:['คาลเท็กซ์','caltex'], key:'caltex', label:'Caltex' },
+  { match:['พีที','pt max','pt station','ปั๊ม pt','pt -','pt –'], key:'pt', label:'PT' },
+  { match:['ซัสโก้','susco'], key:'susco', label:'Susco' },
+  { match:['เพียว','pure'], key:'pure', label:'Pure' },
 ];
 function stationBadge(stationName){
   const name = (stationName||'').toLowerCase();
   const brand = STATION_BRANDS.find(b => b.match.some(m => name.includes(m)));
-  if(brand) return `<div class="ico brand-badge" style="background:${brand.bg};color:${brand.fg}">${brand.initial}</div>`;
+  if(brand) return `<div class="ico brand-badge brand-${brand.key}" title="${brand.label}" aria-label="${brand.label}">${BRAND_ICONS[brand.key]}</div>`;
   return `<div class="ico">⛽</div>`;
 }
 const KEY = 'fuellog-v5-data';
@@ -137,7 +149,7 @@ const efficiencyUnit = () => `${distUnit()}/${volUnit()}`;
 const toDisplayEfficiency = kml => (Number(kml)||0)*distFactor()/volFactor();
 
 let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'system', units:{distance:'km',volume:'liters'} };
-let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups', currentPanel = null;
+let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups', currentPanel = null, serviceMap = null, serviceStations = [], stationView = 'map';
 const familyMembersCache = {};
 
 function seed(){
@@ -156,6 +168,7 @@ function load(){
   state.units ||= {distance:'km',volume:'liters'};
   migrateSettings(state);
   state.homeCards ||= {nearby:true,todayPrice:true,chart:true,latest:true,due:true};
+  state.favoriteStations ||= [];
   state.fontFamily ||= 'system';
   state.entries = state.entries.map(normalizeFuelEntry);
   save();
@@ -236,9 +249,25 @@ function applyFont(){
   document.body.style.fontFamily = FONT_OPTIONS[key].stack;
 }
 
-function renderNav(page='home'){$$('.page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===page||(['reports','panel'].includes(page)&&x.dataset.nav==='more')));const panelNames={family:'ครอบครัวและ Cloud',trips:'ทริปและหน้างาน',gallery:'รูปและเอกสาร',backup:'สำรองและนำเข้า',vehicles:'จัดการรถ',search:'ค้นหาทุกอย่าง',settings:'การตั้งค่า'};const names={home:'ภาพรวม',fuel:'เติมน้ำมัน',expense:'ค่าใช้จ่าย',maintenance:'บำรุงรักษา',more:'เพิ่มเติม',reports:'รายงาน',panel:panelNames[currentPanel]||'เพิ่มเติม'};$('#pageTitle').textContent=names[page];$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';$('#reportsBackBtn').style.display=['reports','panel'].includes(page)?'':'none';window.scrollTo({top:0,behavior:'auto'});}
+function renderNav(page='home'){$$('.page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===page||(['reports','panel'].includes(page)&&x.dataset.nav==='more')));const panelNames={family:'ครอบครัวและ Cloud',trips:'ทริปและหน้างาน',routeFuel:'ปั๊มน้ำมันบนเส้นทาง',stations:'สถานีบริการน้ำมัน',gallery:'รูปและเอกสาร',backup:'สำรองและนำเข้า',vehicles:'จัดการรถ',search:'ค้นหาทุกอย่าง',settings:'การตั้งค่า'};const names={home:'ภาพรวม',fuel:'เติมน้ำมัน',expense:'ค่าใช้จ่าย',maintenance:'บำรุงรักษา',more:'เพิ่มเติม',reports:'รายงาน',panel:panelNames[currentPanel]||'เพิ่มเติม'};$('#pageTitle').textContent=names[page];$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';$('#reportsBackBtn').style.display=['reports','panel'].includes(page)?'':'none';document.body.classList.toggle('station-mode',page==='panel'&&currentPanel==='stations');window.scrollTo({top:0,behavior:'auto'});}
 function metric(label,val,sub=''){if(label==='จำนวนทริป')val=fmtCount(trips().length);return `<article class="metric"><small>${label}</small><b>${val}</b><em>${sub}</em></article>`;}
-function renderVehicleStrip(){ $('#vehicleStrip').innerHTML=state.vehicles.map(v=>`<button class="vehicle-chip ${v.id===state.currentVehicleId?'active':''}" data-vehicle="${v.id}">${esc(v.name)}</button>`).join(''); }
+function renderVehicleStrip(){
+  $('#vehicleStrip').innerHTML=state.vehicles.map(v=>`<button class="vehicle-chip ${v.id===state.currentVehicleId?'active':''}" data-vehicle="${v.id}">${esc(v.name)}</button>`).join('');
+  const select=$('#globalVehicleSelect');
+  if(select){
+    select.innerHTML=state.vehicles.map(v=>`<option value="${esc(v.id)}" ${v.id===state.currentVehicleId?'selected':''}>${esc(v.name)}</option>`).join('');
+    select.disabled=state.vehicles.length<2;
+  }
+}
+function switchVehicle(vehicleId){
+  if(!state.vehicles.some(v=>v.id===vehicleId)||vehicleId===state.currentVehicleId)return;
+  state.currentVehicleId=vehicleId;
+  renderAll();
+  const activePage=$('.page.active')?.dataset.page;
+  if(activePage==='reports')renderReportsPage();
+  if(activePage==='panel'&&currentPanel){renderPanel(currentPanel);if(currentPanel==='stations')setTimeout(initServiceStations,0);}
+  toast(`เปลี่ยนเป็น ${vehicle()?.name||'รถที่เลือก'} แล้ว`);
+}
 function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:'⛽',title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';applyHomeCardVisibility();}
 function rowHtml(x){return `<article class="record"><div class="ico">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><div class="amount">${x.amount}</div></article>`;}
 function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.max(1,...data.map(x=>x.value)),w=320,h=115,p=15;const pts=data.map((x,i)=>[p+i*((w-p*2)/(Math.max(1,data.length-1))),h-p-(x.value/max)*(h-p*2)]);svg.innerHTML=`<path d="${pts.map((q,i)=>(i?'L':'M')+q.join(' ')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M${pts[0]?.[0]||0} ${h-p} ${pts.map(q=>'L'+q.join(' ')).join(' ')} L${pts.at(-1)?.[0]||0} ${h-p}Z" fill="rgba(244,168,59,.10)"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="var(--accent)"/><text x="${q[0]}" y="128" fill="var(--muted)" font-size="9" text-anchor="middle">${data[i].label}</text>`).join('')}`;const a=data.at(-2)?.value||0,b=data.at(-1)?.value||0;$('#trendText').textContent=a?`${b>=a?'▲':'▼'} ${fmt(Math.abs((b-a)/a*100))}%`:' ';}
@@ -264,7 +293,7 @@ function renderFuel(){
   }
   $('#fuelList').innerHTML=html;
 }
-function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.title||x.category)}</b><small>${x.date} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}</small></div><div class="amount">${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
+function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(x.income?-1:1)*(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">${x.income?'↩️':'🔧'}</div><div><b>${esc(x.title||x.category)}</b><small>${x.date}${x.time?' '+x.time:''} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}${x.recurrence==='recurring'?' • 🔁 ประจำ':''}${x.photos?.length?' • 🖼️ '+fmtCount(x.photos.length):''}</small></div><div class="amount">${x.income?'−':''}${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
 function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-reminder="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.name)}</b><small>${x.nextOdo?'ที่ '+fmtDist(x.nextOdo):''}${x.nextDate?' • '+x.nextDate:''}${(x.repeatOdo||x.repeatMonths)?' • 🔁 ทำซ้ำ':''}</small></div><div style="text-align:right;"><div class="amount status-${x.status}">${x.label}</div><button class="secondary" data-done-reminder="${x.id}" style="margin-top:6px;padding:6px 10px;font-size:11px;">✓ เสร็จแล้ว</button></div></article>`).join(''):'<div class="empty">ยังไม่มีรายการเตือน</div>';}
 function renderAll(){renderVehicleStrip();renderHome();renderFuel();renderExpenses();renderMaintenance();$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';if($('#currencyNavIcon'))$('#currencyNavIcon').textContent=currencyMark();save();}
 
@@ -380,13 +409,14 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
 <div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
 <div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
- if(type==='expense')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label></div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
+ if(type==='expense')b.innerHTML=`<h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid compact-media-actions"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label><label class="photo-pick">🖼️ เพิ่มรูป<input hidden type="file" id="expensePhotoFile" accept="image/*" multiple></label></div><div id="ocrStatus" class="muted compact-status"></div><div class="existing-photos-card ${obj.id?'':'is-empty'}"><div class="card-head"><b>🖼️ รูปในรายการ</b><small>${obj.id?'แตะรูปเพื่อเปิด':'ยังไม่มีรูป'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">รูปที่เลือกจะบันทึกพร้อมรายการ</span>'}</div></div><h3 class="form-section-title">2. รายละเอียดค่าใช้จ่าย</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['บำรุงรักษา','น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}${obj.category&&!['บำรุงรักษา','น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].includes(obj.category)?`<option selected>${esc(obj.category)}</option>`:''}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>ลักษณะรายการ</label><select name="recurrence"><option value="once" ${obj.recurrence!=='recurring'?'selected':''}>ค่าใช้จ่ายเพียงครั้งเดียว</option><option value="recurring" ${obj.recurrence==='recurring'?'selected':''}>ค่าใช้จ่ายประจำ</option></select></div><label class="field"><input name="income" type="checkbox" ${obj.income?'checked':''}> รายรับ / ค่าใช้จ่ายเชิงลบ</label><label class="field"><input name="bookmarked" type="checkbox" ${obj.bookmarked?'checked':''}> บันทึกเป็นแม่แบบ</label><div class="field full"><label>เตือนชำระเงิน / วันครบกำหนด</label><input name="reminderDate" type="date" value="${obj.reminderDate||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
  d.showModal();
  configureDeleteButton(type,obj);
  bindMediaPickerForForm();
  $('#fuelOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'fuel'));
  $('#expenseOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'expense'));
+ if(type==='expense'&&obj.id) loadExistingLogPhotos(obj.id,'expense');
  if(type==='fuel'){
    renderDriverOptions();
    loadFamilyDriverOptions();
@@ -575,7 +605,11 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
  }
  if(type==='expense'){
    if(!(+data.amount>0)){ alert('กรอกจำนวนเงินให้ครบก่อนบันทึก'); return; }
-   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=data.odometer?toCanonicalDist(+data.odometer):null;data.amount=+data.amount||0;const old=state.expenses.findIndex(x=>x.id===idv);old>=0?state.expenses[old]=data:state.expenses.push(data);
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=data.odometer?toCanonicalDist(+data.odometer):null;data.amount=+data.amount||0;data.income=$('[name="income"]')?.checked||false;data.bookmarked=$('[name="bookmarked"]')?.checked||false;
+   const old=state.expenses.findIndex(x=>x.id===idv),oldRecord=old>=0?state.expenses[old]:null;
+   const uploadedPhotos=await uploadAttachedPhotos(idv,'expense');
+   data.photos=[...(oldRecord?.photos||[]),...uploadedPhotos].filter((photo,index,all)=>photo?.url&&all.findIndex(item=>item.url===photo.url)===index);
+   old>=0?state.expenses[old]={...oldRecord,...data}:state.expenses.push(data);
  }
  if(type==='reminder'){
    if(!data.name?.trim()){ alert('กรอกชื่อรายการเตือนก่อนบันทึก'); return; }
@@ -603,7 +637,7 @@ async function fetchNearbyStations(){
   const q=`[out:json];(node[amenity=fuel](around:7000,${lat},${lon});way[amenity=fuel](around:7000,${lat},${lon});relation[amenity=fuel](around:7000,${lat},${lon}););out center tags;`;
   const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:q});
   const j=await r.json();
-  return j.elements.map(x=>{const a=x.lat??x.center?.lat,b=x.lon??x.center?.lon,name=x.tags?.name||x.tags?.brand||x.tags?.operator||'ปั๊มน้ำมัน';return {name,dist:haversine(lat,lon,a,b)};}).sort((a,b)=>a.dist-b.dist).slice(0,6);
+  return j.elements.map(x=>{const a=x.lat??x.center?.lat,b=x.lon??x.center?.lon,name=x.tags?.name||x.tags?.brand||x.tags?.operator||'ปั๊มน้ำมัน';return {id:`osm-${x.type}-${x.id}`,name,brand:x.tags?.brand||x.tags?.operator||'',lat:a,lon:b,dist:haversine(lat,lon,a,b),tags:x.tags||{}};}).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon)).sort((a,b)=>a.dist-b.dist).slice(0,30);
 }
 async function autoNearby(){const box=$('#formNearby'),input=$('#stationInput');if(!box)return;box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';try{const stations=await fetchNearbyStations();nearbyCache=stations;if(stations[0]&&!input.value)input.value=stations[0].name;renderNearby(stations,box);}catch(e){box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</div>';}}
 function haversine(a,b,c,d){const R=6371,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,z=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return R*2*Math.atan2(Math.sqrt(z),Math.sqrt(1-z));}
@@ -726,16 +760,17 @@ async function loadTodayPrices(){
   box.innerHTML='<div class="muted">ยังโหลดราคาไม่ได้ กรุณาตรวจว่าไฟล์ oil-prices.json อยู่ที่รากโปรเจกต์และ GitHub Action อัปเดตสำเร็จ</div>';
 }
 
-async function uploadAttachedPhotos(logId){
+async function uploadAttachedPhotos(logId,recordKind='fuel'){
   if(!user)return [];
   try{ await ensureCloudVehicle(); }catch(e){ /* if this fails, the upload below will too, surfaced naturally */ }
   const receipt=$('#receiptCameraFile')?.files[0]||$('#receiptGalleryFile')?.files[0];
   const odometer=$('#odoCameraFile')?.files[0]||$('#odoGalleryFile')?.files[0];
   const attachment=$('#extraAttachmentFile')?.files[0];
-  const files=[['receipt',receipt],['odometer',odometer],['attachment',attachment]].filter(x=>x[1]);
+  const expenseFiles=[...($('#expensePhotoFile')?.files||[])].map(file=>['attachment',file]);
+  const files=recordKind==='expense'?expenseFiles:[['receipt',receipt],['odometer',odometer],['attachment',attachment]].filter(x=>x[1]);
   const uploaded=[];
   for(const [type,file] of files){
-    const path=`vehicles/${state.currentVehicleId}/fuel/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;
+    const path=`vehicles/${state.currentVehicleId}/${recordKind}/${logId}/${type}-${Date.now()}-${file.name.replace(/[^\w.-]/g,'_')}`;
     const sr=ref(storage,path);
     await uploadBytes(sr,file,{contentType:file.type,customMetadata:{uploadedBy:user.uid}});
     const url=await getDownloadURL(sr);
@@ -759,10 +794,11 @@ function isImageAttachment(photo){
   return ['receipt','odometer','fuel','image','photo'].includes(String(photo?.type||'').toLowerCase());
 }
 
-async function loadExistingLogPhotos(logId){
+async function loadExistingLogPhotos(logId,recordKind='fuel'){
   const box=$('#existingLogPhotos');
   if(!box)return;
-  const currentEntry=state.entries.find(entry=>entry.id===logId);
+  const recordList=recordKind==='expense'?state.expenses:state.entries;
+  const currentEntry=recordList.find(entry=>entry.id===logId);
   const aliases=[logId,currentEntry?._uniqueId,currentEntry?.uniqueId,currentEntry?.fuelioId].filter(Boolean).map(String);
   const local=currentEntry?.photos||[];
   const render=photos=>{
@@ -778,11 +814,11 @@ async function loadExistingLogPhotos(logId){
       const references=[photo.logId,photo.entryId,photo.targetId,photo.target_id].filter(Boolean).map(String);
       const direct=references.some(reference=>aliases.includes(reference));
       const path=String(photo.path||'').replaceAll('\\','/');
-      const pathMatch=aliases.some(alias=>path.includes(`/fuel/${alias}/`));
+      const pathMatch=aliases.some(alias=>path.includes(`/${recordKind}/${alias}/`)||path.includes(`/fuel/${alias}/`));
       return direct||pathMatch;
     });
     const merged=[...local,...cloud].map(photo=>({...photo,url:attachmentUrl(photo)})).filter((photo,index,all)=>photo.url&&all.findIndex(item=>item.url===photo.url)===index);
-    const entry=state.entries.find(item=>item.id===logId);
+    const entry=recordList.find(item=>item.id===logId);
     if(entry&&merged.length){entry.photos=merged;save();}
     render(merged);
   }catch(error){
@@ -791,8 +827,8 @@ async function loadExistingLogPhotos(logId){
   }
 }
 
-function openPanel(name){currentPanel=name;renderNav('panel');renderPanel(name);}
-function renderPanel(name){currentPanel=name;const b=$('#panelPageBody');if(name==='family')b.innerHTML=familyPanel();if(name==='trips')b.innerHTML=tripsPanel();if(name==='gallery'){b.innerHTML='<div id="galleryBody" class="muted">กำลังโหลด…</div>';loadGallery();}if(name==='backup')b.innerHTML=backupPanel();if(name==='vehicles')b.innerHTML=vehiclesPanel();if(name==='search')b.innerHTML=searchPanel();if(name==='settings')b.innerHTML=settingsPanel();bindPanel();}
+function openPanel(name){currentPanel=name;renderNav('panel');renderPanel(name);if(name==='stations')setTimeout(initServiceStations,0);}
+function renderPanel(name){currentPanel=name;const b=$('#panelPageBody');if(name==='family')b.innerHTML=familyPanel();if(name==='trips')b.innerHTML=tripsPanel();if(name==='routeFuel')b.innerHTML=routeFuelPanel();if(name==='stations')b.innerHTML=serviceStationPanel();if(name==='gallery'){b.innerHTML='<div id="galleryBody" class="muted">กำลังโหลด…</div>';loadGallery();}if(name==='backup')b.innerHTML=backupPanel();if(name==='vehicles')b.innerHTML=vehiclesPanel();if(name==='search')b.innerHTML=searchPanel();if(name==='settings')b.innerHTML=settingsPanel();bindPanel();}
 
 function openReportsPage(){renderNav('reports');renderReportsPage();}
 function renderReportsPage(){$('#reportsPageBody').innerHTML=reportsPanel();bindReportsPage();}
@@ -804,6 +840,66 @@ function bindReportsPage(){
 }
 function familyPanel(){return user?`<div class="card"><div class="user-card"><img src="${esc(user.photoURL||'icon-192.png')}" referrerpolicy="no-referrer"><div><b>${esc(user.displayName||user.email)}</b><small>${esc(user.email)}</small></div></div><div class="panel-actions" style="margin-top:12px"><button class="secondary" id="signOutBtn">ออกจากระบบ</button><button class="primary" id="syncBtn">ซิงก์ข้อมูลยานพาหนะ</button></div><div id="syncResult" class="muted" style="margin-top:10px;min-height:20px;"></div></div><div class="card"><h2>สมาชิก</h2><div id="membersBody" class="muted">กำลังโหลด…</div></div><div class="card"><h2>สร้างรหัสเชิญ</h2><input id="inviteEmail" type="email" placeholder="Gmail สมาชิก"><select id="inviteRole"><option value="editor">Editor — เพิ่มและแก้ไข</option><option value="viewer">Viewer — ดูอย่างเดียว</option></select><button class="primary" id="inviteBtn" style="margin-top:8px">สร้างรหัส</button><div id="inviteResult" class="muted"></div></div><div class="card"><h2>เข้าร่วมรถ</h2><input id="joinCode" maxlength="8" placeholder="รหัสเชิญ 8 ตัว"><button class="primary" id="joinBtn" style="margin-top:8px">เข้าร่วม</button></div>`:`<div class="card"><h2>แชร์รถกับครอบครัว</h2><p class="muted">ใช้บัญชี Google เดียวสำหรับ Firebase, Firestore และ Storage ไม่ต้องล็อกอิน Google Drive แยก</p><button class="google-btn" id="loginBtn"><b style="color:#4285f4">G</b> เข้าสู่ระบบด้วย Google</button><div id="authMessage" class="muted"></div></div>`;}
 function tripsPanel(){const arr=trips(),sum=arr.reduce((s,x)=>s+(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0),0);return `<div class="metric-grid">${metric('จำนวนทริป',fmt(arr.length),'')}${metric('ต้นทุนรวม',money(sum),'')}</div><div class="card"><h2>บันทึกระยะทางด้วย GPS</h2><div class="panel-actions"><button class="primary" id="gpsStartBtn" style="${gpsTrack?'display:none':''}">▶ เริ่มติดตาม</button><button class="secondary" id="gpsStopBtn" style="${gpsTrack?'':'display:none'}">■ หยุดและบันทึกระยะทาง</button></div><div id="gpsStatus" class="muted" style="margin-top:6px;">${gpsTrack?'กำลังติดตามตำแหน่ง…':'กด "เริ่มติดตาม" ก่อนออกเดินทาง ระบบจะคำนวณระยะทางจาก GPS ให้อัตโนมัติ'}</div><div id="gpsDistance" class="muted">${gpsTrack?fmtDist(gpsTrack.distanceKm,2):''}</div></div><div class="card"><h2>เพิ่มทริป</h2><input id="tripName" placeholder="ชื่องาน/ปลายทาง"><input id="tripDate" type="date" value="${today()}"><input id="tripDistance" type="number" step=".01" placeholder="ระยะทาง (${distUnit()}) — ถ้ากด GPS ไว้จะใส่ให้อัตโนมัติ" value="${gpsTrack?dispDistVal(gpsTrack.distanceKm):''}"><div class="form-grid"><input id="tripFuel" type="number" placeholder="ค่าน้ำมัน"><input id="tripToll" type="number" placeholder="ทางด่วน"><input id="tripParking" type="number" placeholder="ที่จอด"><input id="tripFood" type="number" placeholder="อาหาร/ที่พัก"><input id="tripOther" type="number" placeholder="อื่น ๆ"></div><button class="primary" id="saveTripBtn" style="margin-top:8px">บันทึกทริป</button></div><div class="card">${arr.map(x=>{const t=(+x.fuel||0)+(+x.toll||0)+(+x.parking||0)+(+x.food||0)+(+x.other||0);return `<div class="list-row"><div><b>${esc(x.name)}</b><small>${x.date}${x.distance?' • '+fmtDist(x.distance):''}</small></div><b>${money(t)}</b></div>`}).join('')||'<div class="empty">ยังไม่มีทริป</div>'}</div>`;}
+
+function serviceStationPanel(){return `<section class="station-explorer"><div class="station-filter-bar"><button class="active" data-station-filter="all">⛽ ใกล้ฉัน</button><button data-open-route>🛣️ ปั๊มบนเส้นทาง</button><button data-station-filter="priced">💰 มีราคาล่าสุด</button><button data-station-filter="favorites">★ ชื่นชอบ</button></div><div id="serviceStationMap"></div><div id="serviceStationStatus" class="muted" style="padding:8px 12px">กำลังค้นหาสถานีใกล้คุณ…</div><div id="serviceStationList" class="station-list-panel" hidden></div><div class="station-view-tabs"><button class="active" data-station-view="map"><span>🗺️</span>แผนที่</button><button data-station-view="list"><span>☷</span>รายการ</button><button data-station-view="favorites"><span>★</span>ชื่นชอบ</button></div></section>`;}
+function stationKey(station){return station.id||`${station.name}|${Number(station.lat).toFixed(5)}|${Number(station.lon).toFixed(5)}`;}
+function stationIsFavorite(station){return state.favoriteStations.includes(stationKey(station));}
+function stationPrice(station){const last=findLastPriceForStation(station.name);return last?.pricePerLiter?{value:toDisplayPricePerVol(last.pricePerLiter),date:last.date}:null;}
+function stationVisitCount(station){const name=station.name.toLowerCase();return entries().filter(entry=>{const saved=String(entry.station||'').toLowerCase();return saved&&(name.includes(saved)||saved.includes(name));}).length;}
+function stationBrandLabel(station){const brand=String(station.brand||station.name).toLowerCase();if(brand.includes('shell'))return 'S';if(brand.includes('caltex'))return 'C';if(brand.includes('บางจาก'))return 'BCP';if(brand.includes('ptt')||brand.includes('ปตท')||brand.includes('pt '))return 'PT';return '⛽';}
+function stationDirectionsUrl(station){return `https://www.google.com/maps/dir/?${new URLSearchParams({api:'1',destination:`${station.lat},${station.lon}`,travelmode:'driving',dir_action:'navigate'})}`;}
+function filteredServiceStations(filter='all'){
+  if(filter==='favorites')return serviceStations.filter(stationIsFavorite);
+  if(filter==='priced')return serviceStations.filter(stationPrice);
+  return serviceStations;
+}
+function renderServiceStationList(filter='all'){
+  const box=$('#serviceStationList');if(!box)return;
+  const stations=filteredServiceStations(filter);
+  box.innerHTML=stations.length?stations.map(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station),visits=stationVisitCount(station);return `<article class="card station-row"><div class="station-brand-icon">${esc(stationBrandLabel(station))}</div><div><b>${esc(station.name)}</b><small>${fmtDist(station.dist,1)}${visits?` • เยี่ยมชม ${fmtCount(visits)} ครั้ง`:''}</small><small>${esc(station.brand||'สถานีบริการน้ำมัน')}${price?` • บันทึกล่าสุด ${price.date}`:''}</small></div><div class="station-row-price">${price?`${money(price.value)}<small>/${volUnit()}</small>`:'—'}</div><button class="station-favorite ${favorite?'active':''}" data-favorite-station="${esc(stationKey(station))}" aria-label="ชื่นชอบ">★</button><a class="primary station-nav" href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">นำทาง</a></article>`;}).join(''):'<div class="empty">ไม่พบสถานีในตัวกรองนี้</div>';
+}
+function renderServiceStationMarkers(filter='all'){
+  if(!serviceMap||!window.L)return;
+  serviceMap.eachLayer(layer=>{if(layer.options?.pane==='markerPane')serviceMap.removeLayer(layer);});
+  const stations=filteredServiceStations(filter),bounds=[];
+  stations.forEach(station=>{const price=stationPrice(station),favorite=stationIsFavorite(station);const html=`<div class="station-price-marker ${price?'known':''} ${favorite?'favorite':''}">⛽ ${price?money(price.value):fmtDist(station.dist,1)}</div>`;const icon=L.divIcon({className:'',html,iconSize:[88,32],iconAnchor:[44,28]});L.marker([station.lat,station.lon],{icon}).addTo(serviceMap).bindPopup(`<b>${esc(station.name)}</b><br>${price?`${money(price.value)}/${volUnit()} • ${price.date}`:'ยังไม่มีราคาที่คุณเคยเติม'}<br><a href="${esc(stationDirectionsUrl(station))}" target="_blank" rel="noopener">เปิดนำทาง</a>`);bounds.push([station.lat,station.lon]);});
+  if(bounds.length)serviceMap.fitBounds(bounds,{padding:[25,25],maxZoom:14});
+}
+async function initServiceStations(){
+  const mapEl=$('#serviceStationMap'),status=$('#serviceStationStatus');if(!mapEl)return;
+  if(!window.L){status.textContent='โหลดแผนที่ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ต';return;}
+  if(serviceMap){serviceMap.remove();serviceMap=null;}
+  serviceMap=L.map(mapEl,{zoomControl:true}).setView([13.7563,100.5018],11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(serviceMap);
+  try{serviceStations=await fetchNearbyStations();nearbyCache=serviceStations;status.textContent=`พบ ${fmtCount(serviceStations.length)} สถานีในรัศมี 7 กม. • ราคาเป็นราคาล่าสุดที่คุณเคยบันทึก`;renderServiceStationMarkers('all');renderServiceStationList('all');}
+  catch(error){status.textContent='ค้นหาสถานีไม่ได้ กรุณาอนุญาตตำแหน่งและตรวจอินเทอร์เน็ต';renderServiceStationList('all');}
+}
+function setStationView(view){
+  stationView=view;$$('[data-station-view]').forEach(button=>button.classList.toggle('active',button.dataset.stationView===view));
+  const map=$('#serviceStationMap'),list=$('#serviceStationList');if(!map||!list)return;
+  const showList=view!=='map';map.hidden=showList;list.hidden=!showList;
+  const filter=view==='favorites'?'favorites':document.querySelector('[data-station-filter].active')?.dataset.stationFilter||'all';
+  renderServiceStationList(filter);if(!showList)setTimeout(()=>serviceMap?.invalidateSize(),0);
+}
+function toggleFavoriteStation(key){
+  const index=state.favoriteStations.indexOf(key);index>=0?state.favoriteStations.splice(index,1):state.favoriteStations.push(key);save();
+  const filter=document.querySelector('[data-station-filter].active')?.dataset.stationFilter||'all';renderServiceStationList(stationView==='favorites'?'favorites':filter);renderServiceStationMarkers(filter);
+}
+
+function routeFuelPanel(){return `<div class="card"><h2>⛽ ค้นหาปั๊มน้ำมันบนเส้นทาง</h2><p class="muted route-hint">กำหนดต้นทางและปลายทาง แล้วเปิดเส้นทางใน Google Maps จากนั้นเลือก “ค้นหาตามเส้นทาง” → “ปั๊มน้ำมัน” เพื่อดูปั๊มที่อ้อมน้อยที่สุดและเวลาเพิ่มของแต่ละแห่ง</p><div class="form-grid"><div class="field full"><label>ต้นทาง</label><input id="routeOrigin" placeholder="ตำแหน่งปัจจุบัน หรือชื่อสถานที่" value="ตำแหน่งปัจจุบัน"></div><div class="field full"><label>ปลายทาง</label><input id="routeDestination" placeholder="เช่น เชียงใหม่ หรือชื่อสถานที่"></div></div><div class="route-actions"><button class="secondary" id="routeUseLocationBtn">📍 ใช้ GPS</button><button class="primary" id="routeOpenBtn">🗺️ เปิดเส้นทาง</button></div><div id="routeFuelStatus" class="muted"></div></div><div class="card"><h2>วิธีใช้ระหว่างเดินทาง</h2><div class="list-row"><span>1</span><div><b>เปิดเส้นทาง</b><small>ระบบจะส่งต้นทาง–ปลายทางไปยัง Google Maps โดยไม่ต้องใช้ API Key</small></div></div><div class="list-row"><span>2</span><div><b>แตะค้นหาตามเส้นทาง</b><small>เลือกหมวด “ปั๊มน้ำมัน” เพื่อเปรียบเทียบระยะอ้อมและเวลาเพิ่ม</small></div></div><div class="list-row"><span>3</span><div><b>เลือกปั๊มแล้วนำทางต่อ</b><small>กลับมาบันทึกการเติมใน FuelLog Pro ได้ตามปกติ</small></div></div></div>`;}
+
+function openFuelRoute(){
+  const origin=$('#routeOrigin')?.value.trim(),destination=$('#routeDestination')?.value.trim();
+  if(!destination){$('#routeFuelStatus').textContent='กรุณาระบุปลายทาง';return;}
+  const params=new URLSearchParams({api:'1',destination,travelmode:'driving',dir_action:'navigate'});
+  if(origin&&origin!=='ตำแหน่งปัจจุบัน')params.set('origin',origin);
+  window.open(`https://www.google.com/maps/dir/?${params}`,'_blank','noopener');
+}
+function useRouteLocation(){
+  const status=$('#routeFuelStatus');if(!navigator.geolocation){status.textContent='อุปกรณ์นี้ไม่รองรับ GPS';return;}
+  status.textContent='กำลังอ่านตำแหน่ง…';
+  navigator.geolocation.getCurrentPosition(pos=>{const input=$('#routeOrigin');if(input)input.value=`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;status.textContent='ใช้ตำแหน่งปัจจุบันเป็นต้นทางแล้ว';},()=>{status.textContent='อ่านตำแหน่งไม่ได้ กรุณาอนุญาต GPS หรือพิมพ์ต้นทางเอง';},{enableHighAccuracy:true,timeout:10000,maximumAge:120000});
+}
 
 function startGpsTrip(){
   if(!navigator.geolocation){ alert('อุปกรณ์นี้ไม่รองรับ GPS'); return; }
@@ -1093,6 +1189,12 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.6.0</b> — เพิ่มไอคอนแบรนด์ปั๊มในรายการเติมน้ำมัน รองรับ PTT/OR, Bangchak, Shell, Esso, Caltex, PT, Susco และ Pure</li>
+      <li><b>7.5.1</b> — แถบสลับแผนที่ รายการ และชื่นชอบติดขอบล่างแบบ Fuelio พร้อมหน้ารายการสถานีแบบเต็มพื้นที่</li>
+      <li><b>7.5.0</b> — หน้าสถานีบริการน้ำมันแบบแผนที่ มีหมุด ราคา รายการ ตัวกรอง ชื่นชอบ และเชื่อมปั๊มบนเส้นทาง</li>
+      <li><b>7.4.0</b> — เปลี่ยนรถได้จากส่วนหัวทุกหน้า และเพิ่มเมนูค้นหาปั๊มน้ำมันบนเส้นทางผ่าน Google Maps โดยไม่ฝัง API Key</li>
+      <li><b>7.3.0</b> — นำเข้ารายละเอียดและรูปค่าใช้จ่ายจาก Fuelio เพิ่มเวลา รายรับ/รายจ่าย รายการประจำ แม่แบบ และวันเตือน พร้อมหน้าแก้ไขแบบละเอียด</li>
+      <li><b>7.2.2</b> — นำเข้ารูปจาก Fuelio ครบทุกภาพต่อรายการ ไม่จำกัดเพียงใบเสร็จและเรือนไมล์ 2 ภาพแรก</li>
       <li><b>7.2.1</b> — หน้ารายงานเปลี่ยนสีตามธีมมืด สว่าง ตามระบบ และอัตโนมัติ</li>
       <li><b>7.2.0</b> — แก้สูตรเต็มถัง/เติมบางส่วนและข้อมูลเก่า ย้ายปุ่มเต็มถังขึ้น ลดส่วนหัว แสดงประสิทธิภาพรายช่วง และแก้การลบ Cloud</li>
       <li><b>7.1.3</b> — นำปุ่มเปลี่ยนธีมออกจากแถบด้านบน ให้จัดการธีมจากหน้าการตั้งค่าเพียงจุดเดียว</li>
@@ -1377,8 +1479,8 @@ function parseFuelioCSV(text){
   let catHeaderIdx=-1;
   for(let k=logEndIdx;k<lines.length;k++) if(isFuelioSectionMarker(lines[k])&&fuelioSectionName(lines[k])==='costcategories'){ catHeaderIdx=k+1; break; }
   if(catHeaderIdx>-1&&lines[catHeaderIdx]){
-    const cH=splitFuelioCsvLine(lines[catHeaderIdx],delim).map(h=>h.toLowerCase());
-    const idIdx=cH.findIndex(h=>h==='costtypeid'), nameIdx=cH.findIndex(h=>h==='name');
+    const cH=splitFuelioCsvLine(lines[catHeaderIdx],delim).map(h=>h.toLowerCase().replace(/[_\s-]/g,''));
+    const idIdx=cH.findIndex(h=>['costtypeid','categoryid','id'].includes(h)), nameIdx=cH.findIndex(h=>['name','title','costtypename'].includes(h));
     if(idIdx>-1&&nameIdx>-1) for(let k=catHeaderIdx+1;k<lines.length;k++){ const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break; const cols=splitFuelioCsvLine(l,delim); if(cols[idIdx]) categoryMap[cols[idIdx].trim()]=(cols[nameIdx]||'').trim(); }
   }
 
@@ -1387,7 +1489,8 @@ function parseFuelioCSV(text){
   for(let k=logEndIdx;k<lines.length;k++) if(isFuelioSectionMarker(lines[k])&&fuelioSectionName(lines[k])==='costs'){ costsHeaderIdx=k+1; break; }
   if(costsHeaderIdx>-1&&lines[costsHeaderIdx]){
     const coH=splitFuelioCsvLine(lines[costsHeaderIdx],delim).map(h=>h.toLowerCase());
-    const titleIdx=coH.findIndex(h=>h==='costtitle'), dateIdx=coH.findIndex(h=>h==='date'), odoIdx=coH.findIndex(h=>h==='odo'), typeIdIdx=coH.findIndex(h=>h==='costtypeid'), noteIdx=coH.findIndex(h=>h==='notes'), amtIdx=coH.findIndex(h=>h==='cost'), templateIdx=coH.findIndex(h=>h==='istemplate');
+    const costIndex=(...names)=>coH.findIndex(h=>names.includes(h.replace(/[_\s-]/g,'')));
+    const titleIdx=costIndex('costtitle','title'), dateIdx=costIndex('date','datetime'), odoIdx=costIndex('odo','odometer'), typeIdIdx=costIndex('costtypeid','categoryid'), noteIdx=costIndex('notes','note'), amtIdx=costIndex('cost','amount'), templateIdx=costIndex('istemplate'), uniqueIdx=costIndex('uniqueid','costid','id'), incomeIdx=costIndex('isincome','income'), bookmarkIdx=costIndex('isbookmarked','isbookmark','bookmarked','bookmark'), recurrenceIdx=costIndex('recurrence','recurring','isrecurring','repeattype','recurrencetype'), reminderIdx=costIndex('reminderdate','duedate','paymentdate');
     if(titleIdx>-1&&dateIdx>-1&&amtIdx>-1){
       for(let k=costsHeaderIdx+1;k<lines.length;k++){
         const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break;
@@ -1396,7 +1499,8 @@ function parseFuelioCSV(text){
         if(templateIdx>-1&&(cols[templateIdx]||'').trim()==='1') continue;
         const amount=parseFuelioNum(cols[amtIdx]), odo=odoIdx>-1?parseFuelioNum(cols[odoIdx]):NaN;
         const catName=typeIdIdx>-1?(categoryMap[(cols[typeIdIdx]||'').trim()]||'อื่นๆ'):'อื่นๆ';
-        costRecords.push({ id:uid(), title:(cols[titleIdx]||'').trim(), date:normalizeFuelioDate(cols[dateIdx]), odometer:(!isNaN(odo)&&odo>0)?Math.round(odo*10)/10:null, category:catName, amount:isNaN(amount)?0:Math.round(amount*100)/100, note:noteIdx>-1?(cols[noteIdx]||'').trim():'' });
+        const rawDate=cols[dateIdx]||'';
+        costRecords.push({ id:uid(), title:(cols[titleIdx]||'').trim(), date:normalizeFuelioDate(rawDate), time:extractFuelioTime(rawDate), odometer:(!isNaN(odo)&&odo>0)?Math.round(odo*10)/10:null, category:catName, amount:isNaN(amount)?0:Math.round(amount*100)/100, note:noteIdx>-1?(cols[noteIdx]||'').trim():'', income:incomeIdx>-1&&normalizeBoolean(cols[incomeIdx],false), bookmarked:bookmarkIdx>-1&&normalizeBoolean(cols[bookmarkIdx],false), recurrence:recurrenceIdx>-1&&String(cols[recurrenceIdx]||'').trim()&&!['0','once','single'].includes(String(cols[recurrenceIdx]).trim().toLowerCase())?'recurring':'once', reminderDate:reminderIdx>-1&&String(cols[reminderIdx]||'').trim()?normalizeFuelioDate(cols[reminderIdx]):'', _uniqueId:uniqueIdx>-1?(cols[uniqueIdx]||'').trim():'' });
       }
     }
   }
@@ -1407,7 +1511,7 @@ function parseFuelioCSV(text){
   if(picHeaderIdx>-1&&lines[picHeaderIdx]){
     const pH=splitFuelioCsvLine(lines[picHeaderIdx],delim).map(h=>h.toLowerCase());
     const fIdx=pH.findIndex(h=>h==='filename'), tIdx=pH.findIndex(h=>h==='type'), idIdx=pH.findIndex(h=>h==='target_id');
-    if(fIdx>-1&&tIdx>-1&&idIdx>-1) for(let k=picHeaderIdx+1;k<lines.length;k++){ const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break; const cols=splitFuelioCsvLine(l,delim); if((cols[tIdx]||'').trim()==='1'){ const tid=(cols[idIdx]||'').trim(),fn=(cols[fIdx]||'').trim(); if(tid&&fn){ if(!pictureMap[tid]) pictureMap[tid]=[]; pictureMap[tid].push(fn); } } }
+    if(fIdx>-1&&tIdx>-1&&idIdx>-1) for(let k=picHeaderIdx+1;k<lines.length;k++){ const l=lines[k]; if(!l||!l.trim()||isFuelioSectionMarker(l)) break; const cols=splitFuelioCsvLine(l,delim); const tid=(cols[idIdx]||'').trim(),fn=(cols[fIdx]||'').trim(); if(tid&&fn){ if(!pictureMap[tid]) pictureMap[tid]=[]; pictureMap[tid].push(fn); } }
   }
 
   return { results, skipped, vehicleName, pictureMap, costRecords };
@@ -1428,9 +1532,9 @@ function resizeImportedPhoto(blob,maxDim=1280,quality=0.72){
   });
 }
 
-async function uploadImportedPhoto(vehicleId,logId,type,blob,filename){
+async function uploadImportedPhoto(vehicleId,logId,type,blob,filename,recordKind='fuel'){
   const resized=await resizeImportedPhoto(blob).catch(()=>blob);
-  const path=`vehicles/${vehicleId}/fuel/${logId}/${type}-${Date.now()}-${(filename||'photo').replace(/[^\w.-]/g,'_')}`;
+  const path=`vehicles/${vehicleId}/${recordKind}/${logId}/${type}-${Date.now()}-${(filename||'photo').replace(/[^\w.-]/g,'_')}`;
   const sr=ref(storage,path);
   await uploadBytes(sr,resized,{contentType:'image/jpeg',customMetadata:{uploadedBy:user.uid}});
   const url=await getDownloadURL(sr);
@@ -1472,6 +1576,16 @@ function findMatchingFuelEntry(vehicleId,incoming){
     Math.abs((Number(entry.odometer)||0)-incomingOdo)<0.01
   )||null;
 }
+function findMatchingExpense(vehicleId,incoming){
+  const incomingOdo=Number(incoming.odometer)||0;
+  return state.expenses.find(expense=>
+    expense.vehicleId===vehicleId &&
+    normalizeFuelioDate(expense.date)===normalizeFuelioDate(incoming.date) &&
+    normalizeMatchTime(expense.time)===normalizeMatchTime(incoming.time) &&
+    Math.abs((Number(expense.odometer)||0)-incomingOdo)<0.01 &&
+    String(expense.title||'').trim().toLowerCase()===String(incoming.title||'').trim().toLowerCase()
+  )||null;
+}
 function mergeFuelioEntry(existing,incoming){
   const keep={
     id:existing.id,
@@ -1487,6 +1601,11 @@ function mergeFuelioEntry(existing,incoming){
   return merged;
 }
 
+function fuelioPhotoKey(logId,filename){
+  const base=String(filename||'').replaceAll('\\','/').split('/').pop().trim().toLowerCase();
+  return `${String(logId||'')}\u0000${base}`;
+}
+
 async function applyFuelioVehicle(parsed, imageMap, allowPhotos){
   const { results, skipped, vehicleName, pictureMap, costRecords } = parsed;
   let targetVehicleId = state.currentVehicleId;
@@ -1497,16 +1616,28 @@ async function applyFuelioVehicle(parsed, imageMap, allowPhotos){
   }
 
   let photosMatched=0,created=0,updated=0;
+  const existingPhotoKeys=new Set();
+  if(allowPhotos){
+    try{
+      const photoSnapshot=await getDocs(collection(db,'vehicles',targetVehicleId,'photos'));
+      photoSnapshot.docs.forEach(item=>{
+        const photo=item.data();
+        if(photo.logId&&photo.name) existingPhotoKeys.add(fuelioPhotoKey(photo.logId,photo.name));
+      });
+    }catch(error){ console.warn('Fuelio photo duplicate check failed:',error); }
+  }
   for(const r of results){
     const existing=findMatchingFuelEntry(targetVehicleId,r);
     const targetId=existing?.id||r.id;
     const filenames=(r._uniqueId&&pictureMap[r._uniqueId])||[];
     if(allowPhotos&&filenames.length){
-      const slots=['receipt','odometer'];
-      for(let s=0;s<Math.min(filenames.length,slots.length);s++){
+      for(let s=0;s<filenames.length;s++){
         const base=filenames[s].split(/[\\/]/).pop().toLowerCase();
         const zf=imageMap[base]; if(!zf) continue;
-        try{ const blob=await zf.async('blob'); await uploadImportedPhoto(targetVehicleId,targetId,slots[s],blob,filenames[s]); photosMatched++; }catch(e){ /* skip this photo */ }
+        const photoKey=fuelioPhotoKey(targetId,filenames[s]);
+        if(existingPhotoKeys.has(photoKey)) continue;
+        const photoType=s===0?'receipt':s===1?'odometer':'attachment';
+        try{ const blob=await zf.async('blob'); await uploadImportedPhoto(targetVehicleId,targetId,photoType,blob,filenames[s]); existingPhotoKeys.add(photoKey); photosMatched++; }catch(e){ /* skip this photo */ }
       }
     }
     delete r._uniqueId;
@@ -1520,7 +1651,26 @@ async function applyFuelioVehicle(parsed, imageMap, allowPhotos){
     }
   }
 
-  if(costRecords&&costRecords.length) state.expenses.push(...costRecords.map(c=>({...c,vehicleId:targetVehicleId})));
+  if(costRecords&&costRecords.length){
+    for(const cost of costRecords){
+      const existing=findMatchingExpense(targetVehicleId,cost);
+      const targetId=existing?.id||cost.id;
+      const filenames=(cost._uniqueId&&pictureMap[cost._uniqueId])||[];
+      if(allowPhotos&&filenames.length){
+        for(const filename of filenames){
+          const base=filename.split(/[\\/]/).pop().toLowerCase(),zf=imageMap[base];
+          const photoKey=fuelioPhotoKey(targetId,filename);
+          if(!zf||existingPhotoKeys.has(photoKey))continue;
+          try{const blob=await zf.async('blob');await uploadImportedPhoto(targetVehicleId,targetId,'attachment',blob,filename,'expense');existingPhotoKeys.add(photoKey);photosMatched++;}catch(e){/* skip this photo */}
+        }
+      }
+      delete cost._uniqueId;
+      if(existing){
+        const index=state.expenses.findIndex(expense=>expense.id===existing.id);
+        state.expenses[index]={...existing,...cost,id:existing.id,vehicleId:targetVehicleId,photos:existing.photos};
+      }else state.expenses.push({...cost,id:targetId,vehicleId:targetVehicleId});
+    }
+  }
 
   return { vehicleId:targetVehicleId, vehicleName:state.vehicles.find(v=>v.id===targetVehicleId)?.name, count:results.length, created, updated, skipped, costCount:costRecords?.length||0, photosMatched };
 }
@@ -1573,7 +1723,16 @@ function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.n
 $('#mediaCameraBtn')?.addEventListener('click',()=>chooseMediaSource('camera'));
 $('#mediaGalleryBtn')?.addEventListener('click',()=>chooseMediaSource('gallery'));
 $('#mediaCancelBtn')?.addEventListener('click',closeMediaPicker);
-$('#mediaPickerDialog')?.addEventListener('click',e=>{if(e.target.id==='mediaPickerDialog')closeMediaPicker();});}
+$('#mediaPickerDialog')?.addEventListener('click',e=>{if(e.target.id==='mediaPickerDialog')closeMediaPicker();});
+$('#globalVehicleSelect')?.addEventListener('change',e=>switchVehicle(e.target.value));
+document.addEventListener('click',e=>{
+  if(e.target.closest('#routeUseLocationBtn'))useRouteLocation();
+  if(e.target.closest('#routeOpenBtn'))openFuelRoute();
+  if(e.target.closest('[data-open-route]'))openPanel('routeFuel');
+  const view=e.target.closest('[data-station-view]');if(view)setStationView(view.dataset.stationView);
+  const filter=e.target.closest('[data-station-filter]');if(filter){$$('[data-station-filter]').forEach(button=>button.classList.toggle('active',button===filter));renderServiceStationMarkers(filter.dataset.stationFilter);renderServiceStationList(filter.dataset.stationFilter);}
+  const favorite=e.target.closest('[data-favorite-station]');if(favorite)toggleFavoriteStation(favorite.dataset.favoriteStation);
+});}
 
 function boot(){
   try{
@@ -1594,7 +1753,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.2.1').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.6.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

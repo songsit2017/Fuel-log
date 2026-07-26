@@ -1,0 +1,16 @@
+{
+  "build": "6.0.0",
+  "target_branch": "main",
+  "node_check": true,
+  "required_files": "ok",
+  "feature_tokens": {
+    "discount_field": true,
+    "gross_field": true,
+    "fuelio_import": true,
+    "family_join": true,
+    "sync_status": true,
+    "ocr": true,
+    "oil_local": true
+  },
+  "file_count": 16
+}

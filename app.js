@@ -109,7 +109,22 @@ function seed(){
   const vehicles = oldVehicles?.length ? oldVehicles : [{id:uid(),name:'รถของฉัน'}];
   return {vehicles, entries:oldEntries.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), expenses:oldCosts.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id,amount:Number(x.amount||x.total||0)})), reminders:oldReminders.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), trips:[], currentVehicleId:store.getItem('current-vehicle-id')||vehicles[0].id, theme:'dark', units:{distance:'km',volume:'liters'}};
 }
-function load(){ try{ state = JSON.parse(store.getItem(KEY)) || seed(); }catch{ state=seed(); } if(!state.vehicles?.length)state=seed(); state.entries ||= [];state.expenses ||= [];state.reminders ||= [];state.trips ||= [];state.currentVehicleId ||= state.vehicles[0].id; state.units ||= {distance:'km',volume:'liters'}; save(); }
+function load(){
+  try{ state = JSON.parse(store.getItem(KEY)) || seed(); }catch{ state=seed(); }
+  if(!state.vehicles?.length) state=seed();
+  state.entries ||= []; state.expenses ||= []; state.reminders ||= []; state.trips ||= [];
+  state.currentVehicleId ||= state.vehicles[0].id;
+  state.units ||= {distance:'km',volume:'liters'};
+  // Compatibility: old records only had total. New records keep grossTotal + discount,
+  // while total remains the actual net amount used by all cost/km calculations.
+  state.entries = state.entries.map(x=>{
+    const discount=Math.max(0,Number(x.discount)||0);
+    const net=Number(x.total)||0;
+    const gross=Number(x.grossTotal);
+    return {...x,discount,grossTotal:Number.isFinite(gross)&&gross>0?gross:net+discount,total:net};
+  });
+  save();
+}
 function save(){ store.setItem(KEY,JSON.stringify(state)); }
 const vehicle = () => state.vehicles.find(v=>v.id===state.currentVehicleId) || state.vehicles[0];
 const entries = () => state.entries.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>new Date(a.date)-new Date(b.date)||(+a.odometer)-(+b.odometer));
@@ -134,7 +149,16 @@ function renderVehicleStrip(){ $('#vehicleStrip').innerHTML=state.vehicles.map(v
 function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:'⛽',title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';}
 function rowHtml(x){return `<article class="record"><div class="ico">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><div class="amount">${x.amount}</div></article>`;}
 function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.max(1,...data.map(x=>x.value)),w=320,h=115,p=15;const pts=data.map((x,i)=>[p+i*((w-p*2)/(Math.max(1,data.length-1))),h-p-(x.value/max)*(h-p*2)]);svg.innerHTML=`<path d="${pts.map((q,i)=>(i?'L':'M')+q.join(' ')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M${pts[0]?.[0]||0} ${h-p} ${pts.map(q=>'L'+q.join(' ')).join(' ')} L${pts.at(-1)?.[0]||0} ${h-p}Z" fill="rgba(244,168,59,.10)"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="var(--accent)"/><text x="${q[0]}" y="128" fill="var(--muted)" font-size="9" text-anchor="middle">${data[i].label}</text>`).join('')}`;const a=data.at(-2)?.value||0,b=data.at(-1)?.value||0;$('#trendText').textContent=a?`${b>=a?'▲':'▼'} ${fmt(Math.abs((b-a)/a*100))}%`:' ';}
-function renderFuel(){const q=$('#fuelSearch').value.toLowerCase(),p=$('#fuelPeriod').value;const arr=entries().slice().reverse().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));$('#fuelList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-fuel="${x.id}"><div class="ico">⛽</div><div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small></div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`).join(''):'<div class="empty">ไม่พบรายการ</div>';}
+function renderFuel(){
+  const q=$('#fuelSearch').value.toLowerCase(),p=$('#fuelPeriod').value;
+  const arr=entries().slice().reverse().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));
+  $('#fuelList').innerHTML=arr.length?arr.map(x=>{
+    const discount=Number(x.discount)||0;
+    const gross=Number(x.grossTotal)||((Number(x.total)||0)+discount);
+    const discountLine=discount>0?`<small>ก่อนลด ${money(gross)} • ลด ${money(discount)}</small>`:'';
+    return `<article class="record" data-edit-fuel="${x.id}"><div class="ico">⛽</div><div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
+  }).join(''):'<div class="empty">ไม่พบรายการ</div>';
+}
 function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.title||x.category)}</b><small>${x.date} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}</small></div><div class="amount">${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
 function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-reminder="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.name)}</b><small>${x.nextOdo?'ที่ '+fmtDist(x.nextOdo):''}${x.nextDate?' • '+x.nextDate:''}${(x.repeatOdo||x.repeatMonths)?' • 🔁 ทำซ้ำ':''}</small></div><div style="text-align:right;"><div class="amount status-${x.status}">${x.label}</div><button class="secondary" data-done-reminder="${x.id}" style="margin-top:6px;padding:6px 10px;font-size:11px;">✓ เสร็จแล้ว</button></div></article>`).join(''):'<div class="empty">ยังไม่มีรายการเตือน</div>';}
 function renderAll(){renderVehicleStrip();renderHome();renderFuel();renderExpenses();renderMaintenance();$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';save();}
@@ -144,7 +168,10 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
 <label class="photo-pick">🧾 รูปใบเสร็จ<input hidden type="file" id="receiptFile" accept="image/*"></label>
 <label class="photo-pick">🔢 รูปเรือนไมล์<input hidden type="file" id="odoFile" accept="image/*"></label>
 <label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
-</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div><div class="field"><label>ยอดรวม</label><input name="total" type="number" step=".01" value="${obj.total||''}"></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
+</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
+<div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
+<div class="field"><label>ส่วนลด (บาท)</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
+<div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณบาท/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
   'แก๊สโซฮอล์ 95','แก๊สโซฮอล์ 91','แก๊สโซฮอล์ E20','แก๊สโซฮอล์ E85',
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
@@ -158,6 +185,18 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
  d.showModal();
  $('#fuelOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'fuel'));
  $('#expenseOcrFile')?.addEventListener('change',e=>e.target.files[0]&&scanReceipt(e.target.files[0],'expense'));
+ if(type==='fuel'){
+   const recalc=()=>{
+     const liters=+$('[name="liters"]')?.value||0;
+     const price=+$('[name="pricePerLiter"]')?.value||0;
+     const grossEl=$('[name="grossTotal"]'), discountEl=$('[name="discount"]'), netEl=$('[name="total"]');
+     if(grossEl && !grossEl.value && liters>0 && price>0) grossEl.value=(liters*price).toFixed(2);
+     const gross=+grossEl?.value||0, discount=Math.max(0,+discountEl?.value||0);
+     if(netEl) netEl.value=Math.max(0,gross-discount).toFixed(2);
+   };
+   ['liters','pricePerLiter','grossTotal','discount'].forEach(n=>$(`[name="${n}"]`)?.addEventListener('input',recalc));
+   recalc();
+ }
  if(type==='fuel'&&!obj.station)setTimeout(autoNearby,150);}
 
 let tesseractLoadPromise=null;
@@ -203,7 +242,7 @@ async function scanReceipt(file,type){
     const date=receiptDate(text);
     if(date&&$('[name="date"]')) $('[name="date"]').value=date;
     if(total){
-      const el=type==='fuel'?$('[name="total"]'):$('[name="amount"]');
+      const el=type==='fuel'?$('[name="grossTotal"]'):$('[name="amount"]');
       if(el) el.value=total;
     }
     if(type==='fuel'){
@@ -219,7 +258,8 @@ async function scanReceipt(file,type){
       if(ppl&&$('[name="pricePerLiter"]')) $('[name="pricePerLiter"]').value=ppl;
       const station=guessMerchant(text);
       if(station&&$('#stationInput')&&!$('#stationInput').value) $('#stationInput').value=station;
-      if(!total&&liters&&ppl&&$('[name="total"]')) $('[name="total"]').value=(liters*ppl).toFixed(2);
+      if(!total&&liters&&ppl&&$('[name="grossTotal"]')) $('[name="grossTotal"]').value=(liters*ppl).toFixed(2);
+      $('[name="grossTotal"]')?.dispatchEvent(new Event('input',{bubbles:true}));
     }else{
       const merchant=guessMerchant(text);
       if(merchant&&$('[name="title"]')&&!$('[name="title"]').value) $('[name="title"]').value=merchant;
@@ -235,7 +275,15 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
  if(type==='fuel'){
    const odoRaw=+data.odometer||0, litersRaw=+data.liters||0;
    if(odoRaw<=0||litersRaw<=0){ alert(`กรอกเลข${distUnit()}และปริมาณ${volUnit()}ให้ครบก่อนบันทึก`); return; }
-   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=toCanonicalDist(odoRaw);data.liters=toCanonicalVol(litersRaw);data.pricePerLiter=toCanonicalPricePerVol(+data.pricePerLiter||0);data.total=+data.total||0;data.full=$('[name="full"]')?.checked??true;if(!data.pricePerLiter&&data.total&&data.liters)data.pricePerLiter=data.total/data.liters;const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.odometer=toCanonicalDist(odoRaw);data.liters=toCanonicalVol(litersRaw);
+   data.pricePerLiter=toCanonicalPricePerVol(+data.pricePerLiter||0);
+   data.grossTotal=Math.max(0,+data.grossTotal||0);
+   data.discount=Math.max(0,+data.discount||0);
+   data.total=Math.max(0,data.grossTotal-data.discount);
+   data.full=$('[name="full"]')?.checked??true;
+   if(!data.grossTotal&&data.pricePerLiter&&data.liters){data.grossTotal=data.pricePerLiter*data.liters;data.total=Math.max(0,data.grossTotal-data.discount);}
+   if(!data.pricePerLiter&&data.grossTotal&&data.liters)data.pricePerLiter=data.grossTotal/data.liters;
+   const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);
  }
  if(type==='expense'){
    if(!(+data.amount>0)){ alert('กรอกจำนวนเงินให้ครบก่อนบันทึก'); return; }
@@ -570,7 +618,12 @@ async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ens
 function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
-function exportCSV(){const rows=[['type','vehicleId','date','odometer','liters','amount','category','title','station','note']];state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.total,'','',x.station||'',x.note||'']));state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','',x.amount,x.category||'',x.title||'','',x.note||'']));download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');}
+function exportCSV(){
+  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','category','title','station','note']];
+  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,'','',x.station||'',x.note||'']));
+  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,x.category||'',x.title||'','',x.note||'']));
+  download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
+}
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}
 function ensureJSZip(){return window.JSZip?Promise.resolve():loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');}
 
@@ -653,6 +706,8 @@ function parseFuelioCSV(text){
       odometer: Math.round(odo*10)/10,
       liters: Math.round(liters*100)/100,
       pricePerLiter: Math.round(pricePerLiter*100)/100,
+      grossTotal: Math.round(total*100)/100,
+      discount: 0,
       total: Math.round(total*100)/100,
       full, fuelType:'',
       station: idxStation>-1?(cols[idxStation]||'').trim():'',

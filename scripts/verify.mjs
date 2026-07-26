@@ -30,4 +30,7 @@ if (found.length) throw new Error(`Forbidden client/branch references: ${found.j
 for (const required of ['loadExistingLogPhotos', 'data.photos=[...(oldRecord?.photos||[])', "unavailableGradeRow('ปตท.'", "unavailableGradeRow('เชลล์'"]) {
   if (!app.includes(required)) throw new Error(`V7.0.1 regression check failed: ${required}`);
 }
+for (const legacyPhotoKey of ['photo.entryId','photo.targetId','photo.target_id','/fuel/${alias}/']) {
+  if (!app.includes(legacyPhotoKey)) throw new Error(`V7.0.2 legacy photo check failed: ${legacyPhotoKey}`);
+}
 console.log(`FuelLog Pro V7 verification passed (${Object.keys(checks).length} feature groups).`);

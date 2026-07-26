@@ -85,7 +85,7 @@ function stationBadge(stationName){
   return `<div class="ico">⛽</div>`;
 }
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '7.0.1';
+const APP_VERSION = '7.0.2';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -308,7 +308,9 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
 <input hidden type="file" id="receiptGalleryFile" accept="image/*">
 <input hidden type="file" id="odoCameraFile" accept="image/*" capture="environment">
 <input hidden type="file" id="odoGalleryFile" accept="image/*">
-</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
+</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div>
+<div class="existing-photos-card"><div class="card-head"><b>🖼️ รูปที่บันทึกไว้กับรายการนี้</b><small>${obj.id?'โหลดจาก Cloud และข้อมูลในเครื่อง':'จะปรากฏหลังบันทึก'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>'}</div></div>
+<h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
 <div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
 <div class="field"><label>ส่วนลด (${state.settings.currency})</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
 <div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณ ${state.settings.currency}/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
@@ -328,7 +330,6 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <div class="field full"><label>เหตุผล / วัตถุประสงค์</label><input name="reason" value="${esc(obj.reason||'')}" placeholder="เช่น เดินทางไปงาน, ใช้งานส่วนตัว, เติมก่อนออกต่างจังหวัด"></div>
 <label class="field full"><input name="previousFillMissed" type="checkbox" ${obj.previousFillMissed?'checked':''}> พลาดการบันทึกการเติมครั้งก่อนหน้า</label>
 <div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
-<div class="field full"><label>รูปที่แนบกับรายการนี้</label><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังโหลดรูปเดิม…</span>':'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>'}</div></div>
 <div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
 <label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label>
 <div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
@@ -685,7 +686,9 @@ async function uploadAttachedPhotos(logId){
 async function loadExistingLogPhotos(logId){
   const box=$('#existingLogPhotos');
   if(!box)return;
-  const local=state.entries.find(entry=>entry.id===logId)?.photos||[];
+  const currentEntry=state.entries.find(entry=>entry.id===logId);
+  const aliases=[logId,currentEntry?._uniqueId,currentEntry?.uniqueId,currentEntry?.fuelioId].filter(Boolean).map(String);
+  const local=currentEntry?.photos||[];
   const render=photos=>{
     box.innerHTML=photos.length?photos.map(photo=>`<a class="log-photo-thumb" href="${esc(photo.url)}" target="_blank" rel="noopener">${String(photo.contentType||'').startsWith('image/')?`<img src="${esc(photo.url)}" alt="${esc(photo.name||photo.type||'รูปแนบ')}">`:'<span>📄</span>'}<small>${esc(photo.name||photo.type||'ไฟล์แนบ')}</small></a>`).join(''):'<span class="muted">ยังไม่มีรูปที่บันทึกไว้</span>';
   };
@@ -694,7 +697,13 @@ async function loadExistingLogPhotos(logId){
   try{
     await requireFirebase();
     const snapshot=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos'));
-    const cloud=snapshot.docs.map(item=>({id:item.id,...item.data()})).filter(photo=>photo.logId===logId);
+    const cloud=snapshot.docs.map(item=>({id:item.id,...item.data()})).filter(photo=>{
+      const references=[photo.logId,photo.entryId,photo.targetId,photo.target_id].filter(Boolean).map(String);
+      const direct=references.some(reference=>aliases.includes(reference));
+      const path=String(photo.path||'').replaceAll('\\','/');
+      const pathMatch=aliases.some(alias=>path.includes(`/fuel/${alias}/`));
+      return direct||pathMatch;
+    });
     const merged=[...local,...cloud].filter((photo,index,all)=>photo?.url&&all.findIndex(item=>item.url===photo.url)===index);
     const entry=state.entries.find(item=>item.id===logId);
     if(entry&&merged.length){entry.photos=merged;save();}
@@ -1015,6 +1024,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.0.2</b> — ย้ายรูปเดิมขึ้นมาใต้ OCR ให้เห็นทันที และรองรับการจับคู่รูปจาก schema/path ของรุ่นเก่าและ Fuelio</li>
       <li><b>7.0.1</b> — รูปเดิมกลับมาแสดงในรายการและไม่ถูกเขียนทับเมื่อแก้ไข, ตารางราคาขึ้นครบ บางจาก/ปตท./เชลล์พร้อมสถานะแหล่งข้อมูล</li>
       <li><b>7.0</b> — แยก Settings/Weather/OCR เป็นโมดูล, เพิ่มสกุลเงิน ทศนิยม 0–3 ธีม 4 แบบ, Open-Meteo และ Claude OCR ผ่าน backend ที่ปลอดภัย</li>
       <li><b>6.10</b> — รายการเติมน้ำมันแยกเป็นกลุ่มตามเดือน พร้อมไอคอนสีตามยี่ห้อปั๊ม, แก้ช่องติ๊กเลือกการ์ดหน้าแรกในตั้งค่าที่เคยเรียงเพี้ยน</li>

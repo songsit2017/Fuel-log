@@ -20,6 +20,9 @@ const firebaseJson = await readFile(new URL('../firebase.json', import.meta.url)
 const nativeBuild = await readFile(new URL('../native-kotlin/app/build.gradle.kts', import.meta.url), 'utf8');
 const nativeMain = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/MainActivity.kt', import.meta.url), 'utf8');
 const nativeAuth = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/auth/GoogleAuthRepository.kt', import.meta.url), 'utf8');
+const nativePreviewWorkflow = await readFile(new URL('../.github/workflows/build-native-preview.yml', import.meta.url), 'utf8');
+const nativeFuelApp = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/FuelLogApp.kt', import.meta.url), 'utf8');
+const nativeFuelDatabase = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/FuelLogDatabase.kt', import.meta.url), 'utf8');
 
 test('counts use integer formatting independent of price decimals', () => {
   assert.match(app, /fmtCount\(r\.count\)/);
@@ -212,6 +215,17 @@ test('parallel Kotlin migration starts with repository and ViewModel boundaries'
   assert.match(nativeMain, /class MainActivity : ComponentActivity/);
   assert.match(nativeAuth, /CredentialManager/);
   assert.match(nativeAuth, /GoogleAuthProvider\.getCredential/);
+});
+
+test('native preview stays separate from stable and has an offline fuel core', () => {
+  assert.match(nativePreviewWorkflow, /Build Native Kotlin Preview/);
+  assert.match(nativePreviewWorkflow, /testDebugUnitTest assembleDebug/);
+  assert.match(nativePreviewWorkflow, /Native Kotlin Preview สำหรับทดสอบเท่านั้น/);
+  assert.match(nativeFuelDatabase, /Room\.databaseBuilder/);
+  assert.match(nativeFuelDatabase, /fuellog-native\.db/);
+  assert.match(nativeFuelApp, /fun FuelLogApp\(/);
+  assert.match(nativeFuelApp, /AddFuelDialog/);
+  assert.match(nativeFuelApp, /NavigationBar/);
 });
 
 test('home has one vehicle selector', () => {

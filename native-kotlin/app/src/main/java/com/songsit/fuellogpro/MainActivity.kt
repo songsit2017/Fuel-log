@@ -3,37 +3,30 @@ package com.songsit.fuellogpro
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.songsit.fuellogpro.auth.GoogleAuthRepository
-import com.songsit.fuellogpro.data.firebase.FirestoreVehicleRepository
-import com.songsit.fuellogpro.ui.vehicles.VehiclesScreen
-import com.songsit.fuellogpro.ui.vehicles.VehiclesViewModel
-import com.songsit.fuellogpro.ui.vehicles.VehiclesViewModelFactory
+import com.songsit.fuellogpro.data.LocalFuelRepository
+import com.songsit.fuellogpro.data.local.FuelLogDatabase
+import com.songsit.fuellogpro.ui.FuelLogApp
+import com.songsit.fuellogpro.ui.NativeAppViewModel
+import com.songsit.fuellogpro.ui.NativeAppViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val auth = GoogleAuthRepository()
-        val vehicles = FirestoreVehicleRepository()
+        val repository = LocalFuelRepository(FuelLogDatabase.get(this).fuelEntryDao())
         setContent {
-            MaterialTheme {
-                Surface {
-                    val viewModel: VehiclesViewModel = viewModel(
-                        factory = VehiclesViewModelFactory(vehicles),
-                    )
-                    val state by viewModel.uiState.collectAsState()
-                    LaunchedEffect(auth.currentUid) {
-                        auth.currentUid?.let(viewModel::onSignedIn)
-                    }
-                    VehiclesScreen(state = state)
-                }
-            }
+            val viewModel: NativeAppViewModel = viewModel(
+                factory = NativeAppViewModelFactory(repository),
+            )
+            val state by viewModel.state.collectAsState()
+            FuelLogApp(
+                state = state,
+                onAddFuel = viewModel::addFuel,
+                onDeleteFuel = viewModel::deleteFuel,
+                onClearError = viewModel::clearError,
+            )
         }
     }
 }
-

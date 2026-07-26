@@ -3,7 +3,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="true"
-        android:label="FuelLog Pro Native"
+        android:icon="@mipmap/fuellog_launcher"
+        android:label="FuelLog Pro Native Preview"
+        android:roundIcon="@mipmap/fuellog_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FuelLogPro">
         <activity

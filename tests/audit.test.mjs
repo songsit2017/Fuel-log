@@ -23,7 +23,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.8.0', 'app.js?v=7.8.0', 'firebase-config.js?v=7.8.0']) {
+  for (const asset of ['styles.css?v=7.8.2', 'app.js?v=7.8.2', 'firebase-config.js?v=7.8.2']) {
     assert.ok(sw.includes(asset), `missing cached ${asset}`);
   }
 });
@@ -113,6 +113,14 @@ test('fuel records render recognizable offline station brand pictograms', () => 
   assert.match(app, /BRAND_ICONS\[brand\.key\]/);
   assert.match(styles, /\.record \.ico\.brand-badge svg/);
   assert.doesNotMatch(app, /<img[^>]+(?:logo|brand)/i);
+});
+
+test('generic fuel pump icon is a consistent vector rather than a colorful emoji', () => {
+  assert.match(app, /const FUEL_PUMP_ICON=`<svg class="fuel-pump-icon"/);
+  assert.match(app, /generic-fuel-badge/);
+  assert.match(index, /data-nav="fuel"><span><svg class="fuel-pump-icon"/);
+  assert.doesNotMatch(index, /data-nav="fuel"><span>⛽/);
+  assert.match(styles, /\.fuel-pump-icon\{[^}]*stroke:currentColor/);
 });
 
 test('home has one vehicle selector', () => {

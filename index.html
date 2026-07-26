@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=7.8.0">
+  <link rel="stylesheet" href="styles.css?v=7.8.2">
 </head>
 <body>
   <header class="topbar">
@@ -37,7 +37,7 @@
       </article>
       <div class="metric-grid" id="homeMetrics"></div>
       <article class="card compact" id="homeNearbyCard"><div class="card-head"><h2>📍 ปั๊มน้ำมันใกล้เคียง</h2><button class="text-btn" id="refreshHomeNearby">ค้นหา</button></div><div id="homeNearbyList" class="muted">แตะ "ค้นหา" เพื่อดูปั๊มใกล้ตัวคุณ พร้อมราคาล่าสุดที่คุณเคยเติม</div></article>
-      <article class="card compact" id="todayPriceCard"><div class="card-head"><h2>⛽ ราคาน้ำมันวันนี้</h2><button class="text-btn" id="refreshTodayPrice">โหลดราคา</button></div><div id="todayPriceList" class="muted">กำลังโหลดราคาน้ำมันทั่วประเทศ…</div></article>
+      <article class="card compact" id="todayPriceCard"><div class="card-head"><h2 class="fuel-heading"><svg class="fuel-pump-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 21V4.8c0-1 .8-1.8 1.8-1.8h7.4c1 0 1.8.8 1.8 1.8V21M4 21h14M8 6h6v5H8V6Z"/><path d="m16.5 7 2.2 2.2v6.3c0 .9.7 1.5 1.5 1.5s1.5-.6 1.5-1.5V10l-2.4-2.4M7.5 14.5h7"/></svg>ราคาน้ำมันวันนี้</h2><button class="text-btn" id="refreshTodayPrice">โหลดราคา</button></div><div id="todayPriceList" class="muted">กำลังโหลดราคาน้ำมันทั่วประเทศ…</div></article>
       <article class="card" id="chartCard">
         <div class="card-head"><h2>ค่าใช้จ่าย 6 เดือน</h2><span id="trendText"></span></div>
         <svg id="monthlyChart" viewBox="0 0 320 130" aria-label="กราฟค่าใช้จ่าย"></svg>
@@ -89,7 +89,7 @@
 
   <nav class="bottom-nav">
     <button class="active" data-nav="home"><span>⌂</span>หน้าหลัก</button>
-    <button data-nav="fuel"><span>⛽</span>เติมน้ำมัน</button>
+    <button data-nav="fuel"><span><svg class="fuel-pump-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 21V4.8c0-1 .8-1.8 1.8-1.8h7.4c1 0 1.8.8 1.8 1.8V21M4 21h14M8 6h6v5H8V6Z"/><path d="m16.5 7 2.2 2.2v6.3c0 .9.7 1.5 1.5 1.5s1.5-.6 1.5-1.5V10l-2.4-2.4M7.5 14.5h7"/></svg></span>เติมน้ำมัน</button>
     <button data-nav="expense"><span id="currencyNavIcon">¤</span>ค่าใช้จ่าย</button>
     <button data-nav="maintenance"><span>🔧</span>บำรุง</button>
     <button data-nav="more"><span>•••</span>เพิ่มเติม</button>
@@ -108,6 +108,6 @@
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=7.8.0"></script>
+  <script type="module" src="app.js?v=7.8.2"></script>
 </body>
 </html>

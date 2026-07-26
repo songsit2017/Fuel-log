@@ -6,6 +6,14 @@ FuelLog Pro v6.2 Main Complete
 - Added extra image/PDF attachment
 - Included fields in list view and CSV export
 - Kept Fuelio, OCR, Family, Sync, oil price and Android-ready structure
+FuelLog Pro V7.8.2
+- วาดตรา PTT/OR, Bangchak, PT, SUSCO และ Pure ใหม่ให้ใกล้สัดส่วนและสีแบรนด์จริง
+- คง Shell, Esso และ Caltex แบบเต็มสี พร้อมพื้นตราสีขาวเหมือนรายการในแอป Fuelio
+- ชุดตราทั้งหมดยังฝังในแอปและทำงานออฟไลน์
+FuelLog Pro V7.8.1
+- เปลี่ยนไอคอนปั๊มน้ำมันจาก emoji เป็น SVG เส้นคมที่แสดงเหมือนกันทุกอุปกรณ์
+- ใช้ไอคอนใหม่ใน navigation, ราคาน้ำมัน, รายการล่าสุด, ฟอร์ม และรายการที่ไม่รู้จักแบรนด์
+- รายการที่ตรวจพบแบรนด์ยังใช้ไอคอน PTT/OR, Bangchak, Shell และแบรนด์อื่นตามเดิม
 FuelLog Pro V7.8.0
 - ปรับส่วนหัวเป็น mobile app bar และทำแถบนำทางล่างให้ชัดแบบ native
 - เปลี่ยนหน้ารายการเติมน้ำมัน ค่าใช้จ่าย และบำรุงรักษาเป็นรายการเต็มพื้นที่

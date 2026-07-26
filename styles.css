@@ -136,8 +136,17 @@ body.light .freport{--fr-bg:#eef1fb;--fr-card:#ffffff;--fr-navy:#28345c;--fr-blu
 .station-row .station-nav{padding:8px 10px}.station-favorite{border:0;background:transparent;color:var(--muted);font-size:22px}.station-favorite.active{color:#f4a83b}
 .leaflet-container{font-family:inherit}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--text)}
 body.station-mode{padding-bottom:76px}body.station-mode>.bottom-nav{display:none}body.station-mode .page[data-page="panel"]{padding-bottom:0}
-.record .ico.brand-badge{background:#fff;border:1px solid rgba(0,0,0,.08);padding:4px;box-shadow:0 1px 5px rgba(0,0,0,.18)}
+.record .ico.brand-badge{background:#fff;border:1px solid rgba(15,23,42,.12);padding:5px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .record .ico.brand-badge svg{display:block;width:100%;height:100%}
+.fuel-pump-icon{display:inline-block;width:1.2em;height:1.2em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.2em}
+.bottom-nav .fuel-pump-icon{width:23px;height:23px;vertical-align:middle}
+.record .ico.generic-fuel-badge{background:#f7f8fa;color:#101318;border:1px solid rgba(0,0,0,.08)}
+body.light .record .ico.generic-fuel-badge{background:#fff}
+.record .ico.generic-fuel-badge .fuel-pump-icon{width:25px;height:25px;stroke-width:1.9}
+.fuel-form-hero>span .fuel-pump-icon{width:23px;height:23px;vertical-align:middle}
+.fuel-heading,.fuel-label-icon{display:flex;align-items:center;gap:7px}
+.fuel-heading .fuel-pump-icon{color:var(--accent);font-size:17px}
+.fuel-label-icon .fuel-pump-icon{flex:none;color:var(--accent);font-size:15px}
 .freport-mini small{display:block;color:var(--fr-muted);font-size:10px}
 .freport-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .freport-empty{color:var(--fr-muted);font-size:12px;text-align:center;padding:30px 0}
@@ -189,6 +198,7 @@ button:active,.record:active,.menu-list>button:active{transform:scale(.985);filt
 .native-list-page .record{grid-template-columns:50px minmax(0,1fr) auto;gap:11px;margin:0;padding:14px 16px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:none;min-height:78px}
 .native-list-page .record:last-child{border-bottom:0}
 .native-list-page .record .ico{width:48px;height:48px;background:var(--surface2)}
+.native-list-page .record .ico.brand-badge{background:#fff}
 .native-list-page .record b{font-size:14px;line-height:1.35}
 .native-list-page .record small{font-size:11px;line-height:1.45}
 .native-list-page .record .amount{font-size:15px}

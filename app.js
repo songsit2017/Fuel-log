@@ -3,7 +3,7 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.8.0';
+const APP_VERSION = '7.8.2';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -76,15 +76,16 @@ function thaiMonthLabel(dateStr){
 // Compact brand pictograms for fuel records. They are drawn inline so they work offline
 // and never depend on a third-party logo server.
 const BRAND_ICONS = {
-  ptt:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4C18 12 11 17 11 28a13 13 0 0 0 26 0c0-11-7-16-13-24Z" fill="#1676c4"/><path d="M24 12c-3 6-7 9-7 16a7 7 0 0 0 14 0c0-7-4-10-7-16Z" fill="#e9434b"/><circle cx="24" cy="29" r="3.5" fill="#fff"/></svg>`,
-  bangchak:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 31C12 15 25 7 40 8c-1 16-10 29-27 31" fill="#39a852"/><path d="M11 38c8-10 15-15 27-25M19 31l-1-10m8 4 8 1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`,
+  ptt:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4.5c-2.3 5.4-9.7 10.2-13.2 16.7-4.8 9 .9 20.3 11.4 22.1-5.9-3-8.5-8.8-6.6-14.2 1.7-4.9 6.7-7.9 8.4-12.7 1.7 4.8 6.7 7.8 8.4 12.7 1.9 5.4-.7 11.2-6.6 14.2 10.5-1.8 16.2-13.1 11.4-22.1C33.7 14.7 26.3 9.9 24 4.5Z" fill="#1268b3"/><path d="M24 19.2c-1.5 4.2-6.1 7-6.1 12.5a6.1 6.1 0 0 0 12.2 0c0-5.5-4.6-8.3-6.1-12.5Z" fill="#e42d3b"/><path d="M24 26c-.8 2.2-2.8 3.7-2.8 6.2a2.8 2.8 0 0 0 5.6 0c0-2.5-2-4-2.8-6.2Z" fill="#fff"/></svg>`,
+  bangchak:`<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="bcpG" x1="9" y1="39" x2="38" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="#007f3f"/><stop offset=".58" stop-color="#43b649"/><stop offset="1" stop-color="#a8cf45"/></linearGradient></defs><path d="M9.3 30.2C10.8 18 20.8 8.2 37.6 6.7c1.6 16.8-7 29.8-22.8 34.5-3.9-2.7-6-6.5-5.5-11Z" fill="url(#bcpG)"/><path d="M13 38.5c7.4-11.4 13.6-17.4 23.2-26.3M16.8 31l.2-9.5M23.4 24.2l9.2.1" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><path d="M37.4 6.8c2.3 1.5 3.5 3.7 3.4 6.5-2.8.2-5-.8-6.6-3.1.6-1.4 1.7-2.5 3.2-3.4Z" fill="#f7941d"/></svg>`,
   shell:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 34C7 18 14 8 24 8s17 10 17 26H7Z" fill="#ffd21c" stroke="#d9232e" stroke-width="3"/><path d="M24 10v24M15 14l4 20M33 14l-4 20M9 25h30M8 34h32" fill="none" stroke="#d9232e" stroke-width="2"/></svg>`,
   esso:`<svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="24" rx="20" ry="14" fill="#fff" stroke="#2463a8" stroke-width="3"/><text x="24" y="29" text-anchor="middle" font-size="13" font-weight="900" fill="#e1262f">ESSO</text></svg>`,
   caltex:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#1676b8"/><path d="m24 7 4.2 11.7 12.4.4-9.8 7.6 3.5 11.9L24 31.7l-10.3 6.9 3.5-11.9-9.8-7.6 12.4-.4L24 7Z" fill="#fff"/><path d="m24 12 2.8 8 8.5.3-6.7 5.2 2.4 8.1-7-4.7-7 4.7 2.4-8.1-6.7-5.2 8.5-.3 2.8-8Z" fill="#e52b34"/></svg>`,
-  pt:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#ed177d"/><path d="M14 35V13h11c8 0 11 4 11 10s-4 10-12 10h-3v2h-7Zm7-15v7h3c3 0 5-1 5-4s-2-3-5-3h-3Z" fill="#fff"/><path d="M33 9h8v6h-8z" fill="#f59b23"/></svg>`,
-  susco:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#0874b9"/><path d="M35 13c-4-3-17-3-20 3-4 8 17 6 13 13-2 3-10 2-15-1" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M13 34h22" stroke="#f5a623" stroke-width="4"/></svg>`,
-  pure:`<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#6fbe44"/><path d="M13 34V14h11c8 0 12 4 12 10S32 34 24 34h-4v-7h4c3 0 5-1 5-3s-2-3-5-3h-4v13h-7Z" fill="#fff"/></svg>`
+  pt:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 24C5 13.5 13.5 5 24 5s19 8.5 19 19-8.5 19-19 19S5 34.5 5 24Z" fill="#ec1579"/><path d="M13.2 34.5V13.3h12c6.8 0 10.7 3.5 10.7 9 0 5.8-4 9.2-11.2 9.2h-4.1v3h-7.4Zm7.4-14.9v6h3.7c2.7 0 4.2-1 4.2-3.1 0-2-1.5-2.9-4.2-2.9h-3.7Z" fill="#fff"/><path d="M31.8 8.8h9v6.7h-9Z" fill="#f7941d"/></svg>`,
+  susco:`<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="7" width="40" height="34" rx="9" fill="#fff"/><path d="M37 14c-4.7-2.3-16.5-2.1-20 2.2-5.5 6.8 14.4 6.2 11.8 11.2-1.8 3.4-10.3 2.6-16.8-.8" fill="none" stroke="#1666a8" stroke-width="5.2" stroke-linecap="round"/><path d="M11 34h26" stroke="#ef3b33" stroke-width="4.2" stroke-linecap="round"/></svg>`,
+  pure:`<svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="24" rx="20" ry="18" fill="#69b42e"/><path d="M11.5 34V14h13.2c7 0 11.8 3.7 11.8 10s-4.8 10-12 10h-4.1v-6.5h4c3 0 4.8-1.1 4.8-3.5s-1.8-3.5-4.8-3.5h-5.6V34h-7.3Z" fill="#fff"/><path d="M33.5 12.2h5.7v5.2h-5.7z" fill="#f4a629"/></svg>`
 };
+const FUEL_PUMP_ICON=`<svg class="fuel-pump-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 21V4.8c0-1 .8-1.8 1.8-1.8h7.4c1 0 1.8.8 1.8 1.8V21M4 21h14M8 6h6v5H8V6Z"/><path d="m16.5 7 2.2 2.2v6.3c0 .9.7 1.5 1.5 1.5s1.5-.6 1.5-1.5V10l-2.4-2.4M7.5 14.5h7"/></svg>`;
 const STATION_BRANDS = [
   { match:['ปตท','pttor','ptt','or station'], key:'ptt', label:'PTT/OR' },
   { match:['บางจาก','bcp','bangchak'], key:'bangchak', label:'Bangchak' },
@@ -99,7 +100,7 @@ function stationBadge(stationName){
   const name = (stationName||'').toLowerCase();
   const brand = STATION_BRANDS.find(b => b.match.some(m => name.includes(m)));
   if(brand) return `<div class="ico brand-badge brand-${brand.key}" title="${brand.label}" aria-label="${brand.label}">${BRAND_ICONS[brand.key]}</div>`;
-  return `<div class="ico">⛽</div>`;
+  return `<div class="ico generic-fuel-badge">${FUEL_PUMP_ICON}</div>`;
 }
 const KEY = 'fuellog-v5-data';
 const memoryStore = new Map();
@@ -270,7 +271,7 @@ function switchVehicle(vehicleId){
   if(activePage==='panel'&&currentPanel){renderPanel(currentPanel);if(currentPanel==='stations')setTimeout(initServiceStations,0);}
   toast(`เปลี่ยนเป็น ${vehicle()?.name||'รถที่เลือก'} แล้ว`);
 }
-function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:'⛽',title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';applyHomeCardVisibility();}
+function renderHome(){const m=metrics(),score=health(),mk=monthKey(today()),monthFuel=entries().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.total||0),0),monthExp=expenses().filter(x=>monthKey(x.date)===mk).reduce((s,x)=>s+(+x.amount||0),0);$('#avgKml').textContent=m.kml?fmt(toDisplayEfficiency(m.kml),1):'—';$('#kmlUnit')&&($('#kmlUnit').textContent=efficiencyUnit());$('#healthScore').textContent=score;$('#healthScore').style.borderColor=score>=85?'var(--green)':score>=65?'var(--accent)':'var(--red)';$('#homeMetrics').innerHTML=metric('ค่าใช้จ่ายเดือนนี้',money(monthFuel+monthExp),`${entries().filter(x=>monthKey(x.date)===mk).length+expenses().filter(x=>monthKey(x.date)===mk).length} รายการ`)+metric('ต้นทุนเชื้อเพลิง',m.costKm?`${money(toDisplayCostPerDist(m.costKm))}/${distUnit()}`:'—',`รวม ${money(m.spent)}`)+metric(`เลข${distUnit()}ล่าสุด`,currentOdo()?fmtDist(currentOdo()):'—',`${entries().length} ครั้งเติม`)+metric('ค่าใช้จ่ายสะสม',money(m.spent+expenses().reduce((s,x)=>s+(+x.amount||0),0)),'รวมทั้งหมด');drawChart();const latest=[...entries().slice(-3).reverse().map(x=>({icon:FUEL_PUMP_ICON,title:x.station||x.fuelType||'เติมน้ำมัน',sub:`${x.date} • ${fmtDist(x.odometer)}`,amount:money(x.total)})),...expenses().slice(0,2).map(x=>({icon:'🔧',title:x.title||x.category,sub:`${x.date} • ${x.category||'อื่นๆ'}`,amount:money(x.amount)}))].slice(0,4);$('#latestList').innerHTML=latest.length?latest.map(rowHtml).join(''):'<div class="empty">ยังไม่มีข้อมูล</div>';const due=dueItems().slice(0,4);$('#dueList').innerHTML=due.length?due.map(x=>`<div class="due"><span>${esc(x.name)}</span><b class="status-${x.status}">${x.label}</b></div>`).join(''):'<div class="empty">ยังไม่ได้ตั้งรอบบำรุง</div>';applyHomeCardVisibility();}
 function rowHtml(x){return `<article class="record"><div class="ico">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><div class="amount">${x.amount}</div></article>`;}
 function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.max(1,...data.map(x=>x.value)),w=320,h=115,p=15;const pts=data.map((x,i)=>[p+i*((w-p*2)/(Math.max(1,data.length-1))),h-p-(x.value/max)*(h-p*2)]);svg.innerHTML=`<path d="${pts.map((q,i)=>(i?'L':'M')+q.join(' ')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M${pts[0]?.[0]||0} ${h-p} ${pts.map(q=>'L'+q.join(' ')).join(' ')} L${pts.at(-1)?.[0]||0} ${h-p}Z" fill="rgba(244,168,59,.10)"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="var(--accent)"/><text x="${q[0]}" y="128" fill="var(--muted)" font-size="9" text-anchor="middle">${data[i].label}</text>`).join('')}`;const a=data.at(-2)?.value||0,b=data.at(-1)?.value||0;$('#trendText').textContent=a?`${b>=a?'▲':'▼'} ${fmt(Math.abs((b-a)/a*100))}%`:' ';}
 function renderFuel(){
@@ -378,7 +379,7 @@ async function loadFamilyDriverOptions(){
 }
 
 function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#formTitle').textContent=type==='fuel'?(obj.id?'แก้ไขการเติมน้ำมัน':'เพิ่มรายการเติมน้ำมัน'):type==='expense'?(obj.id?'แก้ไขค่าใช้จ่าย':'เพิ่มค่าใช้จ่าย'):'ตั้งเตือนบำรุงรักษา';d.dataset.type=type;d.dataset.id=obj.id||'';
- if(type==='fuel')b.innerHTML=`<section class="fuel-form-hero"><span>⛽</span><div><b>${obj.id?'แก้ไขข้อมูลการเติม':'บันทึกการเติมครั้งใหม่'}</b><small>กรอกระยะทาง ปริมาณ และยอดชำระ ระบบจะคำนวณให้ทันที</small></div></section><h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid media-actions compact-media-actions">
+ if(type==='fuel')b.innerHTML=`<section class="fuel-form-hero"><span>${FUEL_PUMP_ICON}</span><div><b>${obj.id?'แก้ไขข้อมูลการเติม':'บันทึกการเติมครั้งใหม่'}</b><small>กรอกระยะทาง ปริมาณ และยอดชำระ ระบบจะคำนวณให้ทันที</small></div></section><h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid media-actions compact-media-actions">
 <button type="button" class="photo-pick" data-media-picker="receipt"><img id="receiptPreview" class="selected-photo-preview" alt="" hidden><span>🧾 ใบเสร็จ</span><small id="receiptFileStatus">เพิ่มรูป</small></button>
 <button type="button" class="photo-pick" data-media-picker="odometer"><img id="odoPreview" class="selected-photo-preview" alt="" hidden><span>🔢 เรือนไมล์</span><small id="odoFileStatus">เพิ่มรูป</small></button>
 <label class="photo-pick"><span>✨ OCR</span><small>สแกนบิล</small><input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
@@ -389,7 +390,7 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
 </div><div id="ocrStatus" class="muted compact-status"></div>
 <div class="existing-photos-card ${obj.id?'':'is-empty'}"><div class="card-head"><b>🖼️ รูปในรายการ</b><small>${obj.id?'แตะรูปเพื่อเปิด':'ยังไม่มีรูป'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">รูปที่เลือกจะแสดงด้านบน</span>'}</div></div>
 <h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
-<label class="field full fuel-toggle-row"><span><b>⛽ เติมเต็มถัง</b><small>ใช้คำนวณอัตราสิ้นเปลืองเมื่อถึงการเติมเต็มถังครั้งถัดไป</small></span><input name="full" type="checkbox" ${normalizeBoolean(obj.full,true)?'checked':''}></label>
+<label class="field full fuel-toggle-row"><span><b class="fuel-label-icon">${FUEL_PUMP_ICON} เติมเต็มถัง</b><small>ใช้คำนวณอัตราสิ้นเปลืองเมื่อถึงการเติมเต็มถังครั้งถัดไป</small></span><input name="full" type="checkbox" ${normalizeBoolean(obj.full,true)?'checked':''}></label>
 <div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
 <div class="field"><label>ส่วนลด (${state.settings.currency})</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
 <div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณ ${state.settings.currency}/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
@@ -1215,6 +1216,8 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.8.2</b> — ปรับตรา PTT/OR, Bangchak, PT, SUSCO และ Pure ให้ใช้รูปทรงและสีใกล้ตราแบรนด์จริงมากขึ้น</li>
+      <li><b>7.8.1</b> — เปลี่ยนไอคอนปั๊มน้ำมันจากอีโมจิเป็นเวกเตอร์เส้นคม และคงโลโก้แบรนด์จริงในรายการ</li>
       <li><b>7.8.0</b> — ปรับ app bar, navigation, รายการ และปุ่มเพิ่มให้มีลักษณะเป็นแอปมือถือมากขึ้น</li>
       <li><b>7.7.0</b> — ถอดเมนูสถานีบริการน้ำมันและไลบรารีแผนที่ พร้อมจัดราคาน้ำมันเป็นตารางเปรียบเทียบที่อ่านง่าย</li>
       <li><b>7.6.1</b> — ปั๊มบนเส้นทางเปิดในหน้าสถานี, ลบตัวเลือกรถซ้ำหน้าแรก และรองรับ Google Maps แบบใช้ Restricted Key</li>
@@ -1782,7 +1785,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.8.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.8.2').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

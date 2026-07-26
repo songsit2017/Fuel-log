@@ -26,6 +26,7 @@ const nativeFuelDatabase = await readFile(new URL('../native-kotlin/app/src/main
 const nativeExpenseDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/ExpenseDao.kt', import.meta.url), 'utf8');
 const nativeMaintenanceDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/MaintenanceDao.kt', import.meta.url), 'utf8');
 const nativeMaintenanceStatus = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/MaintenanceStatus.kt', import.meta.url), 'utf8');
+const nativeMaintenanceWorker = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/notifications/MaintenanceReminderWorker.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -261,6 +262,16 @@ test('native maintenance reminders are offline and evaluate date plus odometer',
   assert.match(nativeMaintenanceStatus, /warningOdometerKm/);
   assert.match(nativeFuelApp, /AddMaintenanceDialog/);
   assert.match(nativeFuelApp, /MaintenanceList/);
+});
+
+test('native maintenance dates schedule Android notifications safely', () => {
+  assert.match(nativeBuild, /androidx\.work:work-runtime:2\.11\.2/);
+  assert.match(nativeMain, /MaintenanceReminderWorker\.schedule/);
+  assert.match(nativeMain, /POST_NOTIFICATIONS/);
+  assert.match(nativeMaintenanceWorker, /CoroutineWorker/);
+  assert.match(nativeMaintenanceWorker, /enqueueUniquePeriodicWork/);
+  assert.match(nativeMaintenanceWorker, /ExistingPeriodicWorkPolicy\.UPDATE/);
+  assert.match(nativeMaintenanceWorker, /Manifest\.permission\.POST_NOTIFICATIONS/);
 });
 
 test('home has one vehicle selector', () => {

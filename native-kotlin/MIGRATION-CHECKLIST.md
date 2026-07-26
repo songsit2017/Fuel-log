@@ -12,7 +12,8 @@
 - [x] Fuel records and full/partial-tank metrics.
 - [x] Offline vehicle-scoped expense records and totals.
 - [x] Offline maintenance records with date/odometer due status and recurrence.
-- [ ] Android notification scheduling for maintenance reminders.
+- [x] Android notification channel and daily WorkManager scheduling for date reminders.
+- [ ] Odometer-triggered notification refresh and notification settings.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

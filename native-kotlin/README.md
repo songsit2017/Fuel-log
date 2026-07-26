@@ -14,6 +14,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Vehicle-scoped fuel entry, deletion and full-tank consumption summary.
 - Vehicle-scoped expense entry, categories and total.
 - Maintenance reminders by date or odometer with overdue/soon status and recurrence.
+- Daily Android notifications for upcoming date-based maintenance.
 - A Thai minimal Compose dashboard and launcher icon.
 - A separate prerelease APK workflow that cannot replace Stable.
 

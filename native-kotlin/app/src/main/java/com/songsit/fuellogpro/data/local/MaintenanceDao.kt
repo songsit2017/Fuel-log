@@ -10,6 +10,9 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance_tasks WHERE vehicleId = :vehicleId ORDER BY createdAt ASC")
     fun observeForVehicle(vehicleId: String): Flow<List<MaintenanceEntity>>
 
+    @Query("SELECT * FROM maintenance_tasks WHERE nextDate IS NOT NULL")
+    suspend fun getTasksWithDates(): List<MaintenanceEntity>
+
     @Upsert
     suspend fun upsert(task: MaintenanceEntity)
 

@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function vehicleDoc(vid) { return get(/databases/$(database)/documents/vehicles/$(vid)); }
+    function member(vid) { return signedIn() && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
+    function editor(vid) { return signedIn() && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
+    function owner(vid) { return signedIn() && vehicleDoc(vid).data.ownerUid == request.auth.uid; }
+
+    match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
+    match /vehicles/{vid} {
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.members[request.auth.uid].role == 'owner';
+      allow read: if member(vid);
+      allow delete: if owner(vid);
+      allow update: if owner(vid) || (signedIn() && request.resource.data.lastJoinCode is string && exists(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)) && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.vehicleId == vid && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.emailLower == request.auth.token.email && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.expiresAt > request.time.toMillis());
+      match /{document=**} {
+        allow read: if member(vid);
+        allow create, update: if editor(vid);
+        allow delete: if editor(vid);
+      }
+    }
+    match /invites/{code} {
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.emailLower == request.auth.token.email);
+      allow update, delete: if false;
+    }
+  }
+}

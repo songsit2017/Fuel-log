@@ -163,7 +163,8 @@ test('GitHub builds downloadable signed APK and future Play Store AAB safely', (
   assert.match(androidConfigScript, /versionCode/);
   assert.match(androidConfigScript, /versionName/);
   assert.match(androidConfigScript, /fuellog_icon/);
-  assert.match(androidConfigScript, /ic_launcher_round/);
+  assert.match(androidConfigScript, /android:icon="@mipmap\/fuellog_launcher"/);
+  assert.match(androidConfigScript, /android:roundIcon="@mipmap\/fuellog_launcher_round"/);
   assert.match(androidWorkflow, /format\('8\.0\.0-beta\.\{0\}', github\.run_number\)/);
   assert.match(androidWorkflow, /FuelLog-Pro-\$\{FUELLOG_VERSION_NAME\}\.apk/);
 });

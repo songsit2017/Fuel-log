@@ -8,13 +8,16 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=6.4.0">
+  <link rel="stylesheet" href="styles.css?v=6.5.0">
 </head>
 <body>
   <header class="topbar">
-    <div>
-      <div class="eyebrow" id="pageEyebrow">รถของฉัน</div>
-      <h1 id="pageTitle">ภาพรวม</h1>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="icon-btn" id="reportsBackBtn" style="display:none;" aria-label="ย้อนกลับ">←</button>
+      <div>
+        <div class="eyebrow" id="pageEyebrow">รถของฉัน</div>
+        <h1 id="pageTitle">ภาพรวม</h1>
+      </div>
     </div>
     <button class="icon-btn" id="themeBtn" aria-label="สลับธีม">◐</button>
   </header>
@@ -59,12 +62,16 @@
       <div id="maintenanceList" class="records"></div>
     </section>
 
+    <section class="page" data-page="reports">
+      <div id="reportsPageBody"></div>
+    </section>
+
     <section class="page" data-page="more">
       <div class="menu-list">
         <button data-panel="family"><span>👨‍👩‍👧‍👦</span><div><b>ครอบครัวและ Cloud</b><small>ล็อกอิน แชร์รถ และซิงก์ข้อมูล</small></div><i>›</i></button>
         <button data-panel="trips"><span>🛣️</span><div><b>ทริปและหน้างาน</b><small>GPS ระยะทาง ค่าน้ำมัน ทางด่วน ที่จอด และต้นทุนงาน</small></div><i>›</i></button>
         <button data-panel="gallery"><span>📷</span><div><b>รูปและเอกสาร</b><small>ใบเสร็จ เรือนไมล์ งานซ่อม และเอกสารรถ</small></div><i>›</i></button>
-        <button data-panel="reports"><span>📊</span><div><b>รายงาน</b><small>สัดส่วนค่าใช้จ่าย เทียบเดือน กม./ลิตร และบาท/กม.</small></div><i>›</i></button>
+        <button data-page-link="reports"><span>📊</span><div><b>รายงาน</b><small>เติม-เพิ่ม ค่าใช้จ่าย ระยะทาง และสัดส่วนค่าใช้จ่ายตามหมวด</small></div><i>›</i></button>
         <button data-panel="search"><span>🔎</span><div><b>ค้นหาทุกอย่าง</b><small>ค้นในน้ำมัน ค่าใช้จ่าย เตือน และทริปพร้อมกัน</small></div><i>›</i></button>
         <button data-panel="backup"><span>💾</span><div><b>สำรองและนำเข้า</b><small>JSON, CSV และ Fuelio</small></div><i>›</i></button>
         <button data-panel="vehicles"><span>🚗</span><div><b>จัดการรถ</b><small>เพิ่ม แก้ไข และเลือกรถ</small></div><i>›</i></button>
@@ -96,6 +103,6 @@
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=6.4.0"></script>
+  <script type="module" src="app.js?v=6.5.0"></script>
 </body>
 </html>

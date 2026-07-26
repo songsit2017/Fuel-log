@@ -55,6 +55,7 @@ async function requireFirebase(){
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'fuellog-v5-data';
+const APP_VERSION = '6.7.0';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -793,7 +794,47 @@ function settingsPanel(){
   return `<div class="card"><h2>หน่วยที่ใช้แสดงผล</h2>
     <div class="field"><label>ระยะทาง</label><select id="unitDistance"><option value="km" ${state.units?.distance!=='mi'?'selected':''}>กิโลเมตร (กม.)</option><option value="mi" ${state.units?.distance==='mi'?'selected':''}>ไมล์ (mi)</option></select></div>
     <div class="field"><label>ปริมาตรน้ำมัน</label><select id="unitVolume"><option value="liters" ${state.units?.volume!=='gal'?'selected':''}>ลิตร (L)</option><option value="gal" ${state.units?.volume==='gal'?'selected':''}>แกลลอน (US gal)</option></select></div>
-    <p class="muted">ข้อมูลจะยังเก็บเป็นกิโลเมตร/ลิตรอยู่เบื้องหลังเสมอ (เผื่อย้ายเครื่องหรือประเทศ) แค่แสดงผลเป็นหน่วยที่เลือกไว้เท่านั้น เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม</p></div>`;
+    <p class="muted">ข้อมูลจะยังเก็บเป็นกิโลเมตร/ลิตรอยู่เบื้องหลังเสมอ (เผื่อย้ายเครื่องหรือประเทศ) แค่แสดงผลเป็นหน่วยที่เลือกไว้เท่านั้น เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม</p></div>
+  <div class="card"><h2>ข้อมูล</h2><div class="about-list">
+    <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
+
+    <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>6.7</b> — เพิ่มหน้า "ข้อมูล" ในตั้งค่า (เวอร์ชัน, ประวัติอัปเดต, สิทธิ์การใช้งาน, นโยบายความเป็นส่วนตัว)</li>
+      <li><b>6.6</b> — ธีมสลับตามระบบโทรศัพท์อัตโนมัติ, ตัดปั๊มใกล้ฉันออกจากหน้าเติมน้ำมัน (เหลือหน้าแรก/ฟอร์มเพิ่มรายการ)</li>
+      <li><b>6.5</b> — หน้า "รายงาน" เปลี่ยนเป็นหน้าเต็มจอแยก ไม่ใช่หน้าต่างป๊อปอัพ</li>
+      <li><b>6.4</b> — เพิ่มภาพประกอบในหน้ารายงานทั้ง 4 แท็บ</li>
+      <li><b>6.3</b> — ออกแบบหน้ารายงานใหม่ทั้งหมด แบบ 4 แท็บ (เติม-เพิ่ม/ค่าใช้จ่าย/ระยะทาง/อื่นๆ)</li>
+      <li><b>6.2</b> — เพิ่มช่องผู้ขับขี่ วิธีชำระเงิน เหตุผล และไฟล์แนบเพิ่มเติม</li>
+      <li>รุ่นก่อนหน้า — ระบบ GPS บันทึกทริป, เตือนบำรุงรักษาแบบวนซ้ำ, ตั้งค่าหน่วยระยะทาง/ปริมาตร, ค้นหารวมทุกประเภท, นำเข้าไฟล์ Fuelio หลายคันพร้อมรูปภาพ</li>
+    </ul></div></details>
+
+    <details class="about-item"><summary>บริการและซอฟต์แวร์ที่ใช้</summary><div class="about-body"><ul>
+      <li><b>Firebase</b> (Google) — ระบบล็อกอิน, ฐานข้อมูลคลาวด์, พื้นที่เก็บรูปภาพ สำหรับซิงก์และแชร์รถกับครอบครัว</li>
+      <li><b>Tesseract.js</b> (สัญญาอนุญาต Apache 2.0) — อ่านข้อความจากรูปใบเสร็จ (OCR) ทำงานในเครื่องทั้งหมด ไม่ส่งรูปออกไปที่ไหน</li>
+      <li><b>JSZip</b> (สัญญาอนุญาต MIT) — ใช้แตกไฟล์สำรองข้อมูล .fuelio ตอนนำเข้า</li>
+      <li><b>OpenStreetMap</b> ผ่าน Overpass API (สัญญาอนุญาต ODbL) — ข้อมูลตำแหน่งปั๊มน้ำมันใกล้เคียง</li>
+      <li><b>ข้อมูลราคาน้ำมัน</b> จาก Bangchak Corporation PCL (Open Data)</li>
+    </ul></div></details>
+
+    <details class="about-item"><summary>นโยบายความเป็นส่วนตัว</summary><div class="about-body">
+      <ul>
+        <li>ข้อมูลการเติมน้ำมัน ค่าใช้จ่าย และรูปภาพ เก็บไว้ในเครื่องของพี่เป็นหลัก (localStorage)</li>
+        <li>ถ้าเข้าสู่ระบบด้วย Google ข้อมูลจะซิงก์ขึ้น Firebase เพื่อสำรองและแชร์กับสมาชิกในครอบครัวที่พี่เชิญเท่านั้น ไม่มีใครอื่นเข้าถึงได้</li>
+        <li>ไม่มีการขาย แชร์ หรือส่งข้อมูลให้บุคคล/บริษัทที่สาม ไม่มีโฆษณา ไม่มีการติดตามพฤติกรรมผู้ใช้ (analytics/tracking)</li>
+        <li>ตำแหน่ง GPS ใช้เฉพาะตอนค้นหาปั๊มใกล้เคียงหรือบันทึกระยะทางทริปเท่านั้น ไม่ถูกเก็บสะสมหรือส่งไปนอกเหนือจากนั้น</li>
+        <li>รูปภาพที่แนบ (ใบเสร็จ/เรือนไมล์) เก็บใน Firebase Storage เข้าถึงได้เฉพาะสมาชิกของรถคันนั้น</li>
+      </ul>
+    </div></details>
+
+    <details class="about-item"><summary>ข้อกำหนดการใช้งาน</summary><div class="about-body">
+      <ul>
+        <li>แอปนี้พัฒนาขึ้นเพื่อใช้งานส่วนตัวและในครอบครัว ไม่ได้จำหน่ายหรือเผยแพร่เชิงพาณิชย์</li>
+        <li>ข้อมูลราคาน้ำมันและตำแหน่งปั๊มเป็นข้อมูลอ้างอิงจากแหล่งภายนอก อาจคลาดเคลื่อนจากราคา/สถานะจริง ณ ปั๊ม</li>
+        <li>ผู้ใช้เป็นผู้รับผิดชอบความถูกต้องของข้อมูลที่บันทึกด้วยตนเอง (เลขไมล์ ยอดเงิน ฯลฯ)</li>
+        <li>แนะนำให้สำรองข้อมูล (Export) เป็นระยะ โดยเฉพาะก่อนเปลี่ยนเครื่องหรือล้างเบราว์เซอร์</li>
+      </ul>
+    </div></details>
+  </div></div>`;
 }
 
 function backupPanel(){return `<div class="card"><h2>สำรองข้อมูล</h2><p class="muted">ข้อมูลใช้งานร่วมกันซิงก์ผ่าน Firebase ส่วนไฟล์สำรองใช้สำหรับเก็บฉุกเฉิน</p><div class="panel-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="importBtn">นำเข้า JSON / Fuelio</button><input hidden type="file" id="importFile" accept=".json,.csv,.fuelio,.zip"></div></div>`;}
@@ -1203,7 +1244,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.6.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.7.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

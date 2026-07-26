@@ -49,3 +49,17 @@ body.light{--bg:#f5f6f8;--surface:#fff;--surface2:#eef0f3;--text:#1a1d22;--muted
 .freport-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .freport-empty{color:var(--fr-muted);font-size:12px;text-align:center;padding:30px 0}
 .freport-actions{margin-top:14px}
+
+/* ---- About/Info expandable list (Settings page) ---- */
+.about-list{display:grid;gap:2px}
+.about-item{border-bottom:1px solid var(--line)}
+.about-item:last-child{border-bottom:0}
+.about-item summary{list-style:none;cursor:pointer;padding:13px 2px;display:flex;justify-content:space-between;align-items:center;color:var(--text);font-size:13.5px}
+.about-item summary::-webkit-details-marker{display:none}
+.about-item summary::after{content:'›';color:var(--muted);font-size:20px;transition:transform .15s}
+.about-item[open] summary::after{transform:rotate(90deg)}
+.about-item summary .about-val{color:var(--muted);font-size:12px}
+.about-item .about-body{padding:0 2px 14px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.about-body ul{margin:6px 0;padding-left:18px}
+.about-body li{margin-bottom:4px}
+.about-body b{color:var(--text)}

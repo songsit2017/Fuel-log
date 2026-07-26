@@ -1,14 +1,27 @@
-# FuelLog Pro v5.1 Full Feature Restore
+# FuelLog Pro v5 Clean
 
-เวอร์ชันนี้นำแอปเต็มเดิมกลับมาและแก้เฉพาะจุดที่มีปัญหา โดยไม่ลดฟังก์ชัน
+ชุดนี้ใช้แทนไฟล์เก่าใน Branch `firebase-dev` ได้ทั้งโฟลเดอร์
 
-## ฟังก์ชันหลัก
-- รถหลายคัน, เติมน้ำมัน, ค่าใช้จ่าย, บำรุงรักษา, รายงาน, OCR, รูปใบเสร็จ/เรือนไมล์
-- นำเข้า Fuelio `.fuelio` / `.zip` / `.csv` หลายคัน พร้อม `pictures.data`
-- Firebase Google Login, Family Sharing, Firestore Sync และ Storage
-- Google Drive Backup เดิม, ปั๊มใกล้ฉัน, ราคาน้ำมัน, PWA
+## วิธีติดตั้ง
+1. สำรอง Branch เดิมไว้ก่อน
+2. ลบไฟล์และโฟลเดอร์เก่าทั้งหมดในโฟลเดอร์ Repository **ยกเว้น `.git`**
+3. คัดลอกไฟล์ทั้งหมดจาก ZIP นี้ไปวาง
+4. Commit และ Push ไป `firebase-dev`
+5. คัดลอก `firestore.rules` ไป Firebase > Firestore > Rules แล้ว Publish
+6. คัดลอก `storage.rules` ไป Firebase > Storage > Rules แล้ว Publish
+7. เปิด `https://songsit2017.github.io/Fuel-log/diagnostics.html`
 
-## การติดตั้ง
-ลบไฟล์เดิมใน branch `firebase-dev` ทั้งหมด ยกเว้น `.git` แล้ววางไฟล์ชุดนี้แทน จากนั้น Commit และ Push
+## ระบบ Google
+Firebase Login เป็นบัญชีหลักระบบเดียวสำหรับแชร์รถ Firestore และ Storage
+ไม่มี Cloudinary และไม่มี Google Drive Login ซ้ำในชุดนี้
 
-Rules ไม่ต้อง Publish ซ้ำเมื่อ Rules ปัจจุบันใช้งานได้และไม่พบ `permission-denied`.
+## ข้อมูลเดิม
+แอปจะย้ายข้อมูลจาก localStorage เดิม (`fuel-vehicles`, `fuel-entries`, `fuel-costs`, `fuel-reminders`) อัตโนมัติเมื่อเปิดครั้งแรก
+รองรับนำเข้า JSON และไฟล์ `.fuelio/.zip` แบบ CSV/JSON ทั่วไป
+
+
+## v5.0.1 UI Hotfix
+- แอปและปุ่มทั้งหมดเริ่มทำงานจากไฟล์ในเครื่องก่อน ไม่รอ Firebase CDN
+- Firebase โหลดแบบ lazy เฉพาะฟังก์ชัน Cloud/Login
+- Service Worker ใช้ network-first สำหรับ index/app/css/config เพื่อไม่ค้างไฟล์เก่า
+- อัปเดต Firebase Web SDK เป็น 12.13.0

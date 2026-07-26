@@ -1,1 +1,32 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FuelLog v5.1 Diagnostics</title><style>body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;background:#0b0d11;color:#eef1f5}.card{background:#171b22;border:1px solid #303640;border-radius:16px;padding:16px;margin:10px 0}.ok{color:#56d6aa}.bad{color:#ff7185}code{word-break:break-all}</style></head><body><h1>FuelLog Pro v5.1 Diagnostics</h1><div id="results"></div><script type="module">const files=['index.html','firebase-config.js','addons/minimal-pro.css','addons/true-minimal-ui.css','addons/true-minimal-ui.js','addons/family-pro.js','vendor/jszip.min.js','manifest.json','sw.js'];const out=document.querySelector('#results');for(const f of files){const el=document.createElement('div');el.className='card';try{const r=await fetch('./'+f+'?t='+Date.now(),{cache:'no-store'});el.innerHTML=`<b class="${r.ok?'ok':'bad'}">${r.ok?'✓':'✕'} ${f}</b><div>HTTP ${r.status}</div>`}catch(e){el.innerHTML=`<b class="bad">✕ ${f}</b><div>${e.message}</div>`}out.appendChild(el)}const c=document.createElement('div');c.className='card';try{const {firebaseConfig}=await import('./firebase-config.js?t='+Date.now());c.innerHTML=`<b class="ok">✓ Firebase ${firebaseConfig.projectId}</b><div>Config เหลือไฟล์เดียว</div>`}catch(e){c.innerHTML=`<b class="bad">✕ Firebase Config</b><div>${e.message}</div>`}out.appendChild(c);</script></body></html>
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FuelLog Diagnostics</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#101217;color:#eee;padding:20px;line-height:1.5}.ok{color:#4fc39b}.bad{color:#ef6b6b}pre{white-space:pre-wrap;background:#171a20;padding:12px;border-radius:12px}
+</style>
+<h1>FuelLog v5.0.1 Diagnostics</h1>
+<div id="out"></div>
+<script type="module">
+const files=['index.html','styles.css','app.js','firebase-config.js','manifest.json','sw.js'];
+const out=document.querySelector('#out');
+let appSource='';
+for(const f of files){
+  try{
+    const r=await fetch('./'+f+'?t='+Date.now(),{cache:'no-store'});
+    const text=await r.text();
+    if(f==='app.js') appSource=text;
+    out.innerHTML+=`<p class="${r.ok?'ok':'bad'}">${r.ok?'✓':'✗'} ${f} — ${r.status}</p>`;
+  }catch(e){out.innerHTML+=`<p class="bad">✗ ${f} — ${e.message}</p>`}
+}
+try{
+  new Function(appSource);
+  out.innerHTML+='<p class="ok">✓ app.js syntax ผ่าน</p>';
+}catch(e){
+  out.innerHTML+=`<pre class="bad">✗ app.js syntax error\n${e.stack}</pre>`;
+}
+try{
+  const {firebaseConfig}=await import('./firebase-config.js?t='+Date.now());
+  out.innerHTML+=`<p class="ok">✓ Firebase project: ${firebaseConfig.projectId}</p><p>API key ending: ${firebaseConfig.apiKey.slice(-6)}</p>`;
+}catch(e){out.innerHTML+=`<pre class="bad">${e.stack}</pre>`}
+</script>

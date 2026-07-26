@@ -186,6 +186,17 @@ const expenses = () => state.expenses.filter(x=>x.vehicleId===state.currentVehic
 const reminders = () => state.reminders.filter(x=>x.vehicleId===state.currentVehicleId);
 const trips = () => state.trips.filter(x=>x.vehicleId===state.currentVehicleId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 const currentOdo = () => Math.max(0,...entries().map(x=>+x.odometer||0),...expenses().map(x=>+x.odometer||0));
+const VEHICLE_REMINDER_TEMPLATES = [
+  {key:'tax',name:'ต่อภาษีรถยนต์',category:'เอกสารรถ',icon:'ภ',repeatMonths:12,warningDays:45},
+  {key:'act',name:'ต่อ พ.ร.บ.',category:'เอกสารรถ',icon:'พ',repeatMonths:12,warningDays:45},
+  {key:'insurance',name:'ต่อประกันรถยนต์',category:'เอกสารรถ',icon:'ป',repeatMonths:12,warningDays:45},
+  {key:'engine-oil',name:'เปลี่ยนน้ำมันเครื่อง',category:'บำรุงรักษา',icon:'น',repeatOdo:10000,repeatMonths:12,warningOdo:1000,warningDays:30},
+  {key:'tire-rotation',name:'สลับยาง',category:'ยางและล้อ',icon:'ย',repeatOdo:10000,repeatMonths:12,warningOdo:1000,warningDays:30},
+  {key:'battery',name:'ตรวจ/เปลี่ยนแบตเตอรี่',category:'แบตเตอรี่',icon:'บ',repeatMonths:24,warningDays:60}
+];
+const EXPENSE_CATEGORIES = ['บำรุงรักษา','น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าเดินทาง','ค่าโรงแรม','ค่าทางด่วน','ค่าจอด','ล้างรถ','อื่นๆ'];
+function reminderTemplate(key){return VEHICLE_REMINDER_TEMPLATES.find(item=>item.key===key);}
+function reminderIcon(item){return reminderTemplate(item.templateKey)?.icon||({เอกสารรถ:'อ',บำรุงรักษา:'ซ','ยางและล้อ':'ย',แบตเตอรี่:'บ'}[item.category]||'ซ');}
 function metrics(list=entries()){
   const intervals=calculateFuelIntervals(list,{minEfficiency:1,maxEfficiency:100});
   const dist=intervals.reduce((sum,item)=>sum+item.distance,0);
@@ -197,7 +208,7 @@ function metrics(list=entries()){
 function monthKey(v){return String(v||'').slice(0,7)}
 function withinPeriod(date,p){if(p==='all')return true;const d=new Date(date),n=new Date();if(p==='month')return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();return d.getFullYear()===n.getFullYear();}
 function monthSeries(n=6){const out=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1),k=d.toISOString().slice(0,7);out.push({label:d.toLocaleDateString('th-TH',{month:'short'}),value:entries().filter(x=>monthKey(x.date)===k).reduce((s,x)=>s+(+x.total||0),0)+expenses().filter(x=>monthKey(x.date)===k).reduce((s,x)=>s+(+x.amount||0),0)});}return out;}
-function dueItems(){const odo=currentOdo(),now=new Date();return reminders().map(r=>{let status='ok',label='ปกติ',score=999999;if(r.nextOdo){const left=(+r.nextOdo)-odo;score=left;label=left<0?`เกิน ${fmtDist(-left)}`:`อีก ${fmtDist(left)}`;status=left<0?'over':left<1000?'soon':'ok';}if(r.nextDate){const days=Math.ceil((new Date(r.nextDate)-now)/864e5);if(days<score){score=days;label=days<0?`เกิน ${-days} วัน`:`อีก ${days} วัน`;status=days<0?'over':days<30?'soon':'ok';}}return {...r,status,label};}).sort((a,b)=>({over:0,soon:1,ok:2}[a.status]-({over:0,soon:1,ok:2}[b.status])));}
+function dueItems(){const odo=currentOdo(),now=new Date();return reminders().map(r=>{let status='ok',label='ปกติ',score=999999;if(r.nextOdo){const left=(+r.nextOdo)-odo,warningOdo=Number(r.warningOdo)||1000;score=left;label=left<0?`เกิน ${fmtDist(-left)}`:`อีก ${fmtDist(left)}`;status=left<0?'over':left<=warningOdo?'soon':'ok';}if(r.nextDate){const days=Math.ceil((new Date(r.nextDate)-now)/864e5),warningDays=Number(r.warningDays)||30;if(days<score){score=days;label=days<0?`เกิน ${-days} วัน`:`อีก ${days} วัน`;status=days<0?'over':days<=warningDays?'soon':'ok';}}return {...r,status,label};}).sort((a,b)=>({over:0,soon:1,ok:2}[a.status]-({over:0,soon:1,ok:2}[b.status])));}
 function health(){let score=100;dueItems().forEach(x=>score-=x.status==='over'?18:x.status==='soon'?7:0);const v=metrics().valid;if(v.length>=6){const a=v.slice(-3).reduce((s,x)=>s+x.kml,0)/3,b=v.slice(-6,-3).reduce((s,x)=>s+x.kml,0)/3;if(a<b*.9)score-=10;}return Math.max(20,score);}
 
 // ---------- Theme: 'auto' follows the phone/OS setting, or user can pin light/dark ----------
@@ -301,7 +312,7 @@ function renderFuel(){
   $('#fuelList').innerHTML=html;
 }
 function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(x.income?-1:1)*(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">${x.income?'↩️':'🔧'}</div><div><b>${esc(x.title||x.category)}</b><small>${x.date}${x.time?' '+x.time:''} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}${x.recurrence==='recurring'?' • 🔁 ประจำ':''}${x.photos?.length?' • 🖼️ '+fmtCount(x.photos.length):''}</small></div><div class="amount">${x.income?'−':''}${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
-function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-reminder="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.name)}</b><small>${x.nextOdo?'ที่ '+fmtDist(x.nextOdo):''}${x.nextDate?' • '+x.nextDate:''}${(x.repeatOdo||x.repeatMonths)?' • 🔁 ทำซ้ำ':''}</small></div><div style="text-align:right;"><div class="amount status-${x.status}">${x.label}</div><button class="secondary" data-done-reminder="${x.id}" style="margin-top:6px;padding:6px 10px;font-size:11px;">✓ เสร็จแล้ว</button></div></article>`).join(''):'<div class="empty">ยังไม่มีรายการเตือน</div>';}
+function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTML=arr.length?arr.map(x=>`<article class="record vehicle-due-record status-${x.status}" data-edit-reminder="${x.id}"><div class="ico management-icon">${esc(reminderIcon(x))}</div><div><b>${esc(x.name)}</b><small>${esc(x.category||'บำรุงรักษา')}${x.nextOdo?' • ที่ '+fmtDist(x.nextOdo):''}${x.nextDate?' • '+x.nextDate:''}${(x.repeatOdo||x.repeatMonths)?' • ทำซ้ำอัตโนมัติ':''}</small>${x.provider?`<small>${esc(x.provider)}${x.policyNumber?' • '+esc(x.policyNumber):''}</small>`:''}</div><div style="text-align:right;"><div class="amount status-${x.status}">${x.label}</div><button class="secondary" data-done-reminder="${x.id}" style="margin-top:6px;padding:6px 10px;font-size:11px;">✓ เสร็จแล้ว</button></div></article>`).join(''):'<div class="empty">ยังไม่มีรายการเตือน เลือกแม่แบบเพื่อเริ่มจัดการรถ</div>';}
 function renderAll(){renderVehicleStrip();renderHome();renderFuel();renderExpenses();renderMaintenance();$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';if($('#currencyNavIcon'))$('#currencyNavIcon').textContent=currencyMark();save();}
 
 
@@ -418,6 +429,29 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
  if(type==='expense')b.innerHTML=`<h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid compact-media-actions"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label><label class="photo-pick">🖼️ เพิ่มรูป<input hidden type="file" id="expensePhotoFile" accept="image/*" multiple></label></div><div id="ocrStatus" class="muted compact-status"></div><div class="existing-photos-card ${obj.id?'':'is-empty'}"><div class="card-head"><b>🖼️ รูปในรายการ</b><small>${obj.id?'แตะรูปเพื่อเปิด':'ยังไม่มีรูป'}</small></div><div id="existingLogPhotos" class="log-photo-strip">${obj.id?'<span class="muted">กำลังค้นหารูปเดิม…</span>':'<span class="muted">รูปที่เลือกจะบันทึกพร้อมรายการ</span>'}</div></div><h3 class="form-section-title">2. รายละเอียดค่าใช้จ่าย</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['บำรุงรักษา','น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}${obj.category&&!['บำรุงรักษา','น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].includes(obj.category)?`<option selected>${esc(obj.category)}</option>`:''}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>ลักษณะรายการ</label><select name="recurrence"><option value="once" ${obj.recurrence!=='recurring'?'selected':''}>ค่าใช้จ่ายเพียงครั้งเดียว</option><option value="recurring" ${obj.recurrence==='recurring'?'selected':''}>ค่าใช้จ่ายประจำ</option></select></div><label class="field"><input name="income" type="checkbox" ${obj.income?'checked':''}> รายรับ / ค่าใช้จ่ายเชิงลบ</label><label class="field"><input name="bookmarked" type="checkbox" ${obj.bookmarked?'checked':''}> บันทึกเป็นแม่แบบ</label><div class="field full"><label>เตือนชำระเงิน / วันครบกำหนด</label><input name="reminderDate" type="date" value="${obj.reminderDate||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
+ if(type==='expense'){
+   const categorySelect=$('[name="category"]');
+   if(categorySelect) EXPENSE_CATEGORIES.forEach(category=>{
+     if(![...categorySelect.options].some(option=>option.value===category)) categorySelect.add(new Option(category,category));
+   });
+ }
+ if(type==='reminder'){
+   b.insertAdjacentHTML('afterbegin',`<div class="management-templates"><b>เลือกแม่แบบจัดการรถ</b><div class="template-chip-list">${VEHICLE_REMINDER_TEMPLATES.map(item=>`<button type="button" class="template-chip" data-reminder-template="${item.key}"><span>${item.icon}</span>${item.name}</button>`).join('')}</div></div>`);
+   const grid=b.querySelector('.form-grid');
+   grid?.insertAdjacentHTML('beforeend',`<div class="field"><label>ประเภท</label><select name="category"><option>บำรุงรักษา</option><option>เอกสารรถ</option><option>ยางและล้อ</option><option>แบตเตอรี่</option><option>อื่นๆ</option></select></div><div class="field"><label>เตือนล่วงหน้า (วัน)</label><input name="warningDays" type="number" min="0" value="${obj.warningDays||30}"></div><div class="field"><label>เตือนก่อนถึงระยะ (${distUnit()})</label><input name="warningOdo" type="number" min="0" value="${dispDistVal(obj.warningOdo||1000)}"></div><div class="field"><label>บริษัท/ผู้ให้บริการ</label><input name="provider" value="${esc(obj.provider||'')}"></div><div class="field"><label>เลขกรมธรรม์/เลขอ้างอิง</label><input name="policyNumber" value="${esc(obj.policyNumber||'')}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div><input name="templateKey" type="hidden" value="${esc(obj.templateKey||'')}">`);
+   const category=$('[name="category"]'); if(category&&obj.category) category.value=obj.category;
+   $$('[data-reminder-template]').forEach(button=>button.onclick=()=>{
+     const template=reminderTemplate(button.dataset.reminderTemplate); if(!template)return;
+     $('[name="name"]').value=template.name;
+     $('[name="category"]').value=template.category;
+     $('[name="templateKey"]').value=template.key;
+     $('[name="repeatOdo"]').value=template.repeatOdo?fmt(toDisplayDist(template.repeatOdo),0):'';
+     $('[name="repeatMonths"]').value=template.repeatMonths||'';
+     $('[name="warningOdo"]').value=template.warningOdo?fmt(toDisplayDist(template.warningOdo),0):'';
+     $('[name="warningDays"]').value=template.warningDays||30;
+     $$('.template-chip').forEach(chip=>chip.classList.toggle('active',chip===button));
+   });
+ }
  d.showModal();
  configureDeleteButton(type,obj);
  bindMediaPickerForForm();
@@ -620,7 +654,7 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
  }
  if(type==='reminder'){
    if(!data.name?.trim()){ alert('กรอกชื่อรายการเตือนก่อนบันทึก'); return; }
-   data.id=idv;data.vehicleId=state.currentVehicleId;data.nextOdo=data.nextOdo?toCanonicalDist(+data.nextOdo):null;data.repeatOdo=data.repeatOdo?toCanonicalDist(+data.repeatOdo):null;data.repeatMonths=+data.repeatMonths||null;const old=state.reminders.findIndex(x=>x.id===idv);old>=0?state.reminders[old]=data:state.reminders.push(data);
+   data.id=idv;data.vehicleId=state.currentVehicleId;data.nextOdo=data.nextOdo?toCanonicalDist(+data.nextOdo):null;data.repeatOdo=data.repeatOdo?toCanonicalDist(+data.repeatOdo):null;data.warningOdo=data.warningOdo?toCanonicalDist(+data.warningOdo):null;data.warningDays=+data.warningDays||30;data.repeatMonths=+data.repeatMonths||null;const old=state.reminders.findIndex(x=>x.id===idv);old>=0?state.reminders[old]=data:state.reminders.push(data);
  }
  d.close();renderAll();toast('บันทึกแล้ว');if(user)syncVehicle().catch(()=>{});}
 

@@ -224,3 +224,14 @@ dialog form,.dialog-wrap{border:0;box-shadow:0 18px 60px rgba(0,0,0,.38)}
 .toggle-row:last-of-type{border-bottom:0}
 .toggle-row span{flex:1;font-size:13px;color:var(--text);line-height:1.5;padding-top:1px}
 .toggle-row input[type=checkbox]{flex:none;width:19px;height:19px;margin-top:2px;accent-color:var(--accent)}
+
+/* Vehicle Management Platform */
+.management-templates{margin:0 0 16px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface2)}
+.management-templates>b{display:block;margin-bottom:10px}
+.template-chip-list{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.template-chip{display:flex;align-items:center;gap:7px;min-width:max-content;padding:9px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text);font:inherit;font-size:13px}
+.template-chip span,.management-icon{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:800}
+.template-chip.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.vehicle-due-record.status-over{border-left:3px solid var(--red)}
+.vehicle-due-record.status-soon{border-left:3px solid var(--accent)}
+.vehicle-due-record.status-ok{border-left:3px solid var(--green)}

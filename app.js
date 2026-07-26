@@ -4,7 +4,7 @@ const FIREBASE_SDK_VERSION = '12.13.0';
 let app = null, auth = null, db = null, storage = null;
 let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
     signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
-    doc, setDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
+    doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
     ref, uploadBytes, getDownloadURL;
 let firebaseReadyPromise = null;
 let firebaseLoadError = null;
@@ -14,7 +14,7 @@ async function initFirebase(){
   firebaseReadyPromise = (async()=>{
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
     const [{firebaseConfig}, appMod, authMod, fireMod, storageMod] = await Promise.all([
-      import('./firebase-config.js?v=5.0.3'),
+      import('./firebase-config.js?v=5.0.4'),
       import(`${base}/firebase-app.js`),
       import(`${base}/firebase-auth.js`),
       import(`${base}/firebase-firestore.js`),
@@ -28,7 +28,7 @@ async function initFirebase(){
 
     ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
       signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
-    ({doc, setDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
+    ({doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
     ({ref, uploadBytes, getDownloadURL} = storageMod);
 
     await setPersistence(auth, browserLocalPersistence).catch(console.warn);
@@ -358,7 +358,49 @@ async function syncVehicle(){await ensureCloudVehicle();const batch=writeBatch(d
 async function pullVehicle(){await ensureUser();for(const [name,target] of [['entries',state.entries],['expenses',state.expenses],['reminders',state.reminders],['trips',state.trips]]){const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,name));const map=new Map(target.map((x,i)=>[x.id,i]));s.forEach(d=>{const x=d.data();map.has(x.id)?target[map.get(x.id)]=x:target.push(x)});}save();renderAll();toast('ดึงข้อมูลแล้ว');}
 async function loadMembers(){const box=$('#membersBody');if(!box||!user)return;const s=await getDoc(doc(db,'vehicles',state.currentVehicleId));if(!s.exists()){box.innerHTML='รถคันนี้ยังไม่ขึ้น Cloud';return;}const d=s.data();box.innerHTML=Object.values(d.members||{}).map(m=>`<div class="list-row"><div><b>${esc(m.displayName||m.email)}</b><small>${esc(m.email||'')}</small></div><b>${esc(m.role)}</b></div>`).join('');}
 async function invite(){try{const email=$('#inviteEmail').value.trim().toLowerCase(),role=$('#inviteRole').value,s=await ensureCloudVehicle();if(s.data().ownerUid!==user.uid)throw new Error('เฉพาะ Owner สร้างคำเชิญได้');const code=Math.random().toString(36).slice(2,10).toUpperCase();await setDoc(doc(db,'invites',code),{vehicleId:state.currentVehicleId,vehicleName:vehicle().name,emailLower:email,role,ownerUid:user.uid,expiresAt:Date.now()+7*864e5,createdAt:serverTimestamp()});$('#inviteResult').innerHTML=`รหัสเชิญ: <b>${code}</b> (7 วัน)`;}catch(e){alert(e.message)}}
-async function join(){try{await ensureUser();const code=$('#joinCode').value.trim().toUpperCase(),ir=doc(db,'invites',code),is=await getDoc(ir);if(!is.exists())throw new Error('ไม่พบรหัส');const inv=is.data();if(inv.expiresAt<Date.now())throw new Error('รหัสหมดอายุ');if(inv.emailLower&&inv.emailLower!==user.email.toLowerCase())throw new Error('รหัสนี้ไม่ใช่ของบัญชีนี้');const vr=doc(db,'vehicles',inv.vehicleId),vs=await getDoc(vr),vd=vs.data(),members={...(vd.members||{}),[user.uid]:{role:inv.role,email:user.email,displayName:user.displayName||''}};await setDoc(vr,{members,lastJoinCode:code},{merge:true});if(!state.vehicles.some(v=>v.id===inv.vehicleId))state.vehicles.push({id:inv.vehicleId,name:inv.vehicleName||vd.name});state.currentVehicleId=inv.vehicleId;save();renderAll();toast('เข้าร่วมสำเร็จ');}catch(e){alert(e.message)}}
+async function join(){
+  try{
+    await ensureUser();
+    const code=$('#joinCode').value.trim().toUpperCase();
+    if(code.length!==8) throw new Error('กรอกรหัสเชิญให้ครบ 8 ตัว');
+
+    const ir=doc(db,'invites',code);
+    const is=await getDoc(ir);
+    if(!is.exists()) throw new Error('ไม่พบรหัสเชิญ');
+
+    const inv=is.data();
+    const emailLower=(user.email||'').toLowerCase();
+    if(inv.expiresAt<Date.now()) throw new Error('รหัสเชิญหมดอายุแล้ว');
+    if(inv.emailLower&&inv.emailLower!==emailLower) throw new Error('รหัสนี้สร้างไว้สำหรับบัญชี Google อื่น');
+    if(!['editor','viewer'].includes(inv.role)) throw new Error('สิทธิ์ในรหัสเชิญไม่ถูกต้อง');
+
+    // ห้ามอ่านเอกสารรถก่อนเข้าร่วม เพราะ Firestore Rules ยังไม่ให้ผู้ที่ไม่ใช่สมาชิกอ่านรถคันนั้น
+    // เขียนเฉพาะสมาชิกของ UID ปัจจุบันด้วย dot-path เพื่อไม่เขียนทับสมาชิกเดิมทั้งก้อน
+    const vr=doc(db,'vehicles',inv.vehicleId);
+    await updateDoc(vr,{
+      [`members.${user.uid}`]:{
+        role:inv.role,
+        email:user.email||'',
+        emailLower,
+        displayName:user.displayName||''
+      },
+      lastJoinCode:code,
+      updatedAt:serverTimestamp()
+    });
+
+    if(!state.vehicles.some(v=>v.id===inv.vehicleId)){
+      state.vehicles.push({id:inv.vehicleId,name:inv.vehicleName||'รถที่แชร์'});
+    }
+    state.currentVehicleId=inv.vehicleId;
+    save();
+    await pullVehicle();
+    renderAll();
+    toast('เข้าร่วมรถสำเร็จ');
+  }catch(e){
+    console.error('Join vehicle failed:',e);
+    alert(e?.message||'เข้าร่วมรถไม่สำเร็จ');
+  }
+}
 async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
@@ -632,7 +674,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5.0.3').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5.0.4').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

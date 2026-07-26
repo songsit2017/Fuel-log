@@ -1,7 +1,7 @@
-const CACHE = 'fuellog-v5-clean-4';
+const CACHE = 'fuellog-v5-family-504';
 const CORE = [
-  './', './index.html', './styles.css?v=5.0.3', './app.js?v=5.0.3',
-  './firebase-config.js?v=5.0.3', './manifest.json', './icon-192.png', './icon-512.png'
+  './', './index.html', './styles.css?v=5.0.4', './app.js?v=5.0.4',
+  './firebase-config.js?v=5.0.4', './manifest.json', './icon-192.png', './icon-512.png'
 ];
 
 self.addEventListener('install', event => {

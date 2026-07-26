@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.songsit.fuellogpro.data.LocalFuelRepository
+import com.songsit.fuellogpro.data.LocalExpenseRepository
 import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.ui.FuelLogApp
@@ -18,16 +19,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val database = FuelLogDatabase.get(this)
         val fuelRepository = LocalFuelRepository(database.fuelEntryDao())
+        val expenseRepository = LocalExpenseRepository(database.expenseDao())
         val vehicleRepository = LocalVehicleRepository(database.vehicleDao())
         setContent {
             val viewModel: NativeAppViewModel = viewModel(
-                factory = NativeAppViewModelFactory(fuelRepository, vehicleRepository),
+                factory = NativeAppViewModelFactory(fuelRepository, vehicleRepository, expenseRepository),
             )
             val state by viewModel.state.collectAsState()
             FuelLogApp(
                 state = state,
                 onAddFuel = viewModel::addFuel,
                 onDeleteFuel = viewModel::deleteFuel,
+                onAddExpense = viewModel::addExpense,
+                onDeleteExpense = viewModel::deleteExpense,
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,
                 onDeleteVehicle = viewModel::deleteVehicle,

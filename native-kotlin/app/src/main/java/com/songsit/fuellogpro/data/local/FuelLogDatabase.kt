@@ -8,13 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FuelEntryEntity::class, VehicleEntity::class],
-    version = 2,
+    entities = [FuelEntryEntity::class, VehicleEntity::class, ExpenseEntity::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
     abstract fun fuelEntryDao(): FuelEntryDao
     abstract fun vehicleDao(): VehicleDao
+    abstract fun expenseDao(): ExpenseDao
 
     companion object {
         @Volatile private var instance: FuelLogDatabase? = null
@@ -39,6 +40,24 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 )
             }
         }
+        private val migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS expenses (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        odometerKm REAL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -46,7 +65,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     context.applicationContext,
                     FuelLogDatabase::class.java,
                     "fuellog-native.db",
-                ).addMigrations(migration1To2)
+                ).addMigrations(migration1To2, migration2To3)
                     .build()
                     .also { instance = it }
             }

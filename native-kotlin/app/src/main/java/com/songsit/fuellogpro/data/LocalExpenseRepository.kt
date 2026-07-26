@@ -1,0 +1,50 @@
+package com.songsit.fuellogpro.data
+
+import com.songsit.fuellogpro.data.local.ExpenseDao
+import com.songsit.fuellogpro.data.local.ExpenseEntity
+import com.songsit.fuellogpro.domain.model.Expense
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import java.util.UUID
+
+class LocalExpenseRepository(
+    private val dao: ExpenseDao,
+) {
+    fun observe(vehicleId: String): Flow<List<Expense>> =
+        dao.observeForVehicle(vehicleId).map { expenses -> expenses.map(ExpenseEntity::toDomain) }
+
+    suspend fun add(
+        vehicleId: String,
+        date: String,
+        category: String,
+        description: String,
+        amount: Double,
+        odometerKm: Double?,
+    ) {
+        dao.upsert(
+            ExpenseEntity(
+                id = UUID.randomUUID().toString(),
+                vehicleId = vehicleId,
+                date = date,
+                category = category.trim(),
+                description = description.trim(),
+                amount = amount,
+                odometerKm = odometerKm,
+                createdAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun delete(id: String) = dao.deleteById(id)
+    suspend fun deleteForVehicle(vehicleId: String) = dao.deleteForVehicle(vehicleId)
+}
+
+private fun ExpenseEntity.toDomain() = Expense(
+    id = id,
+    vehicleId = vehicleId,
+    date = date,
+    category = category,
+    description = description,
+    amount = amount,
+    odometerKm = odometerKm,
+)

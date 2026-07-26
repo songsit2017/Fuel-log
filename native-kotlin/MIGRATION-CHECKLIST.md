@@ -10,7 +10,8 @@
 - [ ] Existing Firestore security-rule compatibility tests.
 - [x] Offline multiple-vehicle selection and vehicle-scoped fuel records.
 - [x] Fuel records and full/partial-tank metrics.
-- [ ] Expense and maintenance records.
+- [x] Offline vehicle-scoped expense records and totals.
+- [ ] Maintenance records and reminders.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

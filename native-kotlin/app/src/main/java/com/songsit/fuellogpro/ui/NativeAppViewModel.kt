@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.songsit.fuellogpro.data.LocalFuelRepository
+import com.songsit.fuellogpro.data.LocalExpenseRepository
 import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.domain.FuelSummary
 import com.songsit.fuellogpro.domain.calculateFuelSummary
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,17 +24,21 @@ data class NativeAppState(
     val vehicles: List<Vehicle> = emptyList(),
     val selectedVehicleId: String? = null,
     val entries: List<FuelEntry> = emptyList(),
+    val expenses: List<Expense> = emptyList(),
     val summary: FuelSummary = calculateFuelSummary(emptyList()),
     val saving: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val selectedVehicle: Vehicle?
         get() = vehicles.firstOrNull { it.id == selectedVehicleId } ?: vehicles.firstOrNull()
+    val totalExpenses: Double
+        get() = expenses.sumOf(Expense::amount)
 }
 
 class NativeAppViewModel(
     private val fuelRepository: LocalFuelRepository,
     private val vehicleRepository: LocalVehicleRepository,
+    private val expenseRepository: LocalExpenseRepository,
 ) : ViewModel() {
     private val saving = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
@@ -42,14 +48,20 @@ class NativeAppViewModel(
     private val entries = selectedVehicleId.flatMapLatest { vehicleId ->
         vehicleId?.let(fuelRepository::observe) ?: flowOf(emptyList())
     }
+    private val expenses = selectedVehicleId.flatMapLatest { vehicleId ->
+        vehicleId?.let(expenseRepository::observe) ?: flowOf(emptyList())
+    }
+    private val records = combine(entries, expenses) { fuelEntries, vehicleExpenses ->
+        fuelEntries to vehicleExpenses
+    }
 
     val state: StateFlow<NativeAppState> = combine(
         vehicles,
         selectedVehicleId,
-        entries,
+        records,
         saving,
         error,
-    ) { vehicleList, selectedId, fuelEntries, isSaving, message ->
+    ) { vehicleList, selectedId, (fuelEntries, vehicleExpenses), isSaving, message ->
         val validId = selectedId?.takeIf { id -> vehicleList.any { it.id == id } }
             ?: vehicleList.firstOrNull()?.id
         if (validId != selectedId) selectedVehicleId.value = validId
@@ -57,6 +69,7 @@ class NativeAppViewModel(
             vehicles = vehicleList,
             selectedVehicleId = validId,
             entries = if (validId == selectedId) fuelEntries else emptyList(),
+            expenses = if (validId == selectedId) vehicleExpenses else emptyList(),
             summary = calculateFuelSummary(if (validId == selectedId) fuelEntries else emptyList()),
             saving = isSaving,
             errorMessage = message,
@@ -89,6 +102,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             runCatching {
                 fuelRepository.deleteForVehicle(id)
+                expenseRepository.deleteForVehicle(id)
                 vehicleRepository.delete(id)
             }.onFailure { error.value = it.message ?: "ลบรถไม่สำเร็จ" }
         }
@@ -140,6 +154,41 @@ class NativeAppViewModel(
         }
     }
 
+    fun addExpense(
+        date: String,
+        category: String,
+        description: String,
+        amount: Double,
+        odometerKm: Double?,
+        onSaved: () -> Unit,
+    ) {
+        val vehicleId = state.value.selectedVehicle?.id
+        if (vehicleId == null) {
+            error.value = "กรุณาเพิ่มรถก่อนบันทึกค่าใช้จ่าย"
+            return
+        }
+        if (amount <= 0 || category.isBlank()) {
+            error.value = "กรุณาระบุหมวดหมู่และจำนวนเงินให้ถูกต้อง"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching {
+                expenseRepository.add(vehicleId, date, category, description, amount, odometerKm)
+            }.onSuccess { onSaved() }
+                .onFailure { error.value = it.message ?: "บันทึกค่าใช้จ่ายไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
+    fun deleteExpense(id: String) {
+        viewModelScope.launch {
+            runCatching { expenseRepository.delete(id) }
+                .onFailure { error.value = it.message ?: "ลบค่าใช้จ่ายไม่สำเร็จ" }
+        }
+    }
+
     fun clearError() {
         error.value = null
     }
@@ -148,8 +197,9 @@ class NativeAppViewModel(
 class NativeAppViewModelFactory(
     private val fuelRepository: LocalFuelRepository,
     private val vehicleRepository: LocalVehicleRepository,
+    private val expenseRepository: LocalExpenseRepository,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        NativeAppViewModel(fuelRepository, vehicleRepository) as T
+        NativeAppViewModel(fuelRepository, vehicleRepository, expenseRepository) as T
 }

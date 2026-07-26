@@ -23,6 +23,7 @@ const nativeAuth = await readFile(new URL('../native-kotlin/app/src/main/java/co
 const nativePreviewWorkflow = await readFile(new URL('../.github/workflows/build-native-preview.yml', import.meta.url), 'utf8');
 const nativeFuelApp = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/FuelLogApp.kt', import.meta.url), 'utf8');
 const nativeFuelDatabase = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/FuelLogDatabase.kt', import.meta.url), 'utf8');
+const nativeExpenseDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/ExpenseDao.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -238,6 +239,15 @@ test('native Kotlin source does not contain mojibake text', () => {
   ]) {
     assert.doesNotMatch(source, /เธ|เน€|โ€|โ|โ–/, `${name} contains mojibake`);
   }
+});
+
+test('native expenses are offline, vehicle-scoped and migration-safe', () => {
+  assert.match(nativeFuelDatabase, /entities = \[FuelEntryEntity::class, VehicleEntity::class, ExpenseEntity::class\]/);
+  assert.match(nativeFuelDatabase, /Migration\(2, 3\)/);
+  assert.match(nativeFuelDatabase, /CREATE TABLE IF NOT EXISTS expenses/);
+  assert.match(nativeExpenseDao, /WHERE vehicleId = :vehicleId/);
+  assert.match(nativeFuelApp, /AddExpenseDialog/);
+  assert.match(nativeFuelApp, /ExpenseList/);
 });
 
 test('home has one vehicle selector', () => {

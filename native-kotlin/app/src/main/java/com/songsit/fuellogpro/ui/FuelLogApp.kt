@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -57,6 +58,8 @@ fun FuelLogApp(
     state: NativeAppState,
     onAddFuel: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
+    onAddExpense: (String, String, String, Double, Double?, () -> Unit) -> Unit,
+    onDeleteExpense: (String) -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -65,7 +68,8 @@ fun FuelLogApp(
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
     var showAddVehicle by remember { mutableStateOf(false) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "รถของฉัน", "เพิ่มเติม")
+    var showAddExpense by remember { mutableStateOf(false) }
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "ค่าใช้จ่าย", "รถของฉัน")
 
     FuelLogTheme {
         Scaffold(
@@ -83,11 +87,11 @@ fun FuelLogApp(
             },
             bottomBar = {
                 NavigationBar {
-                    listOf("หน้าหลัก", "น้ำมัน", "รถ", "อื่น ๆ").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "ค่าใช้จ่าย", "รถ").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
-                            icon = { Text(listOf("⌂", "⛽", "●", "•••")[index]) },
+                            icon = { Text(listOf("⌂", "⛽", "฿", "●")[index]) },
                             label = { Text(label) },
                         )
                     }
@@ -98,24 +102,23 @@ fun FuelLogApp(
                     0, 1 -> FloatingActionButton(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddFuel = true },
                     ) { Text("+") }
-                    2 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
+                    2 -> FloatingActionButton(
+                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddExpense = true },
+                    ) { Text("+") }
+                    3 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
                 }
             },
         ) { padding ->
             when (tab) {
                 0 -> Dashboard(state, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
-                2 -> VehicleList(
+                2 -> ExpenseList(state.expenses, state.totalExpenses, onDeleteExpense, Modifier.padding(padding))
+                else -> VehicleList(
                     vehicles = state.vehicles,
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
                     onDelete = onDeleteVehicle,
                     modifier = Modifier.padding(padding),
-                )
-                else -> SimplePage(
-                    "Native Preview",
-                    "กำลังย้ายฟีเจอร์เดิมเข้าสู่ Kotlin ทีละส่วน โดยเก็บข้อมูลไว้ในเครื่องและไม่กระทบ Stable APK",
-                    Modifier.padding(padding),
                 )
             }
         }
@@ -132,6 +135,14 @@ fun FuelLogApp(
                 saving = state.saving,
                 onDismiss = { showAddVehicle = false },
                 onSave = onAddVehicle,
+            )
+        }
+        if (showAddExpense) {
+            AddExpenseDialog(
+                saving = state.saving,
+                latestOdometer = state.summary.latestOdometerKm,
+                onDismiss = { showAddExpense = false },
+                onSave = onAddExpense,
             )
         }
         state.errorMessage?.let { message ->
@@ -218,6 +229,57 @@ private fun FuelList(entries: List<FuelEntry>, onDelete: (String) -> Unit, modif
     ) {
         if (entries.isEmpty()) item { EmptyFuelState() }
         items(entries, key = { it.id }) { FuelRow(it, onDelete) }
+    }
+}
+
+@Composable
+private fun ExpenseList(
+    expenses: List<Expense>,
+    total: Double,
+    onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text("ค่าใช้จ่ายทั้งหมด", style = MaterialTheme.typography.labelLarge)
+                    Text(thaiCurrency.format(total), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        if (expenses.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(18.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ยังไม่มีค่าใช้จ่าย", fontWeight = FontWeight.SemiBold)
+                        Text("แตะ + เพื่อเพิ่มรายการแรก", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        items(expenses, key = { it.id }) { expense ->
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(expense.category, fontWeight = FontWeight.Bold)
+                        Text(
+                            listOf(expense.date, expense.description).filter(String::isNotBlank).joinToString(" • "),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text(thaiCurrency.format(expense.amount), fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { onDelete(expense.id) }) { Text("ลบ") }
+                }
+            }
+        }
     }
 }
 
@@ -386,6 +448,49 @@ private fun AddFuelDialog(
                         price.toDoubleOrNull() ?: 0.0,
                         fullTank,
                         station,
+                        onDismiss,
+                    )
+                },
+            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+}
+
+@Composable
+private fun AddExpenseDialog(
+    saving: Boolean,
+    latestOdometer: Double?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, Double, Double?, () -> Unit) -> Unit,
+) {
+    var date by remember { mutableStateOf(LocalDate.now().toString()) }
+    var category by remember { mutableStateOf("บำรุงรักษา") }
+    var description by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var odometer by remember { mutableStateOf(latestOdometer?.let { "%.0f".format(Locale.US, it) } ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("เพิ่มค่าใช้จ่าย") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(category, { category = it }, label = { Text("หมวดหมู่") }, singleLine = true)
+                OutlinedTextField(description, { description = it }, label = { Text("รายละเอียด") }, singleLine = true)
+                OutlinedTextField(amount, { amount = it }, label = { Text("จำนวนเงิน") }, singleLine = true)
+                OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true)
+                OutlinedTextField(odometer, { odometer = it }, label = { Text("เลขไมล์ (ไม่บังคับ)") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !saving,
+                onClick = {
+                    onSave(
+                        date,
+                        category,
+                        description,
+                        amount.toDoubleOrNull() ?: 0.0,
+                        odometer.toDoubleOrNull(),
                         onDismiss,
                     )
                 },

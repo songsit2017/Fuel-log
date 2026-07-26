@@ -61,7 +61,7 @@ fun FuelLogApp(
     state: NativeAppState,
     onAddFuel: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, Double, Double?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onCompleteMaintenance: (String) -> Unit,
@@ -122,7 +122,14 @@ fun FuelLogApp(
             when (tab) {
                 0 -> Dashboard(state, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
-                2 -> ExpenseList(state.expenses, state.totalExpenses, onDeleteExpense, Modifier.padding(padding))
+                2 -> ExpenseList(
+                    expenses = state.expenses,
+                    totalExpense = state.totalExpenses,
+                    totalIncome = state.totalIncome,
+                    netExpense = state.netExpense,
+                    onDelete = onDeleteExpense,
+                    modifier = Modifier.padding(padding),
+                )
                 3 -> MaintenanceList(
                     tasks = state.maintenanceTasks,
                     currentOdometerKm = state.summary.latestOdometerKm,
@@ -260,7 +267,9 @@ private fun FuelList(entries: List<FuelEntry>, onDelete: (String) -> Unit, modif
 @Composable
 private fun ExpenseList(
     expenses: List<Expense>,
-    total: Double,
+    totalExpense: Double,
+    totalIncome: Double,
+    netExpense: Double,
     onDelete: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -275,8 +284,12 @@ private fun ExpenseList(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text("ค่าใช้จ่ายทั้งหมด", style = MaterialTheme.typography.labelLarge)
-                    Text(thaiCurrency.format(total), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("สุทธิ", style = MaterialTheme.typography.labelLarge)
+                    Text(thaiCurrency.format(netExpense), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "รายจ่าย ${thaiCurrency.format(totalExpense)} • รายรับ ${thaiCurrency.format(totalIncome)}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }
@@ -300,7 +313,15 @@ private fun ExpenseList(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    Text(thaiCurrency.format(expense.amount), fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "${if (expense.income) "+" else "−"}${thaiCurrency.format(expense.amount)}",
+                            fontWeight = FontWeight.Bold,
+                            color = if (expense.income) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (expense.recurring) Text("รายการประจำ", style = MaterialTheme.typography.labelSmall)
+                        expense.reminderDate?.let { Text("เตือน $it", style = MaterialTheme.typography.labelSmall) }
+                    }
                     TextButton(onClick = { onDelete(expense.id) }) { Text("ลบ") }
                 }
             }
@@ -545,13 +566,16 @@ private fun AddExpenseDialog(
     saving: Boolean,
     latestOdometer: Double?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Double, Double?, () -> Unit) -> Unit,
+    onSave: (String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit,
 ) {
     var date by remember { mutableStateOf(LocalDate.now().toString()) }
     var category by remember { mutableStateOf("บำรุงรักษา") }
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var odometer by remember { mutableStateOf(latestOdometer?.let { "%.0f".format(Locale.US, it) } ?: "") }
+    var income by remember { mutableStateOf(false) }
+    var recurring by remember { mutableStateOf(false) }
+    var reminderDate by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("เพิ่มค่าใช้จ่าย") },
@@ -562,6 +586,20 @@ private fun AddExpenseDialog(
                 OutlinedTextField(amount, { amount = it }, label = { Text("จำนวนเงิน") }, singleLine = true)
                 OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true)
                 OutlinedTextField(odometer, { odometer = it }, label = { Text("เลขไมล์ (ไม่บังคับ)") }, singleLine = true)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(income, { income = it })
+                    Text("เป็นรายรับ")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(recurring, { recurring = it })
+                    Text("รายการประจำ")
+                }
+                OutlinedTextField(
+                    reminderDate,
+                    { reminderDate = it },
+                    label = { Text("วันเตือนชำระ (ไม่บังคับ)") },
+                    singleLine = true,
+                )
             }
         },
         confirmButton = {
@@ -574,6 +612,9 @@ private fun AddExpenseDialog(
                         description,
                         amount.toDoubleOrNull() ?: 0.0,
                         odometer.toDoubleOrNull(),
+                        income,
+                        recurring,
+                        reminderDate.takeIf(String::isNotBlank),
                         onDismiss,
                     )
                 },

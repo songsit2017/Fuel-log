@@ -20,6 +20,9 @@ class LocalExpenseRepository(
         description: String,
         amount: Double,
         odometerKm: Double?,
+        income: Boolean,
+        recurring: Boolean,
+        reminderDate: String?,
     ) {
         dao.upsert(
             ExpenseEntity(
@@ -30,6 +33,9 @@ class LocalExpenseRepository(
                 description = description.trim(),
                 amount = amount,
                 odometerKm = odometerKm,
+                income = income,
+                recurring = recurring,
+                reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = System.currentTimeMillis(),
             ),
         )
@@ -47,4 +53,7 @@ private fun ExpenseEntity.toDomain() = Expense(
     description = description,
     amount = amount,
     odometerKm = odometerKm,
+    income = income,
+    recurring = recurring,
+    reminderDate = reminderDate,
 )

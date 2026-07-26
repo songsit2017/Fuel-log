@@ -10,6 +10,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE vehicleId = :vehicleId ORDER BY date DESC, createdAt DESC")
     fun observeForVehicle(vehicleId: String): Flow<List<ExpenseEntity>>
 
+    @Query("SELECT * FROM expenses WHERE reminderDate IS NOT NULL")
+    suspend fun getItemsWithReminderDates(): List<ExpenseEntity>
+
     @Upsert
     suspend fun upsert(expense: ExpenseEntity)
 

@@ -11,6 +11,7 @@
 - [x] Offline multiple-vehicle selection and vehicle-scoped fuel records.
 - [x] Fuel records and full/partial-tank metrics.
 - [x] Offline vehicle-scoped expense records and totals.
+- [x] Expense income, recurrence and payment reminder dates.
 - [x] Offline maintenance records with date/odometer due status and recurrence.
 - [x] Android notification channel and daily WorkManager scheduling for date reminders.
 - [ ] Odometer-triggered notification refresh and notification settings.

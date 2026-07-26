@@ -9,6 +9,7 @@ import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.LocalMaintenanceRepository
 import com.songsit.fuellogpro.domain.FuelSummary
 import com.songsit.fuellogpro.domain.calculateFuelSummary
+import com.songsit.fuellogpro.domain.calculateExpenseSummary
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
@@ -35,7 +36,11 @@ data class NativeAppState(
     val selectedVehicle: Vehicle?
         get() = vehicles.firstOrNull { it.id == selectedVehicleId } ?: vehicles.firstOrNull()
     val totalExpenses: Double
-        get() = expenses.sumOf(Expense::amount)
+        get() = calculateExpenseSummary(expenses).totalExpense
+    val totalIncome: Double
+        get() = calculateExpenseSummary(expenses).totalIncome
+    val netExpense: Double
+        get() = calculateExpenseSummary(expenses).netExpense
 }
 
 class NativeAppViewModel(
@@ -170,6 +175,9 @@ class NativeAppViewModel(
         description: String,
         amount: Double,
         odometerKm: Double?,
+        income: Boolean,
+        recurring: Boolean,
+        reminderDate: String?,
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.selectedVehicle?.id
@@ -185,7 +193,17 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                expenseRepository.add(vehicleId, date, category, description, amount, odometerKm)
+                expenseRepository.add(
+                    vehicleId,
+                    date,
+                    category,
+                    description,
+                    amount,
+                    odometerKm,
+                    income,
+                    recurring,
+                    reminderDate,
+                )
             }.onSuccess { onSaved() }
                 .onFailure { error.value = it.message ?: "บันทึกค่าใช้จ่ายไม่สำเร็จ" }
             saving.value = false

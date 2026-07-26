@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExpenseEntity::class,
         MaintenanceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -88,6 +88,13 @@ abstract class FuelLogDatabase : RoomDatabase() {
                 )
             }
         }
+        private val migration4To5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN income INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN recurring INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN reminderDate TEXT")
+            }
+        }
 
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
@@ -95,7 +102,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     context.applicationContext,
                     FuelLogDatabase::class.java,
                     "fuellog-native.db",
-                ).addMigrations(migration1To2, migration2To3, migration3To4)
+                ).addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
                     .build()
                     .also { instance = it }
             }

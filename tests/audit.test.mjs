@@ -251,6 +251,12 @@ test('native expenses are offline, vehicle-scoped and migration-safe', () => {
   assert.match(nativeExpenseDao, /WHERE vehicleId = :vehicleId/);
   assert.match(nativeFuelApp, /AddExpenseDialog/);
   assert.match(nativeFuelApp, /ExpenseList/);
+  assert.match(nativeFuelDatabase, /Migration\(4, 5\)/);
+  assert.match(nativeFuelDatabase, /ADD COLUMN income INTEGER NOT NULL DEFAULT 0/);
+  assert.match(nativeFuelDatabase, /ADD COLUMN recurring INTEGER NOT NULL DEFAULT 0/);
+  assert.match(nativeFuelDatabase, /ADD COLUMN reminderDate TEXT/);
+  assert.match(nativeFuelApp, /เป็นรายรับ/);
+  assert.match(nativeFuelApp, /รายการประจำ/);
 });
 
 test('native maintenance reminders are offline and evaluate date plus odometer', () => {
@@ -272,6 +278,7 @@ test('native maintenance dates schedule Android notifications safely', () => {
   assert.match(nativeMaintenanceWorker, /enqueueUniquePeriodicWork/);
   assert.match(nativeMaintenanceWorker, /ExistingPeriodicWorkPolicy\.UPDATE/);
   assert.match(nativeMaintenanceWorker, /Manifest\.permission\.POST_NOTIFICATIONS/);
+  assert.match(nativeMaintenanceWorker, /getItemsWithReminderDates/);
 });
 
 test('home has one vehicle selector', () => {

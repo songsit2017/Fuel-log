@@ -12,5 +12,8 @@ data class ExpenseEntity(
     val description: String,
     val amount: Double,
     val odometerKm: Double?,
+    val income: Boolean,
+    val recurring: Boolean,
+    val reminderDate: String?,
     val createdAt: Long,
 )

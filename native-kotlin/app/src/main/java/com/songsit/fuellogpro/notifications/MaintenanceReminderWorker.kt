@@ -52,6 +52,24 @@ class MaintenanceReminderWorker(
                     )
                 }
             }
+        FuelLogDatabase.get(applicationContext).expenseDao().getItemsWithReminderDates()
+            .forEach { expense ->
+                val reminderDate = expense.reminderDate
+                    ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                    ?: return@forEach
+                val days = ChronoUnit.DAYS.between(today, reminderDate)
+                if (days <= 7) {
+                    notifyTask(
+                        id = "expense-${expense.id}".hashCode(),
+                        title = expense.description.ifBlank { expense.category },
+                        message = when {
+                            days < 0 -> "เลยวันเตือนชำระ ${-days} วัน"
+                            days == 0L -> "ถึงวันเตือนชำระวันนี้"
+                            else -> "ถึงวันเตือนชำระใน $days วัน"
+                        },
+                    )
+                }
+            }
         return Result.success()
     }
 

@@ -1,7 +1,18 @@
-# FuelLog Pro v6 Main Complete
+# FuelLog Pro V7 — main
 
 **Target branch:** `main`  
 **Base:** `Fuel-log-5.03.zip`
+
+> V7 ใช้ `main` เป็นฐานและเป้าหมายเดียว
+
+## ตั้งค่า Claude OCR ที่ปลอดภัย
+
+1. ติดตั้ง Firebase CLI และล็อกอินโปรเจกต์ production
+2. รัน `firebase functions:secrets:set ANTHROPIC_API_KEY`
+3. รัน `firebase deploy --only functions:scanReceipt`
+4. ผู้ใช้ต้อง Google Login ก่อนใช้ Claude OCR; หาก backend ไม่พร้อม แอปจะ fallback ไป Tesseract ในเครื่อง
+
+API key จะอยู่ใน Firebase Secret เท่านั้น ไม่อยู่ใน `app.js`, localStorage หรือไฟล์ export
 
 ชุดนี้เป็นไฟล์เต็มสำหรับแทนที่โปรเจกต์เดิมทั้งชุด ไม่ใช่ Patch
 

@@ -6,6 +6,6 @@ const mobile=resolve(here,'..');
 const root=resolve(mobile,'..');
 const www=resolve(mobile,'www');
 await rm(www,{recursive:true,force:true}); await mkdir(www,{recursive:true});
-const files=['index.html','app.js','styles.css','firebase-config.js','manifest.json','sw.js','oil-prices.json','icon-192.png','icon-512.png'];
+const files=['index.html','app.js','styles.css','firebase-config.js','manifest.json','sw.js','oil-prices.json','icon-192.png','icon-512.png','modules'];
 for(const f of files) await cp(resolve(root,f),resolve(www,f),{recursive:true});
 console.log('FuelLog web files synced to mobile/www');

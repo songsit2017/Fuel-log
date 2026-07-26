@@ -6,3 +6,10 @@ FuelLog Pro v6.2 Main Complete
 - Added extra image/PDF attachment
 - Included fields in list view and CSV export
 - Kept Fuelio, OCR, Family, Sync, oil price and Android-ready structure
+FuelLog Pro V7.0
+- แยก Settings, Weather และ OCR client เป็น ES modules
+- เพิ่มสกุลเงิน, ทศนิยม 0–3, ธีมสว่าง/มืด/ตามระบบ/อัตโนมัติ
+- เพิ่ม Open-Meteo พร้อมบันทึก weather ในรายการและ Export
+- ย้าย Claude OCR ไป Firebase Functions Secret พร้อม Auth และ rate limit
+- ปรับฟอร์มเติมน้ำมันเป็น guided flow พร้อม sticky save action
+- คง Google Login, Family Sharing, Fuelio Import, local OCR, ราคาน้ำมัน, Sync และ Export

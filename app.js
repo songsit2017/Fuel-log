@@ -1,11 +1,15 @@
+import { CURRENCIES, formatCurrency, migrateSettings, resolveLightTheme } from './modules/settings.js';
+import { captureWeather, weatherSummary } from './modules/weather.js';
+import { scanWithSecureBackend } from './modules/ocr-client.js';
+
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
 const FIREBASE_SDK_VERSION = '12.13.0';
-let app = null, auth = null, db = null, storage = null;
+let app = null, auth = null, db = null, storage = null, functions = null;
 let GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
     signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
     doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp,
-    ref, uploadBytes, getDownloadURL;
+    ref, uploadBytes, getDownloadURL, httpsCallable;
 let firebaseReadyPromise = null;
 let firebaseLoadError = null;
 
@@ -13,23 +17,26 @@ async function initFirebase(){
   if(firebaseReadyPromise) return firebaseReadyPromise;
   firebaseReadyPromise = (async()=>{
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-    const [{firebaseConfig}, appMod, authMod, fireMod, storageMod] = await Promise.all([
+    const [{firebaseConfig}, appMod, authMod, fireMod, storageMod, functionsMod] = await Promise.all([
       import('./firebase-config.js?v=5.0.4'),
       import(`${base}/firebase-app.js`),
       import(`${base}/firebase-auth.js`),
       import(`${base}/firebase-firestore.js`),
-      import(`${base}/firebase-storage.js`)
+      import(`${base}/firebase-storage.js`),
+      import(`${base}/firebase-functions.js`)
     ]);
 
     app = appMod.initializeApp(firebaseConfig);
     auth = authMod.getAuth(app);
     db = fireMod.getFirestore(app);
     storage = storageMod.getStorage(app);
+    functions = functionsMod.getFunctions(app, 'asia-southeast1');
 
     ({GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
       signOut, onAuthStateChanged, setPersistence, browserLocalPersistence} = authMod);
     ({doc, setDoc, updateDoc, getDoc, getDocs, collection, writeBatch, serverTimestamp} = fireMod);
     ({ref, uploadBytes, getDownloadURL} = storageMod);
+    ({httpsCallable} = functionsMod);
 
     await setPersistence(auth, browserLocalPersistence).catch(console.warn);
     getRedirectResult(auth).catch(console.warn);
@@ -78,7 +85,7 @@ function stationBadge(stationName){
   return `<div class="ico">⛽</div>`;
 }
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '6.10.0';
+const APP_VERSION = '7.0.0';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -97,8 +104,8 @@ const store = (()=>{
 const uid = () => crypto.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const today = () => new Date().toISOString().slice(0,10);
 const nowTime = () => new Date().toTimeString().slice(0,5);
-const fmt = (n,d=0) => new Intl.NumberFormat('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Number(n)||0);
-const money = n => `฿${fmt(n,0)}`;
+const fmt = (n,d=state?.settings?.decimals??0) => new Intl.NumberFormat('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Number(n)||0);
+const money = n => formatCurrency(n,state?.settings);
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toast = t => { const x=$('#toast'); x.textContent=t; x.classList.add('show'); setTimeout(()=>x.classList.remove('show'),1800); };
 
@@ -122,7 +129,7 @@ const fmtVol = (l,d=2) => `${fmt(toDisplayVol(l),d)} ${volUnit()}`;
 const efficiencyUnit = () => `${distUnit()}/${volUnit()}`;
 const toDisplayEfficiency = kml => (Number(kml)||0)*distFactor()/volFactor();
 
-let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'dark', units:{distance:'km',volume:'liters'} };
+let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'system', units:{distance:'km',volume:'liters'} };
 let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups';
 
 function seed(){
@@ -131,7 +138,7 @@ function seed(){
   const oldCosts = JSON.parse(store.getItem('fuel-costs')||'[]');
   const oldReminders = JSON.parse(store.getItem('fuel-reminders')||'[]');
   const vehicles = oldVehicles?.length ? oldVehicles : [{id:uid(),name:'รถของฉัน'}];
-  return {vehicles, entries:oldEntries.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), expenses:oldCosts.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id,amount:Number(x.amount||x.total||0)})), reminders:oldReminders.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), trips:[], currentVehicleId:store.getItem('current-vehicle-id')||vehicles[0].id, theme:'dark', units:{distance:'km',volume:'liters'}};
+  return {vehicles, entries:oldEntries.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), expenses:oldCosts.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id,amount:Number(x.amount||x.total||0)})), reminders:oldReminders.map(x=>({...x,id:x.id||uid(),vehicleId:x.vehicleId||vehicles[0].id})), trips:[], currentVehicleId:store.getItem('current-vehicle-id')||vehicles[0].id, theme:'system', units:{distance:'km',volume:'liters'}};
 }
 function load(){
   try{ state = JSON.parse(store.getItem(KEY)) || seed(); }catch{ state=seed(); }
@@ -139,7 +146,7 @@ function load(){
   state.entries ||= []; state.expenses ||= []; state.reminders ||= []; state.trips ||= [];
   state.currentVehicleId ||= state.vehicles[0].id;
   state.units ||= {distance:'km',volume:'liters'};
-  if(!state.themeMigratedAuto){ state.theme='auto'; state.themeMigratedAuto=true; }
+  migrateSettings(state);
   state.homeCards ||= {nearby:true,todayPrice:true,chart:true,latest:true,due:true};
   state.fontFamily ||= 'system';
   // Compatibility: old records only had total. New records keep grossTotal + discount,
@@ -173,22 +180,21 @@ function health(){let score=100;dueItems().forEach(x=>score-=x.status==='over'?1
 // ---------- Theme: 'auto' follows the phone/OS setting, or user can pin light/dark ----------
 let systemThemeMedia = null;
 function computeIsLight(){
-  if(state.theme==='light') return true;
-  if(state.theme==='dark') return false;
-  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+  const systemPrefersLight=!!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+  return resolveLightTheme(state.theme,systemPrefersLight);
 }
 function applyTheme(){
   const isLight = computeIsLight();
   document.body.classList.toggle('light', isLight);
   const btn = $('#themeBtn');
-  if(btn) btn.textContent = state.theme==='light' ? '☀' : state.theme==='dark' ? '☾' : '◐';
+  if(btn) btn.textContent = state.theme==='light' ? '☀' : state.theme==='dark' ? '☾' : state.theme==='auto' ? '◒' : '◐';
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', isLight ? '#f5f6f8' : '#0f1115');
 }
 function watchSystemTheme(){
   if(!window.matchMedia || systemThemeMedia) return;
   systemThemeMedia = window.matchMedia('(prefers-color-scheme: light)');
-  const handler = () => { if(state.theme==='auto') applyTheme(); };
+  const handler = () => { if(state.theme==='system') applyTheme(); };
   if(systemThemeMedia.addEventListener) systemThemeMedia.addEventListener('change', handler);
   else if(systemThemeMedia.addListener) systemThemeMedia.addListener(handler); // older WebView fallback
 }
@@ -245,8 +251,9 @@ function renderFuel(){
     const discountLine=discount>0?`<small>ก่อนลด ${money(gross)} • ลด ${money(discount)}</small>`:'';
     const meta=[x.driver,x.paymentMethod,x.reason].filter(Boolean).map(esc).join(' • ');
     const metaLine=meta?`<small>${meta}</small>`:'';
+    const weatherLine=x.weather?`<small>🌦️ ${esc(weatherSummary(x.weather))}</small>`:'';
     const missedLine=x.previousFillMissed?`<small style="color:var(--accent)">⚠ พลาดการบันทึกครั้งก่อน</small>`:'';
-    html+=`<article class="record" data-edit-fuel="${x.id}">${stationBadge(x.station)}<div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
+    html+=`<article class="record" data-edit-fuel="${x.id}">${stationBadge(x.station)}<div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${weatherLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?money(toDisplayPricePerVol(x.pricePerLiter))+'/'+volUnit():''}</small></div></article>`;
   }
   $('#fuelList').innerHTML=html;
 }
@@ -284,12 +291,16 @@ function bindMediaPickerForForm(){
   ];
   inputs.forEach(([inputId,statusId])=>{
     const input=document.getElementById(inputId),status=document.getElementById(statusId);
-    if(input)input.onchange=()=>{if(input.files?.[0]&&status)status.textContent=input.files[0].name||'เลือกรูปแล้ว';};
+    if(input)input.onchange=()=>{
+      if(input.files?.[0]&&status)status.textContent=input.files[0].name||'เลือกรูปแล้ว';
+      if(kindForInput(inputId)==='receipt'&&state.settings?.autoOcrEnabled&&input.files?.[0]) scanReceipt(input.files[0],'fuel');
+    };
   });
 }
+function kindForInput(inputId){return inputId.startsWith('receipt')?'receipt':'odometer';}
 
 function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#formTitle').textContent=type==='fuel'?(obj.id?'แก้ไขการเติมน้ำมัน':'เพิ่มรายการเติมน้ำมัน'):type==='expense'?(obj.id?'แก้ไขค่าใช้จ่าย':'เพิ่มค่าใช้จ่าย'):'ตั้งเตือนบำรุงรักษา';d.dataset.type=type;d.dataset.id=obj.id||'';
- if(type==='fuel')b.innerHTML=`<div class="photo-grid media-actions">
+ if(type==='fuel')b.innerHTML=`<section class="fuel-form-hero"><span>⛽</span><div><b>${obj.id?'แก้ไขข้อมูลการเติม':'บันทึกการเติมครั้งใหม่'}</b><small>กรอกระยะทาง ปริมาณ และยอดชำระ ระบบจะคำนวณให้ทันที</small></div></section><h3 class="form-section-title">1. รูปและ OCR</h3><div class="photo-grid media-actions">
 <button type="button" class="photo-pick" data-media-picker="receipt">🧾 เพิ่มรูปใบเสร็จ<small id="receiptFileStatus">กล้องหรือแกลเลอรี</small></button>
 <button type="button" class="photo-pick" data-media-picker="odometer">🔢 เพิ่มรูปเรือนไมล์<small id="odoFileStatus">กล้องหรือแกลเลอรี</small></button>
 <label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="fuelOcrFile" accept="image/*"></label>
@@ -297,10 +308,10 @@ function showForm(type,obj={}){const d=$('#formDialog'),b=$('#formBody');$('#for
 <input hidden type="file" id="receiptGalleryFile" accept="image/*">
 <input hidden type="file" id="odoCameraFile" accept="image/*" capture="environment">
 <input hidden type="file" id="odoGalleryFile" accept="image/*">
-</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
+</div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><h3 class="form-section-title">2. รายละเอียดการเติม</h3><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เวลา</label><input name="time" type="time" value="${obj.time||nowTime()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" inputmode="decimal" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field"><label>${volUnit()}</label><input name="liters" type="number" inputmode="decimal" step=".001" value="${dispVolVal(obj.liters)}"></div><div class="field"><label>ราคา/${volUnit()}</label><input name="pricePerLiter" type="number" inputmode="decimal" step=".01" value="${obj.pricePerLiter?fmt(toDisplayPricePerVol(obj.pricePerLiter),2):''}"></div>
 <div class="field"><label>ยอดก่อนส่วนลด</label><input name="grossTotal" type="number" step=".01" value="${obj.grossTotal||((+obj.total||0)+(+obj.discount||0))||''}"></div>
-<div class="field"><label>ส่วนลด (บาท)</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
-<div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณบาท/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
+<div class="field"><label>ส่วนลด (${state.settings.currency})</label><input name="discount" type="number" min="0" step=".01" value="${obj.discount||''}"></div>
+<div class="field full"><label>ยอดสุทธิที่ใช้คำนวณต้นทุนจริง</label><input name="total" type="number" step=".01" value="${obj.total||''}" readonly><small class="muted">ยอดสุทธิ = ยอดก่อนส่วนลด − ส่วนลด และใช้ค่านี้คำนวณ ${state.settings.currency}/${distUnit()}</small></div><div class="field"><label>ชนิดน้ำมัน</label><select name="fuelType">${[
   'แก๊สโซฮอล์ 95','แก๊สโซฮอล์ 91','แก๊สโซฮอล์ E20','แก๊สโซฮอล์ E85',
   'เบนซิน 95','ดีเซล B7','ดีเซล B10','ดีเซล B20','ดีเซลพรีเมียม',
   'LPG','NGV','ไฟฟ้า','อื่นๆ'
@@ -318,7 +329,8 @@ ${obj.paymentMethod&&!['เงินสด','บัตรเครดิต','�
 <label class="field full"><input name="previousFillMissed" type="checkbox" ${obj.previousFillMissed?'checked':''}> พลาดการบันทึกการเติมครั้งก่อนหน้า</label>
 <div class="field full"><label>แนบไฟล์เพิ่มเติม</label><input id="extraAttachmentFile" type="file" accept="image/*,application/pdf"></div>
 <div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div>
-<label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label></div>`;
+<label class="field full"><input name="full" type="checkbox" ${obj.full!==false?'checked':''}> เติมเต็มถัง</label>
+<div class="field full weather-preview"><b>🌦️ สภาพอากาศ</b><small>${obj.weather?esc(weatherSummary(obj.weather)):(state.settings?.weatherEnabled?'จะบันทึกจาก Open-Meteo อัตโนมัติเมื่อกดบันทึก':'ปิดอยู่ในการตั้งค่า')}</small><div id="weatherStatus" class="muted"></div></div></div>`;
  if(type==='expense')b.innerHTML=`<div class="photo-grid"><label class="photo-pick">✨ สแกนบิล<input hidden type="file" id="expenseOcrFile" accept="image/*"></label></div><div id="ocrStatus" class="muted" style="margin:8px 0;min-height:20px;"></div><div class="form-grid"><div class="field"><label>วันที่</label><input name="date" type="date" value="${obj.date||today()}"></div><div class="field"><label>เลข${distUnit()}</label><input name="odometer" type="number" step=".01" value="${dispDistVal(obj.odometer)}"></div><div class="field full"><label>รายการ</label><input name="title" value="${esc(obj.title||'')}"></div><div class="field"><label>หมวด</label><select name="category">${['น้ำมันเครื่อง','ของเหลว/ไส้กรอง','เบรก','ยางและล้อ','ช่วงล่าง','แบตเตอรี่/ไฟฟ้า','เครื่องยนต์','เกียร์','แอร์','ไฮบริด/EV','ประกัน','พ.ร.บ.','ภาษี','ค่าจอด','ทางด่วน','ล้างรถ','อื่นๆ'].map(x=>`<option ${obj.category===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>จำนวนเงิน</label><input name="amount" type="number" step=".01" value="${obj.amount||''}"></div><div class="field full"><label>หมายเหตุ</label><textarea name="note">${esc(obj.note||'')}</textarea></div></div>`;
  if(type==='reminder')b.innerHTML=`<div class="form-grid"><div class="field full"><label>รายการ</label><input name="name" value="${esc(obj.name||'เปลี่ยนน้ำมันเครื่อง')}"></div><div class="field"><label>กำหนดที่เลข${distUnit()}</label><input name="nextOdo" type="number" step=".01" value="${dispDistVal(obj.nextOdo)}"></div><div class="field"><label>กำหนดวันที่</label><input name="nextDate" type="date" value="${obj.nextDate||''}"></div><div class="field"><label>ทำซ้ำทุก (${distUnit()}) — ถ้ามี</label><input name="repeatOdo" type="number" step=".01" value="${dispDistVal(obj.repeatOdo)}"></div><div class="field"><label>ทำซ้ำทุก (เดือน) — ถ้ามี</label><input name="repeatMonths" type="number" value="${obj.repeatMonths||''}"></div><p class="muted full" style="grid-column:1/-1;">ถ้าใส่ "ทำซ้ำ" ไว้ กด "✓ เสร็จแล้ว" ที่รายการนี้ในหน้าบำรุงรักษาจะเลื่อนกำหนดครั้งถัดไปให้อัตโนมัติ แทนที่จะลบทิ้ง</p></div>`;
  d.showModal();
@@ -372,34 +384,13 @@ function guessMerchant(text){
 }
 async function scanReceiptWithClaude(file,type,status){
   if(status) status.textContent='กำลังส่งรูปให้ AI อ่าน…';
-  const base64=await new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(r.result.split(',')[1]);
-    r.onerror=reject;
-    r.readAsDataURL(file);
-  });
-  const mediaType=file.type||'image/jpeg';
-  const isFuel=type==='fuel';
-  const schemaHint=isFuel
-    ? '{"date":"YYYY-MM-DD หรือ null","liters":number หรือ null,"pricePerLiter":number หรือ null,"total":number หรือ null,"station":string หรือ null}'
-    : '{"date":"YYYY-MM-DD หรือ null","title":string หรือ null,"amount":number หรือ null}';
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':state.anthropicApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,messages:[{role:'user',content:[
-      {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
-      {type:'text',text:`นี่คือรูปใบเสร็จ${isFuel?'เติมน้ำมัน':''} อ่านข้อมูลแล้วตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ markdown fence รูปแบบ: ${schemaHint} ถ้าอ่านค่าใดไม่ได้ให้ใส่ null แปลงปี พ.ศ. เป็น ค.ศ. ถ้าจำเป็น`}
-    ]}]})
-  });
-  const data=await res.json();
-  if(data.error) throw new Error(data.error.message||'Anthropic API error');
-  const textBlock=(data.content||[]).find(c=>c.type==='text');
-  if(!textBlock) throw new Error('ไม่มีคำตอบจาก AI');
-  return JSON.parse(textBlock.text.replace(/```json|```/g,'').trim());
+  await requireFirebase();
+  if(!user) throw new Error('กรุณาเข้าสู่ระบบด้วย Google เพื่อใช้ Claude OCR');
+  return scanWithSecureBackend(file,type,httpsCallable(functions,'scanReceipt'));
 }
 async function scanReceipt(file,type){
   const status=$('#ocrStatus');
-  if(state.anthropicApiKey){
+  if(user){
     try{
       const parsed=await scanReceiptWithClaude(file,type,status);
       if(parsed.date&&$('[name="date"]')) $('[name="date"]').value=parsed.date;
@@ -508,7 +499,18 @@ async function saveForm(e){e.preventDefault();const d=$('#formDialog'),type=d.da
    data.previousFillMissed=$('[name="previousFillMissed"]')?.checked??false;
    if(!data.grossTotal&&data.pricePerLiter&&data.liters){data.grossTotal=data.pricePerLiter*data.liters;data.total=Math.max(0,data.grossTotal-data.discount);}
    if(!data.pricePerLiter&&data.grossTotal&&data.liters)data.pricePerLiter=data.grossTotal/data.liters;
-   const old=state.entries.findIndex(x=>x.id===idv);old>=0?state.entries[old]=data:state.entries.push(data);await uploadAttachedPhotos(idv);
+   const old=state.entries.findIndex(x=>x.id===idv);
+   const oldRecord=old>=0?state.entries[old]:null;
+   if(state.settings?.weatherEnabled){
+     const status=$('#weatherStatus');
+     if(status)status.textContent='กำลังบันทึกสภาพอากาศ…';
+     try{data.weather=await captureWeather();}catch(error){
+       console.warn('Weather capture skipped:',error);
+       data.weather=oldRecord?.weather||null;
+       if(status)status.textContent='ใช้ตำแหน่งไม่ได้ จึงบันทึกรายการโดยไม่มีข้อมูลอากาศ';
+     }
+   }else if(oldRecord?.weather)data.weather=oldRecord.weather;
+   old>=0?state.entries[old]={...oldRecord,...data}:state.entries.push(data);await uploadAttachedPhotos(idv);
  }
  if(type==='expense'){
    if(!(+data.amount>0)){ alert('กรอกจำนวนเงินให้ครบก่อนบันทึก'); return; }
@@ -930,10 +932,23 @@ function runGlobalSearch(){
 // ---------- Settings: display units ----------
 function settingsPanel(){
   const hc = state.homeCards || {};
-  return `<div class="card"><h2>สแกนบิลด้วย AI (แม่นยำกว่าตัวอ่านฟรี)</h2>
-    <p class="muted">ค่าเริ่มต้นแอปอ่านบิลด้วย Tesseract.js (ฟรี ทำงานในเครื่อง) ซึ่งความแม่นยำสำหรับภาษาไทยและบิลถ่ายเอียง/แสงไม่ดีจะสู้ AI ไม่ได้ — ใส่ Anthropic API key ของตัวเองเพื่อให้สแกนด้วย Claude แทน แม่นยำขึ้นมาก โดยแอปจะสลับกลับไปใช้ตัวอ่านฟรีให้อัตโนมัติถ้า AI อ่านไม่สำเร็จ</p>
-    <div class="field"><label>Anthropic API key</label><input type="password" id="anthropicApiKey" placeholder="sk-ant-..." value="${esc(state.anthropicApiKey||'')}"></div>
-    <p class="muted">เก็บไว้ในเครื่องนี้เท่านั้น ไม่ถูกส่งไปที่อื่นนอกจาก Anthropic API ตอนสแกนบิล — สมัคร/สร้าง key ได้ที่ <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> (มีค่าใช้จ่ายตามการใช้งานจริง ~เศษสตางค์ต่อการสแกน 1 ครั้ง) เว้นว่างไว้เพื่อใช้ตัวอ่านฟรีต่อไป</p></div>
+  return `<div class="card"><h2>ภูมิภาคและตัวเลข</h2>
+    <div class="settings-grid">
+      <div class="field"><label>สกุลเงิน</label><select id="currency">${Object.entries(CURRENCIES).map(([code,item])=>`<option value="${code}" ${state.settings.currency===code?'selected':''}>${item.label}</option>`).join('')}</select></div>
+      <div class="field"><label>จำนวนทศนิยม</label><select id="decimals">${[0,1,2,3].map(n=>`<option value="${n}" ${state.settings.decimals===n?'selected':''}>${n} ตำแหน่ง</option>`).join('')}</select></div>
+    </div>
+    <p class="muted">การเปลี่ยนสกุลเงินเปลี่ยนรูปแบบการแสดงผลเท่านั้น ไม่แปลงอัตราแลกเปลี่ยนหรือแก้จำนวนเงินเดิม</p></div>
+  <div class="card"><h2>ธีม</h2>
+    <div class="field"><label>ลักษณะหน้าจอ</label><select id="themeMode">
+      <option value="light" ${state.theme==='light'?'selected':''}>สว่าง</option>
+      <option value="dark" ${state.theme==='dark'?'selected':''}>มืด</option>
+      <option value="system" ${state.theme==='system'?'selected':''}>ตามระบบ</option>
+      <option value="auto" ${state.theme==='auto'?'selected':''}>อัตโนมัติ (สว่าง 06:00–18:00)</option>
+    </select></div></div>
+  <div class="card"><h2>การบันทึกอัจฉริยะ</h2>
+    <label class="toggle-row"><span>🌦️ บันทึก Weather ด้วย Open-Meteo</span><input type="checkbox" id="weatherEnabled" ${state.settings.weatherEnabled?'checked':''}></label>
+    <label class="toggle-row"><span>✨ OCR อัตโนมัติเมื่อแนบใบเสร็จ</span><input type="checkbox" id="autoOcrEnabled" ${state.settings.autoOcrEnabled?'checked':''}></label>
+    <p class="muted">Claude OCR เรียกผ่าน Firebase Functions ที่ตรวจการล็อกอินและเก็บ API key เป็น Secret เท่านั้น หาก backend ใช้ไม่ได้ แอปจะใช้ Tesseract ในเครื่องเป็นตัวสำรอง</p></div>
   <div class="card"><h2>รูปแบบและลักษณะ</h2>
     <div class="field"><label>แบบอักษร (Font)</label><select id="fontFamily">${Object.entries(FONT_OPTIONS).map(([k,v])=>`<option value="${k}" ${state.fontFamily===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
     <p class="muted">แบบอักษรนอกจาก "ระบบ" จะโหลดจาก Google Fonts ครั้งแรกที่เลือก (ต้องมีอินเทอร์เน็ต) หลังจากนั้นเบราว์เซอร์จะจำไว้ให้</p>
@@ -952,6 +967,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.0</b> — แยก Settings/Weather/OCR เป็นโมดูล, เพิ่มสกุลเงิน ทศนิยม 0–3 ธีม 4 แบบ, Open-Meteo และ Claude OCR ผ่าน backend ที่ปลอดภัย</li>
       <li><b>6.10</b> — รายการเติมน้ำมันแยกเป็นกลุ่มตามเดือน พร้อมไอคอนสีตามยี่ห้อปั๊ม, แก้ช่องติ๊กเลือกการ์ดหน้าแรกในตั้งค่าที่เคยเรียงเพี้ยน</li>
       <li><b>6.9</b> — เทียบราคาน้ำมัน ปตท./เชลล์ กับบางจากในหน้าแรก, เพิ่มตัวเลือกสแกนบิลด้วย Claude AI (แม่นยำกว่าตัวอ่านฟรี)</li>
       <li><b>6.8</b> — เลือกฟอนต์ของแอปได้ (Sarabun/Kanit/Prompt/ระบบ), ปิด/เปิดการ์ดในหน้าแรกได้เอง</li>
@@ -967,7 +983,8 @@ function settingsPanel(){
     <details class="about-item"><summary>บริการและซอฟต์แวร์ที่ใช้</summary><div class="about-body"><ul>
       <li><b>Firebase</b> (Google) — ระบบล็อกอิน, ฐานข้อมูลคลาวด์, พื้นที่เก็บรูปภาพ สำหรับซิงก์และแชร์รถกับครอบครัว</li>
       <li><b>Tesseract.js</b> (สัญญาอนุญาต Apache 2.0) — อ่านข้อความจากรูปใบเสร็จ (OCR) แบบฟรี ทำงานในเครื่องทั้งหมด ไม่ส่งรูปออกไปที่ไหน ใช้เป็นค่าเริ่มต้นหรือเป็นตัวสำรอง</li>
-      <li><b>Claude (Anthropic API)</b> — ทางเลือกสแกนบิลด้วย AI ที่แม่นยำกว่า ใช้เมื่อใส่ API key ของตัวเองในตั้งค่าเท่านั้น ไม่บังคับใช้</li>
+      <li><b>Claude (Anthropic API)</b> — สแกนบิลผ่าน Firebase Functions; API key อยู่ใน Secret ฝั่ง server และผู้ใช้ต้องล็อกอิน</li>
+      <li><b>Open-Meteo</b> — อ่านอากาศปัจจุบันตามตำแหน่งเมื่อบันทึกรายการ (ปิดได้)</li>
       <li><b>thai-oil-api (chnwt.dev)</b> — ราคาน้ำมัน ปตท./เชลล์ สำหรับเทียบกับราคาทางการของบางจาก</li>
       <li><b>JSZip</b> (สัญญาอนุญาต MIT) — ใช้แตกไฟล์สำรองข้อมูล .fuelio ตอนนำเข้า</li>
       <li><b>OpenStreetMap</b> ผ่าน Overpass API (สัญญาอนุญาต ODbL) — ข้อมูลตำแหน่งปั๊มน้ำมันใกล้เคียง</li>
@@ -981,7 +998,7 @@ function settingsPanel(){
         <li>ไม่มีการขาย แชร์ หรือส่งข้อมูลให้บุคคล/บริษัทที่สาม ไม่มีโฆษณา ไม่มีการติดตามพฤติกรรมผู้ใช้ (analytics/tracking)</li>
         <li>ตำแหน่ง GPS ใช้เฉพาะตอนค้นหาปั๊มใกล้เคียงหรือบันทึกระยะทางทริปเท่านั้น ไม่ถูกเก็บสะสมหรือส่งไปนอกเหนือจากนั้น</li>
         <li>รูปภาพที่แนบ (ใบเสร็จ/เรือนไมล์) เก็บใน Firebase Storage เข้าถึงได้เฉพาะสมาชิกของรถคันนั้น</li>
-        <li>ถ้าตั้งค่า Anthropic API key เพื่อสแกนบิลด้วย AI รูปบิลที่สแกนจะถูกส่งไปยัง Anthropic เพื่อประมวลผลเท่านั้น (ไม่ได้เก็บถาวรฝั่งเขา) — ถ้าไม่ตั้งค่าไว้ การสแกนจะทำในเครื่องทั้งหมด ไม่มีรูปออกจากเครื่องเลย</li>
+        <li>เมื่อใช้ Claude OCR รูปบิลจะส่งผ่าน Firebase Functions ไปยัง Anthropic เพื่อประมวลผล โดยไม่มี API key อยู่ในแอป; หากไม่พร้อมใช้งานจะสลับไปอ่านในเครื่อง</li>
       </ul>
     </div></details>
 
@@ -1121,13 +1138,13 @@ async function join(){
 async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
-function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});$('#anthropicApiKey')?.addEventListener('change',e=>{state.anthropicApiKey=e.target.value.trim();save();});if(user)loadMembers();}
+function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#currency')?.addEventListener('change',e=>{state.settings.currency=e.target.value;save();renderAll();renderPanel('settings');});$('#decimals')?.addEventListener('change',e=>{state.settings.decimals=Number(e.target.value);save();renderAll();renderPanel('settings');});$('#themeMode')?.addEventListener('change',e=>{state.theme=e.target.value;applyTheme();save();});$('#weatherEnabled')?.addEventListener('change',e=>{state.settings.weatherEnabled=e.target.checked;save();});$('#autoOcrEnabled')?.addEventListener('change',e=>{state.settings.autoOcrEnabled=e.target.checked;save();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
-function exportJSON(){const {anthropicApiKey,...safeState}=state;download(`fuellog-${today()}.json`,JSON.stringify({version:5,...safeState,exportedAt:new Date().toISOString()},null,2));}
+function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:7,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
-  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note']];
-  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'']));
-  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'']));
+  const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note','weatherDescription','temperatureC','humidityPercent','latitude','longitude']];
+  state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'',x.weather?.description||'',x.weather?.temperatureC??'',x.weather?.humidityPercent??'',x.weather?.latitude??'',x.weather?.longitude??'']));
+  state.expenses.forEach(x=>rows.push(['expense',x.vehicleId,x.date,x.odometer||'','','','',x.amount,'','','','',x.category||'',x.title||'','',x.note||'','','','','','']));
   download(`fuellog-${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
 }
 function loadScript(src){return new Promise((ok,no)=>{if([...document.scripts].some(x=>x.src===src))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}
@@ -1379,7 +1396,7 @@ async function importFile(file){
     alert(`นำเข้าไม่สำเร็จ: ${e.message}`);
   }
 }
-function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();if(x.dataset.nav==='home')refreshHomeNearby();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){const si=$('#stationInput');if(si){si.value=st.dataset.station;}else{showForm('fuel',{station:st.dataset.station});}}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#formCloseX').onclick=()=>$('#formDialog').close();$('#formCancelBtn').onclick=()=>$('#formDialog').close();$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$$('[data-page-link]').forEach(x=>x.onclick=()=>openReportsPage());$('#reportsBackBtn').onclick=()=>renderNav('more');$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='auto'?'light':state.theme==='light'?'dark':'auto';applyTheme();save();};
+function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();if(x.dataset.nav==='home')refreshHomeNearby();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){const si=$('#stationInput');if(si){si.value=st.dataset.station;}else{showForm('fuel',{station:st.dataset.station});}}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#formCloseX').onclick=()=>$('#formDialog').close();$('#formCancelBtn').onclick=()=>$('#formDialog').close();$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$$('[data-page-link]').forEach(x=>x.onclick=()=>openReportsPage());$('#reportsBackBtn').onclick=()=>renderNav('more');$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{const modes=['system','light','dark','auto'];state.theme=modes[(modes.indexOf(state.theme)+1)%modes.length];applyTheme();save();};
 $('#mediaCameraBtn')?.addEventListener('click',()=>chooseMediaSource('camera'));
 $('#mediaGalleryBtn')?.addEventListener('click',()=>chooseMediaSource('gallery'));
 $('#mediaCancelBtn')?.addEventListener('click',closeMediaPicker);

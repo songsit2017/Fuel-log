@@ -1,5 +1,5 @@
 {
-  "build": "6.2.0",
+  "build": "7.0.0",
   "target_branch": "main",
   "node_check": true,
   "checks": {
@@ -10,7 +10,10 @@
     "attachment": true,
     "fuelio": true,
     "ocr": true,
-    "family": true
+    "family": true,
+    "settings": true,
+    "weather": true,
+    "secure_claude_ocr": true
   },
   "file_count": 30
 }

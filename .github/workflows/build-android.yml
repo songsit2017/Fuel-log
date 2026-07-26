@@ -14,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      FUELLOG_VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '8.0.0-beta.1' }}
+      # Every manual run gets a unique install/file version such as
+      # 8.0.0-beta.12. Tagged releases keep the exact tag name.
+      FUELLOG_VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('8.0.0-beta.{0}', github.run_number) }}
       FUELLOG_VERSION_CODE: ${{ github.run_number }}
       FUELLOG_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
       FUELLOG_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}

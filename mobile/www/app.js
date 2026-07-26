@@ -85,7 +85,7 @@ function stationBadge(stationName){
   return `<div class="ico">⛽</div>`;
 }
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '7.0.2';
+const APP_VERSION = '7.0.3';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -588,6 +588,7 @@ function gradeRow(label, grades){
   if(grades.gasohol_95) parts.push(`95 ฿${grades.gasohol_95.toFixed(2)}`);
   if(grades.gasohol_91) parts.push(`91 ฿${grades.gasohol_91.toFixed(2)}`);
   if(grades.diesel_b7) parts.push(`ดีเซล B7 ฿${grades.diesel_b7.toFixed(2)}`);
+  if(grades.premium_95) parts.push(`พรีเมียม 95 ฿${grades.premium_95.toFixed(2)}`);
   return parts.length ? `<div class="list-row"><b>${esc(label)}</b><span>${parts.join(' · ')}</span></div>` : '';
 }
 function unavailableGradeRow(label, message='แหล่งข้อมูลยังไม่ส่งราคา'){
@@ -601,7 +602,11 @@ async function fetchBangchakLocal(){
     const root = data?.data?.[0];
     if(!root?.OilList) return null;
     const list = JSON.parse(root.OilList);
-    return { grades: extractBangchakGrades(list), dateLabel: root.OilRemark2 || root.OilPriceDate || '' };
+    return {
+      grades: extractBangchakGrades(list),
+      dateLabel: root.OilRemark2 || root.OilPriceDate || '',
+      comparison: data.comparison || null
+    };
   }catch(e){ return null; }
 }
 async function fetchAggregatorPrices(){
@@ -626,8 +631,8 @@ async function loadTodayPrices(){
     const [bangchak, aggregator] = await Promise.all([fetchBangchakLocal(), fetchAggregatorPrices()]);
     const previous=JSON.parse(store.getItem('fuellog-oil-brand-cache')||'{}');
     const bcpGrades=bangchak?.grades||normalizeAggregatorStation(aggregator?.stations?.bcp)||previous.bcp||null;
-    const pttLive=normalizeAggregatorStation(aggregator?.stations?.ptt);
-    const shellLive=normalizeAggregatorStation(aggregator?.stations?.shell);
+    const pttLive=bangchak?.comparison?.ptt?.grades||normalizeAggregatorStation(aggregator?.stations?.ptt);
+    const shellLive=bangchak?.comparison?.shell?.grades||normalizeAggregatorStation(aggregator?.stations?.shell);
     const hasPrice=grades=>grades&&Object.values(grades).some(Boolean);
     const pttGrades=hasPrice(pttLive)?pttLive:previous.ptt||null;
     const shellGrades=hasPrice(shellLive)?shellLive:previous.shell||null;
@@ -639,13 +644,16 @@ async function loadTodayPrices(){
     }));
     const rows = [
       hasPrice(bcpGrades)?gradeRow(bangchak?.grades?'บางจาก (ทางการ)':'บางจาก',bcpGrades):unavailableGradeRow('บางจาก'),
-      hasPrice(pttGrades)?gradeRow('ปตท.',pttGrades):unavailableGradeRow('ปตท.','API ต้นทางยังไม่ส่งราคา'),
-      hasPrice(shellGrades)?gradeRow('เชลล์',shellGrades):unavailableGradeRow('เชลล์','API ต้นทางยังไม่ส่งราคา')
+      hasPrice(pttGrades)?gradeRow('ปตท. (OR ทางการ)',pttGrades):unavailableGradeRow('ปตท.','แหล่งข้อมูลทางการยังไม่ส่งราคา'),
+      hasPrice(shellGrades)?gradeRow('เชลล์ (ราคาหน้าสถานี)',shellGrades):unavailableGradeRow('เชลล์','สถานีอ้างอิงยังไม่ส่งราคา')
     ];
     const html = rows.filter(Boolean).join('');
     if(html){
       const dateLine = bangchak?.dateLabel ? `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(bangchak.dateLabel)}</div>` : '';
-      const note = (!hasPrice(pttGrades)||!hasPrice(shellGrades)) ? `<div class="muted" style="margin-top:6px;font-size:10px;">แสดงครบทั้ง 3 แบรนด์เสมอ และจะเติมราคาปตท./เชลล์ทันทีเมื่อ API ต้นทางกลับมาส่งข้อมูล โดยไม่ใช้ค่าประมาณ</div>` : '';
+      const shellStation=bangchak?.comparison?.shell?.station;
+      const note = shellStation
+        ? `<div class="muted" style="margin-top:6px;font-size:10px;">ราคาเชลล์อ้างอิงจาก ${esc(shellStation)} และแสดงเฉพาะชนิดที่สถานีส่งราคาจริง ราคาแต่ละสถานีอาจต่างกัน</div>`
+        : ((!hasPrice(pttGrades)||!hasPrice(shellGrades)) ? `<div class="muted" style="margin-top:6px;font-size:10px;">แสดงเฉพาะราคาที่แหล่งข้อมูลทางการส่งมา โดยไม่ใช้ค่าประมาณ</div>` : '');
       const full = dateLine+html+note;
       box.innerHTML = full;
       store.setItem('fuellog-oil-cache', JSON.stringify({html:dateLine+html,time:Date.now()}));
@@ -1024,6 +1032,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.0.3</b> — เปรียบเทียบราคาจริงจากบางจาก, OR/ปตท. และสถานีเชลล์ทางการ พร้อมข้อมูลสำรองแบบ same-origin</li>
       <li><b>7.0.2</b> — ย้ายรูปเดิมขึ้นมาใต้ OCR ให้เห็นทันที และรองรับการจับคู่รูปจาก schema/path ของรุ่นเก่าและ Fuelio</li>
       <li><b>7.0.1</b> — รูปเดิมกลับมาแสดงในรายการและไม่ถูกเขียนทับเมื่อแก้ไข, ตารางราคาขึ้นครบ บางจาก/ปตท./เชลล์พร้อมสถานะแหล่งข้อมูล</li>
       <li><b>7.0</b> — แยก Settings/Weather/OCR เป็นโมดูล, เพิ่มสกุลเงิน ทศนิยม 0–3 ธีม 4 แบบ, Open-Meteo และ Claude OCR ผ่าน backend ที่ปลอดภัย</li>

@@ -17,6 +17,10 @@
 - [ ] Odometer-triggered notification refresh and notification settings.
 - [x] Offline trip records with distance and all Stable cost categories.
 - [x] Versioned full JSON backup and non-destructive merge restore through Android file picker.
+- [x] Native Google sign-in UI and manual Firestore sync.
+- [x] Conflict-safe sync: local-only uploads, Cloud-only downloads, divergent IDs never overwrite.
+- [x] Legacy fixed vehicle ID is transactionally replaced by a UUID before Cloud upload.
+- [ ] User-visible conflict resolution and deletion tombstones.
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.

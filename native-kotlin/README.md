@@ -17,6 +17,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Daily Android notifications for upcoming date-based maintenance.
 - Offline trips with distance, fuel, toll, parking, food and other costs.
 - Versioned JSON backup/restore for every Room collection using Android's file picker.
+- Manual Google/Firebase sync that preserves divergent copies as explicit conflicts.
 - A Thai minimal Compose dashboard and launcher icon.
 - A separate prerelease APK workflow that cannot replace Stable.
 

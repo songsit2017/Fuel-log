@@ -30,6 +30,8 @@ const nativeMaintenanceWorker = await readFile(new URL('../native-kotlin/app/src
 const nativeTripDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/TripDao.kt', import.meta.url), 'utf8');
 const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/TripSummary.kt', import.meta.url), 'utf8');
 const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalBackupRepository.kt', import.meta.url), 'utf8');
+const nativeCloudSync = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreSyncRepository.kt', import.meta.url), 'utf8');
+const nativeSyncDecision = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/SyncDecision.kt', import.meta.url), 'utf8');
 const nativeAppViewModel = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/ui/NativeAppViewModel.kt', import.meta.url), 'utf8');
 const nativeFirestoreVehicles = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreVehicleRepository.kt', import.meta.url), 'utf8');
 
@@ -310,6 +312,22 @@ test('native backup is versioned, complete and restores without deleting local d
   assert.match(nativeMain, /readTextLimited\(20_000_000\)/);
   assert.match(nativeFuelApp, /สำรองข้อมูล/);
   assert.match(nativeFuelApp, /นำเข้าข้อมูล/);
+});
+
+test('native Cloud sync never overwrites divergent records automatically', () => {
+  assert.match(nativeSyncDecision, /localExists && cloudExists -> SyncDecision\.CONFLICT/);
+  assert.match(nativeCloudSync, /SyncDecision\.CONFLICT -> conflicts\+\+/);
+  assert.match(nativeCloudSync, /whereEqualTo\("ownerUid", uid\)/);
+  assert.match(nativeCloudSync, /whereArrayContains\("memberUids", uid\)/);
+  for (const collection of ['entries', 'expenses', 'reminders', 'trips']) {
+    assert.match(nativeCloudSync, new RegExp(`collection = "${collection}"`));
+  }
+  assert.doesNotMatch(nativeCloudSync, /\.delete\(\)\.await/);
+  assert.match(nativeCloudSync, /normalizeLegacyVehicleId/);
+  assert.match(nativeCloudSync, /UUID\.randomUUID\(\)\.toString\(\)/);
+  assert.match(nativeCloudSync, /database\.withTransaction/);
+  assert.match(nativeFuelApp, /ระบบยังไม่เขียนทับทั้งสองฝั่ง/);
+  assert.match(nativeMain, /default_web_client_id/);
 });
 
 test('home has one vehicle selector', () => {

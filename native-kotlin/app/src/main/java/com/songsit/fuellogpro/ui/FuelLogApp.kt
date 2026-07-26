@@ -57,6 +57,14 @@ private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
     maximumFractionDigits = 2
 }
 
+data class CloudUiState(
+    val uid: String? = null,
+    val email: String? = null,
+    val syncing: Boolean = false,
+    val message: String? = null,
+    val conflicts: Int = 0,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FuelLogApp(
@@ -72,6 +80,10 @@ fun FuelLogApp(
     onDeleteTrip: (String) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    cloudState: CloudUiState,
+    onGoogleSignIn: () -> Unit,
+    onCloudSync: () -> Unit,
+    onSignOut: () -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (String, String, String, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
@@ -156,6 +168,10 @@ fun FuelLogApp(
                     onDelete = onDeleteVehicle,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
+                    cloudState = cloudState,
+                    onGoogleSignIn = onGoogleSignIn,
+                    onCloudSync = onCloudSync,
+                    onSignOut = onSignOut,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -535,6 +551,10 @@ private fun VehicleList(
     onDelete: (String) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    cloudState: CloudUiState,
+    onGoogleSignIn: () -> Unit,
+    onCloudSync: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -542,6 +562,35 @@ private fun VehicleList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Cloud sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (cloudState.uid == null) {
+                        Text("เข้าสู่ระบบเพื่อรวมข้อมูลกับ Firebase โดยไม่เขียนทับรายการที่ขัดแย้งกัน")
+                        Button(onClick = onGoogleSignIn, enabled = !cloudState.syncing) {
+                            Text(if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบด้วย Google")
+                        }
+                    } else {
+                        Text(cloudState.email ?: "เชื่อมต่อบัญชี Google แล้ว")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onCloudSync, enabled = !cloudState.syncing) {
+                                Text(if (cloudState.syncing) "กำลังซิงก์…" else "ซิงก์ตอนนี้")
+                            }
+                            TextButton(onClick = onSignOut, enabled = !cloudState.syncing) { Text("ออกจากระบบ") }
+                        }
+                    }
+                    cloudState.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    if (cloudState.conflicts > 0) {
+                        Text(
+                            "พบ ${cloudState.conflicts} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

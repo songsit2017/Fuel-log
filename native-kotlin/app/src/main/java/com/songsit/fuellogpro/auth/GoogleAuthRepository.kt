@@ -13,6 +13,8 @@ class GoogleAuthRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
     val currentUid: String? get() = auth.currentUser?.uid
+    val currentEmail: String? get() = auth.currentUser?.email
+    val currentDisplayName: String? get() = auth.currentUser?.displayName
 
     suspend fun signIn(context: Context, webClientId: String): String {
         val googleOption = GetGoogleIdOption.Builder()
@@ -34,4 +36,3 @@ class GoogleAuthRepository(
 
     fun signOut() = auth.signOut()
 }
-

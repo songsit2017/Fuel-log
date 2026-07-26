@@ -16,14 +16,21 @@ import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.LocalMaintenanceRepository
 import com.songsit.fuellogpro.data.LocalTripRepository
 import com.songsit.fuellogpro.data.LocalBackupRepository
+import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
+import com.songsit.fuellogpro.auth.GoogleAuthRepository
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.ui.FuelLogApp
 import com.songsit.fuellogpro.ui.NativeAppViewModel
 import com.songsit.fuellogpro.ui.NativeAppViewModelFactory
+import com.songsit.fuellogpro.ui.CloudUiState
 import com.songsit.fuellogpro.notifications.MaintenanceReminderWorker
 import android.widget.Toast
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 
 class MainActivity : ComponentActivity() {
     private lateinit var backupRepository: LocalBackupRepository
@@ -77,12 +84,23 @@ class MainActivity : ComponentActivity() {
         }
         val database = FuelLogDatabase.get(this)
         backupRepository = LocalBackupRepository(database)
+        val authRepository = GoogleAuthRepository()
+        val cloudRepository = FirestoreSyncRepository(database)
         val fuelRepository = LocalFuelRepository(database.fuelEntryDao())
         val expenseRepository = LocalExpenseRepository(database.expenseDao())
         val vehicleRepository = LocalVehicleRepository(database.vehicleDao())
         val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao())
         val tripRepository = LocalTripRepository(database.tripDao())
         setContent {
+            var cloudState by remember {
+                mutableStateOf(
+                    CloudUiState(
+                        uid = authRepository.currentUid,
+                        email = authRepository.currentEmail,
+                    ),
+                )
+            }
+            val composeScope = rememberCoroutineScope()
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
                     fuelRepository,
@@ -109,6 +127,61 @@ class MainActivity : ComponentActivity() {
                 },
                 onImportBackup = {
                     openBackup.launch(arrayOf("application/json", "text/json", "text/plain"))
+                },
+                cloudState = cloudState,
+                onGoogleSignIn = {
+                    composeScope.launch {
+                        cloudState = cloudState.copy(syncing = true, message = null)
+                        runCatching {
+                            authRepository.signIn(
+                                this@MainActivity,
+                                getString(R.string.default_web_client_id),
+                            )
+                        }.onSuccess { uid ->
+                            cloudState = CloudUiState(
+                                uid = uid,
+                                email = authRepository.currentEmail,
+                                message = "เข้าสู่ระบบแล้ว แตะซิงก์ตอนนี้เพื่อรวมข้อมูล",
+                            )
+                        }.onFailure {
+                            cloudState = cloudState.copy(
+                                syncing = false,
+                                message = it.message ?: "เข้าสู่ระบบไม่สำเร็จ",
+                            )
+                        }
+                    }
+                },
+                onCloudSync = {
+                    val uid = authRepository.currentUid
+                    if (uid == null) {
+                        cloudState = cloudState.copy(message = "กรุณาเข้าสู่ระบบก่อน")
+                    } else {
+                        composeScope.launch {
+                            cloudState = cloudState.copy(syncing = true, message = null, conflicts = 0)
+                            runCatching {
+                                cloudRepository.sync(
+                                    uid,
+                                    authRepository.currentEmail,
+                                    authRepository.currentDisplayName,
+                                )
+                            }.onSuccess { result ->
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    conflicts = result.conflicts,
+                                    message = "อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",
+                                )
+                            }.onFailure {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = it.message ?: "ซิงก์ไม่สำเร็จ",
+                                )
+                            }
+                        }
+                    }
+                },
+                onSignOut = {
+                    authRepository.signOut()
+                    cloudState = CloudUiState(message = "ออกจากระบบแล้ว ข้อมูลในเครื่องยังอยู่ครบ")
                 },
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,

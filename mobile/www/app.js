@@ -115,6 +115,7 @@ function load(){
   state.entries ||= []; state.expenses ||= []; state.reminders ||= []; state.trips ||= [];
   state.currentVehicleId ||= state.vehicles[0].id;
   state.units ||= {distance:'km',volume:'liters'};
+  if(!state.themeMigratedAuto){ state.theme='auto'; state.themeMigratedAuto=true; }
   // Compatibility: old records only had total. New records keep grossTotal + discount,
   // while total remains the actual net amount used by all cost/km calculations.
   state.entries = state.entries.map(x=>{
@@ -142,6 +143,29 @@ function withinPeriod(date,p){if(p==='all')return true;const d=new Date(date),n=
 function monthSeries(n=6){const out=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1),k=d.toISOString().slice(0,7);out.push({label:d.toLocaleDateString('th-TH',{month:'short'}),value:entries().filter(x=>monthKey(x.date)===k).reduce((s,x)=>s+(+x.total||0),0)+expenses().filter(x=>monthKey(x.date)===k).reduce((s,x)=>s+(+x.amount||0),0)});}return out;}
 function dueItems(){const odo=currentOdo(),now=new Date();return reminders().map(r=>{let status='ok',label='ปกติ',score=999999;if(r.nextOdo){const left=(+r.nextOdo)-odo;score=left;label=left<0?`เกิน ${fmtDist(-left)}`:`อีก ${fmtDist(left)}`;status=left<0?'over':left<1000?'soon':'ok';}if(r.nextDate){const days=Math.ceil((new Date(r.nextDate)-now)/864e5);if(days<score){score=days;label=days<0?`เกิน ${-days} วัน`:`อีก ${days} วัน`;status=days<0?'over':days<30?'soon':'ok';}}return {...r,status,label};}).sort((a,b)=>({over:0,soon:1,ok:2}[a.status]-({over:0,soon:1,ok:2}[b.status])));}
 function health(){let score=100;dueItems().forEach(x=>score-=x.status==='over'?18:x.status==='soon'?7:0);const v=metrics().valid;if(v.length>=6){const a=v.slice(-3).reduce((s,x)=>s+x.kml,0)/3,b=v.slice(-6,-3).reduce((s,x)=>s+x.kml,0)/3;if(a<b*.9)score-=10;}return Math.max(20,score);}
+
+// ---------- Theme: 'auto' follows the phone/OS setting, or user can pin light/dark ----------
+let systemThemeMedia = null;
+function computeIsLight(){
+  if(state.theme==='light') return true;
+  if(state.theme==='dark') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+}
+function applyTheme(){
+  const isLight = computeIsLight();
+  document.body.classList.toggle('light', isLight);
+  const btn = $('#themeBtn');
+  if(btn) btn.textContent = state.theme==='light' ? '☀' : state.theme==='dark' ? '☾' : '◐';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', isLight ? '#f5f6f8' : '#0f1115');
+}
+function watchSystemTheme(){
+  if(!window.matchMedia || systemThemeMedia) return;
+  systemThemeMedia = window.matchMedia('(prefers-color-scheme: light)');
+  const handler = () => { if(state.theme==='auto') applyTheme(); };
+  if(systemThemeMedia.addEventListener) systemThemeMedia.addEventListener('change', handler);
+  else if(systemThemeMedia.addListener) systemThemeMedia.addListener(handler); // older WebView fallback
+}
 
 function renderNav(page='home'){$$('.page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===page||(page==='reports'&&x.dataset.nav==='more')));const names={home:'ภาพรวม',fuel:'เติมน้ำมัน',expense:'ค่าใช้จ่าย',maintenance:'บำรุงรักษา',more:'เพิ่มเติม',reports:'รายงาน'};$('#pageTitle').textContent=names[page];$('#pageEyebrow').textContent=vehicle()?.name||'รถของฉัน';$('#reportsBackBtn').style.display=page==='reports'?'':'none';}
 function metric(label,val,sub=''){return `<article class="metric"><small>${label}</small><b>${val}</b><em>${sub}</em></article>`;}
@@ -404,7 +428,7 @@ async function fetchNearbyStations(){
   const j=await r.json();
   return j.elements.map(x=>{const a=x.lat??x.center?.lat,b=x.lon??x.center?.lon,name=x.tags?.name||x.tags?.brand||x.tags?.operator||'ปั๊มน้ำมัน';return {name,dist:haversine(lat,lon,a,b)};}).sort((a,b)=>a.dist-b.dist).slice(0,6);
 }
-async function autoNearby(){const box=$('#formNearby'),input=$('#stationInput');if(!box)return;box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';try{const stations=await fetchNearbyStations();nearbyCache=stations;if(stations[0]&&!input.value)input.value=stations[0].name;renderNearby(stations,box);renderNearby(stations,$('#nearbyList'));}catch(e){box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</div>';}}
+async function autoNearby(){const box=$('#formNearby'),input=$('#stationInput');if(!box)return;box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';try{const stations=await fetchNearbyStations();nearbyCache=stations;if(stations[0]&&!input.value)input.value=stations[0].name;renderNearby(stations,box);}catch(e){box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</div>';}}
 function haversine(a,b,c,d){const R=6371,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,z=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return R*2*Math.atan2(Math.sqrt(z),Math.sqrt(1-z));}
 function renderNearby(arr,box){if(!box)return;box.innerHTML=arr?.length?arr.map(x=>`<button type="button" class="nearby-option" data-station="${esc(x.name)}"><b>${esc(x.name)}</b><small> ${fmtDist(x.dist,1)}</small></button>`).join(''):'<div class="muted">ไม่พบปั๊ม</div>';}
 
@@ -420,15 +444,6 @@ async function refreshHomeNearby(){
     const stations=await fetchNearbyStations();
     nearbyCache=stations;
     box.innerHTML=stations.length?stations.map(s=>{const last=findLastPriceForStation(s.name);return `<div class="list-row"><div><b>${esc(s.name)}</b>${last?`<br><small style="color:var(--green)">฿${fmt(toDisplayPricePerVol(last.pricePerLiter),2)}/${volUnit()} เมื่อคุณเติมล่าสุด (${last.date})</small>`:''}</div><b>${fmtDist(s.dist,1)}</b></div>`;}).join(''):'<div class="muted">ไม่พบปั๊มในรัศมี 7 กม.</div>';
-  }catch(e){ box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่ง</div>'; }
-}
-async function refreshFuelNearby(){
-  const box=$('#nearbyList');if(!box)return;
-  box.innerHTML='<div class="muted">กำลังค้นหาตำแหน่ง…</div>';
-  try{
-    const stations=await fetchNearbyStations();
-    nearbyCache=stations;
-    renderNearby(stations, box);
   }catch(e){ box.innerHTML='<div class="muted">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่ง</div>'; }
 }
 
@@ -1164,7 +1179,7 @@ async function importFile(file){
     alert(`นำเข้าไม่สำเร็จ: ${e.message}`);
   }
 }
-function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel'){renderFuel();refreshFuelNearby();}if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();if(x.dataset.nav==='home')refreshHomeNearby();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){const si=$('#stationInput');if(si){si.value=st.dataset.station;}else{showForm('fuel',{station:st.dataset.station});}}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#formCloseX').onclick=()=>$('#formDialog').close();$('#formCancelBtn').onclick=()=>$('#formDialog').close();$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshNearby').onclick=refreshFuelNearby;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$$('[data-page-link]').forEach(x=>x.onclick=()=>openReportsPage());$('#reportsBackBtn').onclick=()=>renderNav('more');$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.body.classList.toggle('light',state.theme==='light');save();};
+function bind(){$$('[data-nav]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.nav);if(x.dataset.nav==='fuel')renderFuel();if(x.dataset.nav==='expense')renderExpenses();if(x.dataset.nav==='maintenance')renderMaintenance();if(x.dataset.nav==='home')refreshHomeNearby();});$$('[data-go]').forEach(x=>x.onclick=()=>{renderNav(x.dataset.go);});document.addEventListener('click',e=>{const v=e.target.closest('[data-vehicle]');if(v){state.currentVehicleId=v.dataset.vehicle;renderAll();}const done=e.target.closest('[data-done-reminder]');if(done){e.stopPropagation();markReminderDone(done.dataset.doneReminder);return;}const f=e.target.closest('[data-edit-fuel]');if(f)showForm('fuel',state.entries.find(x=>x.id===f.dataset.editFuel));const c=e.target.closest('[data-edit-expense]');if(c)showForm('expense',state.expenses.find(x=>x.id===c.dataset.editExpense));const r=e.target.closest('[data-edit-reminder]');if(r)showForm('reminder',state.reminders.find(x=>x.id===r.dataset.editReminder));const st=e.target.closest('[data-station]');if(st){const si=$('#stationInput');if(si){si.value=st.dataset.station;}else{showForm('fuel',{station:st.dataset.station});}}});$('#addFuelBtn').onclick=()=>showForm('fuel');$('#addExpenseBtn').onclick=()=>showForm('expense');$('#addReminderBtn').onclick=()=>showForm('reminder');$('#formCloseX').onclick=()=>$('#formDialog').close();$('#formCancelBtn').onclick=()=>$('#formDialog').close();$('#dynamicForm').addEventListener('submit',saveForm);$('#fuelSearch').oninput=renderFuel;$('#fuelPeriod').onchange=renderFuel;$('#expenseSearch').oninput=renderExpenses;$('#expensePeriod').onchange=renderExpenses;$('#refreshHomeNearby').onclick=refreshHomeNearby;$('#refreshTodayPrice').onclick=loadTodayPrices;$$('[data-panel]').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$$('[data-page-link]').forEach(x=>x.onclick=()=>openReportsPage());$('#reportsBackBtn').onclick=()=>renderNav('more');$('#closePanel').onclick=()=>$('#panelDialog').close();$('#themeBtn').onclick=()=>{state.theme=state.theme==='auto'?'light':state.theme==='light'?'dark':'auto';applyTheme();save();};
 $('#mediaCameraBtn')?.addEventListener('click',()=>chooseMediaSource('camera'));
 $('#mediaGalleryBtn')?.addEventListener('click',()=>chooseMediaSource('gallery'));
 $('#mediaCancelBtn')?.addEventListener('click',closeMediaPicker);
@@ -1173,7 +1188,8 @@ $('#mediaPickerDialog')?.addEventListener('click',e=>{if(e.target.id==='mediaPic
 function boot(){
   try{
     load();
-    document.body.classList.toggle('light',state.theme==='light');
+    applyTheme();
+    watchSystemTheme();
     bind();
     renderAll();
     renderNav('home');
@@ -1187,7 +1203,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5.0.4').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.6.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

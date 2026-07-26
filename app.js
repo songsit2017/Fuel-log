@@ -54,31 +54,8 @@ async function requireFirebase(){
 }
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-
-const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-function thaiMonthLabel(dateStr){
-  const d = new Date(dateStr);
-  if(isNaN(d.getTime())) return '';
-  return `${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
-// Color + initial badges (not a reproduction of any brand's actual logo/trademark) so entries feel recognizable at a glance.
-const STATION_BRANDS = [
-  { match:['ปตท','ptt'], initial:'ป', bg:'#00A19C', fg:'#fff' },
-  { match:['บางจาก','bcp'], initial:'บ', bg:'#00A651', fg:'#fff' },
-  { match:['เชลล์','shell'], initial:'S', bg:'#FBCE07', fg:'#D3242A' },
-  { match:['เอสโซ่','esso'], initial:'E', bg:'#1B4F9C', fg:'#fff' },
-  { match:['คาลเท็กซ์','caltex'], initial:'C', bg:'#DA291C', fg:'#fff' },
-  { match:['พีที'], initial:'P', bg:'#EC008C', fg:'#fff' },
-  { match:['ซัสโก้','susco'], initial:'ซ', bg:'#0072BC', fg:'#fff' },
-];
-function stationBadge(stationName){
-  const name = (stationName||'').toLowerCase();
-  const brand = STATION_BRANDS.find(b => b.match.some(m => name.includes(m)));
-  if(brand) return `<div class="ico brand-badge" style="background:${brand.bg};color:${brand.fg}">${brand.initial}</div>`;
-  return `<div class="ico">⛽</div>`;
-}
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '6.10.0';
+const APP_VERSION = '6.9.0';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -235,20 +212,15 @@ function drawChart(){const data=monthSeries(),svg=$('#monthlyChart'),max=Math.ma
 function renderFuel(){
   const q=$('#fuelSearch').value.toLowerCase(),p=$('#fuelPeriod').value;
   const arr=entries().slice().reverse().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));
-  if(!arr.length){ $('#fuelList').innerHTML='<div class="empty">ไม่พบรายการ</div>'; return; }
-  let html='', lastMonthKey=null;
-  for(const x of arr){
-    const monthKeyStr=(x.date||'').slice(0,7);
-    if(monthKeyStr!==lastMonthKey){ html+=`<div class="month-header">${thaiMonthLabel(x.date)}</div>`; lastMonthKey=monthKeyStr; }
+  $('#fuelList').innerHTML=arr.length?arr.map(x=>{
     const discount=Number(x.discount)||0;
     const gross=Number(x.grossTotal)||((Number(x.total)||0)+discount);
     const discountLine=discount>0?`<small>ก่อนลด ${money(gross)} • ลด ${money(discount)}</small>`:'';
     const meta=[x.driver,x.paymentMethod,x.reason].filter(Boolean).map(esc).join(' • ');
     const metaLine=meta?`<small>${meta}</small>`:'';
     const missedLine=x.previousFillMissed?`<small style="color:var(--accent)">⚠ พลาดการบันทึกครั้งก่อน</small>`:'';
-    html+=`<article class="record" data-edit-fuel="${x.id}">${stationBadge(x.station)}<div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
-  }
-  $('#fuelList').innerHTML=html;
+    return `<article class="record" data-edit-fuel="${x.id}"><div class="ico">⛽</div><div><b>${esc(x.station||x.fuelType||'เติมน้ำมัน')}</b><small>${x.date}${x.time?' '+x.time:''} • ${fmtDist(x.odometer)} • ${fmtVol(x.liters)}</small>${discountLine}${metaLine}${missedLine}</div><div class="amount">${money(x.total)}<small>${x.pricePerLiter?fmt(toDisplayPricePerVol(x.pricePerLiter),2)+' บ./'+volUnit():''}</small></div></article>`;
+  }).join(''):'<div class="empty">ไม่พบรายการ</div>';
 }
 function renderExpenses(){const q=$('#expenseSearch').value.toLowerCase(),p=$('#expensePeriod').value,arr=expenses().filter(x=>withinPeriod(x.date,p)&&JSON.stringify(x).toLowerCase().includes(q));const sum=arr.reduce((s,x)=>s+(+x.amount||0),0);$('#expenseMetrics').innerHTML=metric('ยอดรวม',money(sum),`${arr.length} รายการ`)+metric('เฉลี่ย/รายการ',arr.length?money(sum/arr.length):'—','ตามตัวกรอง');$('#expenseList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-expense="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.title||x.category)}</b><small>${x.date} • ${esc(x.category||'อื่นๆ')}${x.odometer?' • '+fmtDist(x.odometer):''}</small></div><div class="amount">${money(x.amount)}</div></article>`).join(''):'<div class="empty">ยังไม่มีค่าใช้จ่าย</div>';}
 function renderMaintenance(){const arr=dueItems();$('#maintenanceList').innerHTML=arr.length?arr.map(x=>`<article class="record" data-edit-reminder="${x.id}"><div class="ico">🔧</div><div><b>${esc(x.name)}</b><small>${x.nextOdo?'ที่ '+fmtDist(x.nextOdo):''}${x.nextDate?' • '+x.nextDate:''}${(x.repeatOdo||x.repeatMonths)?' • 🔁 ทำซ้ำ':''}</small></div><div style="text-align:right;"><div class="amount status-${x.status}">${x.label}</div><button class="secondary" data-done-reminder="${x.id}" style="margin-top:6px;padding:6px 10px;font-size:11px;">✓ เสร็จแล้ว</button></div></article>`).join(''):'<div class="empty">ยังไม่มีรายการเตือน</div>';}
@@ -938,11 +910,11 @@ function settingsPanel(){
     <div class="field"><label>แบบอักษร (Font)</label><select id="fontFamily">${Object.entries(FONT_OPTIONS).map(([k,v])=>`<option value="${k}" ${state.fontFamily===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
     <p class="muted">แบบอักษรนอกจาก "ระบบ" จะโหลดจาก Google Fonts ครั้งแรกที่เลือก (ต้องมีอินเทอร์เน็ต) หลังจากนั้นเบราว์เซอร์จะจำไว้ให้</p>
     <h3 style="font-size:13px;margin:16px 0 6px;color:var(--text)">การ์ดในหน้าแรก</h3>
-    <label class="toggle-row"><span>📍 ปั๊มใกล้เคียง</span><input type="checkbox" id="homeCardNearby" ${hc.nearby!==false?'checked':''}></label>
-    <label class="toggle-row"><span>⛽ ราคาน้ำมันวันนี้</span><input type="checkbox" id="homeCardTodayPrice" ${hc.todayPrice!==false?'checked':''}></label>
-    <label class="toggle-row"><span>📈 กราฟค่าใช้จ่าย</span><input type="checkbox" id="homeCardChart" ${hc.chart!==false?'checked':''}></label>
-    <label class="toggle-row"><span>🧾 รายการล่าสุด</span><input type="checkbox" id="homeCardLatest" ${hc.latest!==false?'checked':''}></label>
-    <label class="toggle-row"><span>🔧 เตือนบำรุงรักษา</span><input type="checkbox" id="homeCardDue" ${hc.due!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>📍 ปั๊มน้ำมันใกล้เคียง</span><input type="checkbox" id="homeCardNearby" ${hc.nearby!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>⛽ ราคาน้ำมันวันนี้</span><input type="checkbox" id="homeCardTodayPrice" ${hc.todayPrice!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>📈 กราฟค่าใช้จ่าย 6 เดือน</span><input type="checkbox" id="homeCardChart" ${hc.chart!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>🧾 รายการล่าสุด</span><input type="checkbox" id="homeCardLatest" ${hc.latest!==false?'checked':''}></label>
+    <label class="field" style="display:flex;align-items:center;justify-content:space-between;flex-direction:row;"><span>🔧 ใกล้ถึงกำหนดบำรุงรักษา</span><input type="checkbox" id="homeCardDue" ${hc.due!==false?'checked':''}></label>
     <p class="muted">ปิดการ์ดที่ไม่ได้ใช้เพื่อให้หน้าแรกดูโล่งและเลื่อนถึงข้อมูลที่สำคัญเร็วขึ้น</p></div>
   <div class="card"><h2>หน่วยที่ใช้แสดงผล</h2>
     <div class="field"><label>ระยะทาง</label><select id="unitDistance"><option value="km" ${state.units?.distance!=='mi'?'selected':''}>กิโลเมตร (กม.)</option><option value="mi" ${state.units?.distance==='mi'?'selected':''}>ไมล์ (mi)</option></select></div>
@@ -952,7 +924,6 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
-      <li><b>6.10</b> — รายการเติมน้ำมันแยกเป็นกลุ่มตามเดือน พร้อมไอคอนสีตามยี่ห้อปั๊ม, แก้ช่องติ๊กเลือกการ์ดหน้าแรกในตั้งค่าที่เคยเรียงเพี้ยน</li>
       <li><b>6.9</b> — เทียบราคาน้ำมัน ปตท./เชลล์ กับบางจากในหน้าแรก, เพิ่มตัวเลือกสแกนบิลด้วย Claude AI (แม่นยำกว่าตัวอ่านฟรี)</li>
       <li><b>6.8</b> — เลือกฟอนต์ของแอปได้ (Sarabun/Kanit/Prompt/ระบบ), ปิด/เปิดการ์ดในหน้าแรกได้เอง</li>
       <li><b>6.7</b> — เพิ่มหน้า "ข้อมูล" ในตั้งค่า (เวอร์ชัน, ประวัติอัปเดต, สิทธิ์การใช้งาน, นโยบายความเป็นส่วนตัว)</li>
@@ -1404,7 +1375,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.10.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.9.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

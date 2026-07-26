@@ -1,7 +1,7 @@
-const CACHE = 'fuellog-main-v6-620';
+const CACHE = 'fuellog-main-v6-640';
 const CORE = [
-  './', './index.html', './styles.css?v=6.2.0', './app.js?v=6.2.0',
-  './firebase-config.js?v=6.2.0', './manifest.json', './icon-192.png', './icon-512.png'
+  './', './index.html', './styles.css?v=6.4.0', './app.js?v=6.4.0',
+  './firebase-config.js?v=6.4.0', './manifest.json', './icon-192.png', './icon-512.png'
 ];
 
 self.addEventListener('install', event => {

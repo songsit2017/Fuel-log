@@ -17,3 +17,35 @@ body.light{--bg:#f5f6f8;--surface:#fff;--surface2:#eef0f3;--text:#1a1d22;--muted
 .sheet-cancel{justify-content:center;color:var(--muted);margin-top:5px;border-top:1px solid var(--line);border-radius:0;padding-top:18px}
 @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @media(min-width:700px){.bottom-sheet{left:50%;right:auto;width:min(480px,calc(100% - 32px));transform:translateX(-50%);bottom:18px;border-radius:24px}.bottom-sheet-dialog[open] .bottom-sheet{animation:sheetUpDesktop .22s ease-out}@keyframes sheetUpDesktop{from{transform:translate(-50%,100%)}to{transform:translate(-50%,0)}}}
+
+/* ---- Fuelio-style detailed report cards (always light, regardless of app theme) ---- */
+.freport{--fr-bg:#eef1fb;--fr-card:#ffffff;--fr-navy:#28345c;--fr-blue:#33448a;--fr-muted:#8890a8;--fr-green:#2e9e5b;--fr-red:#e0533f;--fr-line:#e4e8f5;background:var(--fr-bg);margin:-16px;padding:16px;border-radius:20px;color:var(--fr-navy)}
+.freport-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}
+.freport-tabs::-webkit-scrollbar{display:none}
+.freport-tab{flex:0 0 auto;border:0;background:transparent;color:var(--fr-muted);font-weight:700;font-size:12.5px;padding:8px 10px;border-bottom:3px solid transparent;white-space:nowrap}
+.freport-tab.active{color:var(--fr-blue);border-bottom-color:var(--fr-blue)}
+.freport-hero-icons{display:flex;justify-content:center;align-items:center;background:var(--fr-card);border-radius:18px;padding:12px 10px;margin-bottom:12px;box-shadow:0 1px 2px rgba(40,52,92,.06)}
+.freport-hero-icons svg{width:150px;height:135px}
+.freport-card{background:var(--fr-card);border-radius:18px;padding:18px;margin-bottom:12px;box-shadow:0 1px 2px rgba(40,52,92,.06)}
+.freport-card.small{padding:14px}
+.freport-card.center{text-align:center}
+.freport-label{color:var(--fr-muted);font-size:12.5px;margin-bottom:4px}
+.freport-big{font-size:32px;font-weight:800;color:var(--fr-navy);line-height:1.15}
+.freport-big.small{font-size:21px}
+.freport-big.accent{color:var(--fr-blue)}
+.freport-big .unit{font-size:14px;font-weight:600;color:var(--fr-muted)}
+.freport-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px 10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--fr-line)}
+.freport-compare-cell{display:flex;align-items:center;gap:9px}
+.freport-compare-cell .fc-icon{font-size:19px;flex:none;line-height:1}
+.freport-compare-cell b{display:block;font-size:16px;color:var(--fr-navy)}
+.freport-compare-cell small{display:block;color:var(--fr-muted);font-size:10.5px}
+.freport-minigrid{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
+.freport-mini{display:flex;align-items:center;gap:9px}
+.freport-mini .fm-icon{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:15px;background:var(--fr-line);flex:none}
+.freport-mini .fm-icon.good{background:#e3f6ea;color:var(--fr-green)}
+.freport-mini .fm-icon.bad{background:#fdeae7;color:var(--fr-red)}
+.freport-mini b{display:block;font-size:14px;color:var(--fr-navy)}
+.freport-mini small{display:block;color:var(--fr-muted);font-size:10px}
+.freport-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.freport-empty{color:var(--fr-muted);font-size:12px;text-align:center;padding:30px 0}
+.freport-actions{margin-top:14px}

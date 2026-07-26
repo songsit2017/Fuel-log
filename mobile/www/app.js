@@ -99,7 +99,7 @@ const efficiencyUnit = () => `${distUnit()}/${volUnit()}`;
 const toDisplayEfficiency = kml => (Number(kml)||0)*distFactor()/volFactor();
 
 let state = { vehicles:[], entries:[], expenses:[], reminders:[], trips:[], currentVehicleId:null, theme:'dark', units:{distance:'km',volume:'liters'} };
-let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null;
+let user = null, vehicleUnsub = null, nearbyCache = null, gpsTrack = null, reportTab = 'fillups';
 
 function seed(){
   const oldVehicles = JSON.parse(store.getItem('fuel-vehicles')||'null');
@@ -531,6 +531,11 @@ function stopGpsTrip(){
 }
 
 // ---------- Reports: category donut chart + month-over-month comparison ----------
+// ---------- hand-drawn flat illustrations for the report tabs (original artwork, not copied from any app) ----------
+const ILLUS_FILLUPS = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="160" rx="70" ry="10" fill="#e4e8f5"/><!-- fuel drop --><path d="M148 38 C148 38 132 60 132 74 C132 84.5 140 92 148 92 C156 92 164 84.5 164 74 C164 60 148 38 148 38 Z" fill="#5b8def"/><ellipse cx="142" cy="72" rx="4.5" ry="7" fill="#ffffff" opacity=".45"/><!-- pump base --><rect x="52" y="140" width="80" height="14" rx="6" fill="#1f2a4d"/><!-- pump body --><rect x="58" y="46" width="68" height="98" rx="14" fill="#33448a"/><rect x="58" y="46" width="68" height="98" rx="14" fill="url(#pumpShade)"/><!-- screen --><rect x="68" y="58" width="48" height="30" rx="6" fill="#eef1fb"/><rect x="75" y="66" width="20" height="6" rx="3" fill="#2e9e5b"/><rect x="75" y="76" width="30" height="6" rx="3" fill="#28345c"/><!-- keypad dots --><circle cx="72" cy="100" r="3.5" fill="#8fa2e0"/><circle cx="84" cy="100" r="3.5" fill="#8fa2e0"/><circle cx="96" cy="100" r="3.5" fill="#8fa2e0"/><circle cx="108" cy="100" r="3.5" fill="#8fa2e0"/><circle cx="72" cy="112" r="3.5" fill="#8fa2e0"/><circle cx="84" cy="112" r="3.5" fill="#8fa2e0"/><circle cx="96" cy="112" r="3.5" fill="#8fa2e0"/><circle cx="108" cy="112" r="3.5" fill="#8fa2e0"/><!-- top light --><rect x="80" y="34" width="36" height="14" rx="7" fill="#28345c"/><circle cx="98" cy="41" r="4" fill="#f4a83b"/><!-- hose --><path d="M126 70 C150 70 150 100 132 108 C118 114 112 122 118 132" fill="none" stroke="#f4a83b" stroke-width="6" stroke-linecap="round"/><!-- nozzle --><path d="M112 128 L128 122 L134 134 L126 144 L112 140 Z" fill="#28345c"/><defs><linearGradient id="pumpShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".08"/><stop offset="1" stop-color="#000000" stop-opacity=".06"/></linearGradient></defs></svg>`;
+const ILLUS_COST = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="160" rx="70" ry="10" fill="#e4e8f5"/><!-- card peeking behind, rotated --><g transform="rotate(10 132 76)"><rect x="96" y="52" width="72" height="48" rx="9" fill="#5b8def"/><rect x="96" y="64" width="72" height="10" fill="#28345c"/><rect x="104" y="82" width="26" height="7" rx="3.5" fill="#ffffff" opacity=".85"/></g><!-- receipt, rotated slightly --><g transform="rotate(-7 90 92)"><path d="M50 40 h80 v104 l-8 -7 -8 7 -8 -7 -8 7 -8 -7 -8 7 -8 -7 -8 7 -8 -7 -8 7 z" fill="#ffffff" stroke="#e4e8f5" stroke-width="2"/><rect x="62" y="54" width="56" height="7" rx="3.5" fill="#28345c"/><rect x="62" y="68" width="40" height="5" rx="2.5" fill="#c3cbe8"/><rect x="62" y="80" width="48" height="5" rx="2.5" fill="#c3cbe8"/><rect x="62" y="92" width="34" height="5" rx="2.5" fill="#c3cbe8"/><rect x="62" y="104" width="44" height="5" rx="2.5" fill="#c3cbe8"/><line x1="62" y1="118" x2="118" y2="118" stroke="#e4e8f5" stroke-width="2"/><rect x="62" y="126" width="30" height="8" rx="4" fill="#c3cbe8"/><text x="94" y="133" text-anchor="end" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#2e9e5b">฿</text></g><!-- coin --><circle cx="55" cy="128" r="26" fill="#f4a83b"/><circle cx="55" cy="128" r="26" fill="none" stroke="#d98f22" stroke-width="2"/><circle cx="55" cy="128" r="18" fill="none" stroke="#ffffff" stroke-width="2" opacity=".55"/><text x="55" y="134" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="800" fill="#ffffff">฿</text></svg>`;
+const ILLUS_DISTANCE = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><!-- road --><rect x="10" y="132" width="180" height="26" rx="13" fill="#e4e8f5"/><rect x="26" y="143" width="14" height="5" rx="2.5" fill="#ffffff"/><rect x="54" y="143" width="14" height="5" rx="2.5" fill="#ffffff"/><rect x="82" y="143" width="14" height="5" rx="2.5" fill="#ffffff"/><!-- motion lines --><rect x="14" y="82" width="24" height="5" rx="2.5" fill="#c3cbe8"/><rect x="10" y="94" width="18" height="5" rx="2.5" fill="#c3cbe8"/><!-- car body --><path d="M38 128 L38 112 Q38 103 47 101 L60 98 Q70 80 90 78 L124 78 Q140 80 149 98 L160 101 Q168 103 168 112 L168 128 Z" fill="#33448a"/><!-- cabin window --><path d="M67 97 L78 82 Q82 79 88 79 L122 79 Q129 79 133 85 L142 97 Z" fill="#9db3ef"/><line x1="105" y1="79" x2="102" y2="97" stroke="#33448a" stroke-width="3"/><!-- headlight & taillight --><circle cx="163" cy="112" r="4" fill="#f4a83b"/><rect x="38" y="106" width="6" height="8" rx="2" fill="#e0533f"/><!-- door line --><line x1="103" y1="101" x2="103" y2="126" stroke="#28345c" stroke-width="2" opacity=".5"/><!-- wheels --><circle cx="70" cy="130" r="16" fill="#1f2a4d"/><circle cx="70" cy="130" r="7" fill="#c3cbe8"/><circle cx="146" cy="130" r="16" fill="#1f2a4d"/><circle cx="146" cy="130" r="7" fill="#c3cbe8"/><!-- speed / trend badge --><g transform="translate(140,30)"><circle cx="26" cy="26" r="26" fill="#ffffff"/><circle cx="26" cy="26" r="26" fill="none" stroke="#e4e8f5" stroke-width="2"/><path d="M12 32 L20 22 L27 28 L38 14" fill="none" stroke="#2e9e5b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M31 14 L38 14 L38 21" fill="none" stroke="#2e9e5b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+const ILLUS_OTHER = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="160" rx="70" ry="10" fill="#e4e8f5"/><!-- mini bar chart card --><g transform="translate(112,86)"><rect x="0" y="0" width="70" height="56" rx="12" fill="#ffffff"/><rect x="0" y="0" width="70" height="56" rx="12" fill="none" stroke="#e4e8f5" stroke-width="2"/><rect x="12" y="30" width="10" height="16" rx="3" fill="#9db3ef"/><rect x="30" y="20" width="10" height="26" rx="3" fill="#5b8def"/><rect x="48" y="10" width="10" height="36" rx="3" fill="#33448a"/></g><!-- gears --><g transform="translate(50,55)"><path d="M 26.0,0.0 L 18.48,7.65 L 18.38,18.38 L 7.65,18.48 L 0.0,26.0 L -7.65,18.48 L -18.38,18.38 L -18.48,7.65 L -26.0,0.0 L -18.48,-7.65 L -18.38,-18.38 L -7.65,-18.48 L -0.0,-26.0 L 7.65,-18.48 L 18.38,-18.38 L 18.48,-7.65 Z" fill="#f4a83b"/><circle cx="0" cy="0" r="10" fill="#eef1fb"/></g><g transform="translate(84,90)"><path d="M 17.0,0.0 L 12.1,5.01 L 12.02,12.02 L 5.01,12.1 L 0.0,17.0 L -5.01,12.1 L -12.02,12.02 L -12.1,5.01 L -17.0,0.0 L -12.1,-5.01 L -12.02,-12.02 L -5.01,-12.1 L -0.0,-17.0 L 5.01,-12.1 L 12.02,-12.02 L 12.1,-5.01 Z" fill="#28345c"/><circle cx="0" cy="0" r="6.3" fill="#eef1fb"/></g></svg>`;
 const CHART_COLORS = ['#f4a83b','#4fc39b','#5b8def','#ef6b6b','#c084fc','#f472b6','#38bdf8','#facc15','#a3e635','#fb923c'];
 function donutSVG(segments, size=140, thickness=22){
   const total = segments.reduce((s,x)=>s+x.value,0) || 1;
@@ -561,13 +566,189 @@ function periodComparison(){
   return { cur, prev, diff: prev ? ((cur-prev)/prev*100) : null };
 }
 function reportsPanel(){
-  const m=metrics(),exp=expenses().reduce((s,x)=>s+(+x.amount||0),0),total=m.spent+exp;
-  const segs=categoryBreakdown(), cmp=periodComparison();
-  return `<div class="metric-grid">${metric('น้ำมันทั้งหมด',money(m.spent),fmtVol(m.lit))}${metric('ค่าใช้จ่ายอื่น',money(exp),`${expenses().length} รายการ`)}${metric(efficiencyUnit(),m.kml?fmt(toDisplayEfficiency(m.kml),1):'—','เติมเต็มถัง')}${metric(`ต้นทุน/${distUnit()}`,m.dist?money(toDisplayCostPerDist(total/m.dist)):'—',m.dist?fmtDist(m.dist):'')}</div>
-  <div class="card"><h2>สัดส่วนค่าใช้จ่ายตามหมวด</h2><div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">${donutSVG(segs)}<div style="flex:1;min-width:140px;">${segs.length?segs.map(s=>`<div class="list-row" style="padding:6px 0;"><div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:${s.color};display:inline-block;"></span>${esc(s.label)}</div><b>${money(s.value)}</b></div>`).join(''):'<div class="muted">ยังไม่มีข้อมูล</div>'}</div></div></div>
-  <div class="card"><h2>เทียบเดือนนี้กับเดือนก่อน</h2><div class="metric-grid">${metric('เดือนนี้',money(cmp.cur),'')}${metric('เดือนก่อน',money(cmp.prev),'')}</div><div class="muted" style="margin-top:8px;">${cmp.diff===null?'ยังไม่มีข้อมูลเดือนก่อนสำหรับเทียบ':`${cmp.diff>=0?'▲ เพิ่มขึ้น':'▼ ลดลง'} ${fmt(Math.abs(cmp.diff),1)}%`}</div></div>
-  <div class="panel-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="printBtn">พิมพ์/PDF</button></div>`;
+  return `<div class="freport">
+    <div class="freport-tabs">
+      <button class="freport-tab ${reportTab==='fillups'?'active':''}" data-report-tab="fillups">เติม-เพิ่ม</button>
+      <button class="freport-tab ${reportTab==='cost'?'active':''}" data-report-tab="cost">ค่าใช้จ่าย</button>
+      <button class="freport-tab ${reportTab==='distance'?'active':''}" data-report-tab="distance">ระยะทาง</button>
+      <button class="freport-tab ${reportTab==='other'?'active':''}" data-report-tab="other">อื่นๆ</button>
+    </div>
+    <div id="freportBody">${renderReportTab(reportTab)}</div>
+  </div>
+  <div class="panel-actions freport-actions"><button class="primary" id="exportJsonBtn">Export JSON</button><button class="secondary" id="exportCsvBtn">Export CSV</button><button class="secondary" id="printBtn">พิมพ์/PDF</button></div>`;
 }
+function renderReportTab(tab){
+  if(!entries().length && tab!=='other') return `<div class="freport-hero-icons">${ILLUS_FILLUPS}</div><div class="freport-card"><div class="freport-empty">ยังไม่มีข้อมูลการเติมน้ำมันของรถคันนี้</div></div>`;
+  if(tab==='fillups') return renderFillupsTab();
+  if(tab==='cost') return renderCostTab();
+  if(tab==='distance') return renderDistanceTab();
+  return renderOtherTab();
+}
+function freportHero(label,big,compares){
+  return `<div class="freport-card">
+    <div class="freport-label">${esc(label)}</div>
+    <div class="freport-big">${big}</div>
+    <div class="freport-compare">${compares.map(c=>`<div class="freport-compare-cell"><span class="fc-icon">${c.icon}</span><div><b>${c.value}</b><small>${esc(c.label)}</small></div></div>`).join('')}</div>
+  </div>`;
+}
+function freportMini(items){
+  return `<div class="freport-minigrid">${items.map(c=>`<div class="freport-mini"><span class="fm-icon ${c.tone||''}">${c.icon}</span><div><b>${c.value}</b><small>${esc(c.label)}</small></div></div>`).join('')}</div>`;
+}
+
+// ---------- date-range helpers for year/month comparisons ----------
+function isThisYear(d){ return new Date(d).getFullYear()===new Date().getFullYear(); }
+function isLastYear(d){ return new Date(d).getFullYear()===new Date().getFullYear()-1; }
+function isThisMonth(d){ const n=new Date(),x=new Date(d); return x.getFullYear()===n.getFullYear()&&x.getMonth()===n.getMonth(); }
+function isLastMonth(d){ const n=new Date(),lm=new Date(n.getFullYear(),n.getMonth()-1,1),x=new Date(d); return x.getFullYear()===lm.getFullYear()&&x.getMonth()===lm.getMonth(); }
+function daySpanOf(arr){ if(!arr.length) return 1; const first=new Date(arr[0].date).getTime(); return Math.max(1,Math.round((Date.now()-first)/864e5)); }
+function distanceInRange(arr,inRangeFn){
+  const sorted=[...arr].sort((a,b)=>(+a.odometer)-(+b.odometer));
+  const within=sorted.filter(x=>inRangeFn(x.date));
+  if(!within.length) return 0;
+  const beforeList=sorted.filter(x=>!inRangeFn(x.date)&&new Date(x.date)<new Date(within[0].date));
+  const before=beforeList.length?beforeList[beforeList.length-1]:null;
+  const startOdo=before?+before.odometer:+within[0].odometer;
+  const endOdo=+within[within.length-1].odometer;
+  return Math.max(0,endOdo-startOdo);
+}
+function fillupIntervals(){
+  const arr=entries(); const out=[];
+  for(let i=1;i<arr.length;i++){
+    const a=arr[i-1],b=arr[i],d=(+b.odometer)-(+a.odometer);
+    if(a.full&&b.full&&!b.previousFillMissed&&d>0&&+b.liters>0){
+      const k=d/(+b.liters);
+      if(k>2&&k<80) out.push({distance:d,liters:+b.liters,kml:k,cost:+b.total||0,costPerKm:d>0?(+b.total||0)/d:0,date:b.date});
+    }
+  }
+  return out;
+}
+function fillupsReport(){
+  const arr=entries(), litersOf=x=>+x.liters||0, litersVals=arr.map(litersOf).filter(v=>v>0);
+  return {
+    count:arr.length,
+    countThisYear:arr.filter(x=>isThisYear(x.date)).length, countLastYear:arr.filter(x=>isLastYear(x.date)).length,
+    countThisMonth:arr.filter(x=>isThisMonth(x.date)).length, countLastMonth:arr.filter(x=>isLastMonth(x.date)).length,
+    totalLiters:arr.reduce((s,x)=>s+litersOf(x),0),
+    litersThisYear:arr.filter(x=>isThisYear(x.date)).reduce((s,x)=>s+litersOf(x),0),
+    litersLastYear:arr.filter(x=>isLastYear(x.date)).reduce((s,x)=>s+litersOf(x),0),
+    litersThisMonth:arr.filter(x=>isThisMonth(x.date)).reduce((s,x)=>s+litersOf(x),0),
+    litersLastMonth:arr.filter(x=>isLastMonth(x.date)).reduce((s,x)=>s+litersOf(x),0),
+    minFill:litersVals.length?Math.min(...litersVals):0, maxFill:litersVals.length?Math.max(...litersVals):0,
+  };
+}
+function costReport(){
+  const arr=entries(), totalOf=x=>+x.total||0;
+  const totals=arr.map(totalOf).filter(v=>v>0), prices=arr.map(x=>+x.pricePerLiter||0).filter(v=>v>0);
+  const ivals=fillupIntervals(), cpkVals=ivals.map(x=>x.costPerKm).filter(v=>v>0), m=metrics(arr);
+  const total=arr.reduce((s,x)=>s+totalOf(x),0), ds=daySpanOf(arr);
+  return {
+    total,
+    thisYear:arr.filter(x=>isThisYear(x.date)).reduce((s,x)=>s+totalOf(x),0),
+    lastYear:arr.filter(x=>isLastYear(x.date)).reduce((s,x)=>s+totalOf(x),0),
+    thisMonth:arr.filter(x=>isThisMonth(x.date)).reduce((s,x)=>s+totalOf(x),0),
+    lastMonth:arr.filter(x=>isLastMonth(x.date)).reduce((s,x)=>s+totalOf(x),0),
+    minBill:totals.length?Math.min(...totals):0, maxBill:totals.length?Math.max(...totals):0,
+    bestPrice:prices.length?Math.min(...prices):0, worstPrice:prices.length?Math.max(...prices):0,
+    costPerKm:m.dist?m.spent/m.dist:0,
+    bestCostPerKm:cpkVals.length?Math.min(...cpkVals):0, worstCostPerKm:cpkVals.length?Math.max(...cpkVals):0,
+    avgPerDay:total/ds, avgPerMonth:(total/ds)*30.44,
+  };
+}
+function distanceReport(){
+  const arr=entries(), sorted=[...arr].sort((a,b)=>(+a.odometer)-(+b.odometer));
+  const totalDistance=sorted.length>=2?Math.max(0,(+sorted[sorted.length-1].odometer)-(+sorted[0].odometer)):0;
+  const ds=daySpanOf(arr);
+  return {
+    totalDistance, lastOdo:currentOdo(),
+    dThisYear:distanceInRange(arr,isThisYear), dLastYear:distanceInRange(arr,isLastYear),
+    dThisMonth:distanceInRange(arr,isThisMonth), dLastMonth:distanceInRange(arr,isLastMonth),
+    avgPerDay:totalDistance/ds, avgPerMonth:(totalDistance/ds)*30.44,
+  };
+}
+function renderFillupsTab(){
+  const r=fillupsReport(), m=metrics();
+  return `<div class="freport-hero-icons">${ILLUS_FILLUPS}</div>
+  ${freportHero('เติม-เพิ่ม',fmt(r.count),[
+    {icon:'⛽',value:fmt(r.countThisYear),label:'ปีนี้'},{icon:'⛽',value:fmt(r.countLastYear),label:'ปีก่อนหน้านี้'},
+    {icon:'⛽',value:fmt(r.countThisMonth),label:'เดือนนี้'},{icon:'⛽',value:fmt(r.countLastMonth),label:'เดือนก่อนหน้า'},
+  ])}
+  ${freportHero('เชื้อเพลิง',fmtVol(r.totalLiters),[
+    {icon:'💧',value:fmtVol(r.litersThisYear),label:'ปีนี้'},{icon:'💧',value:fmtVol(r.litersLastYear),label:'ปีก่อนหน้านี้'},
+    {icon:'💧',value:fmtVol(r.litersThisMonth),label:'เดือนนี้'},{icon:'💧',value:fmtVol(r.litersLastMonth),label:'เดือนก่อนหน้า'},
+  ])}
+  <div class="freport-card">${freportMini([
+    {icon:'⬇️',value:fmtVol(r.minFill),label:'เติมต่ำสุด',tone:'good'},
+    {icon:'⬆️',value:fmtVol(r.maxFill),label:'เติมสูงสุด',tone:'bad'},
+  ])}</div>
+  <div class="freport-card center">
+    <div class="freport-label">ปริมาณการใช้เชื้อเพลิงเฉลี่ย</div>
+    <div class="freport-big accent">${m.kml?fmt(toDisplayEfficiency(m.kml),2):'—'} <span class="unit">${efficiencyUnit()}</span></div>
+  </div>`;
+}
+function renderCostTab(){
+  const r=costReport();
+  return `<div class="freport-hero-icons">${ILLUS_COST}</div>
+  ${freportHero('ค่าใช้จ่าย',money(r.total),[
+    {icon:'📉',value:money(r.thisYear),label:'ปีนี้'},{icon:'📈',value:money(r.lastYear),label:'ปีก่อนหน้านี้'},
+    {icon:'📈',value:money(r.thisMonth),label:'เดือนนี้'},{icon:'💵',value:money(r.lastMonth),label:'เดือนก่อนหน้า'},
+  ])}
+  <div class="freport-row2">
+    <div class="freport-card small"><div class="freport-label">บิล</div>${freportMini([
+      {icon:'💲',value:money(r.minBill),label:'รายจ่ายต่ำสุด',tone:'good'},{icon:'💲',value:money(r.maxBill),label:'รายจ่ายสูงสุด',tone:'bad'},
+    ])}</div>
+    <div class="freport-card small"><div class="freport-label">ราคาเชื้อเพลิง</div>${freportMini([
+      {icon:'⛽',value:'฿'+fmt(toDisplayPricePerVol(r.bestPrice),3),label:'ราคาดีที่สุด',tone:'good'},
+      {icon:'⛽',value:'฿'+fmt(toDisplayPricePerVol(r.worstPrice),3),label:'ราคาแย่ที่สุด',tone:'bad'},
+    ])}</div>
+  </div>
+  <div class="freport-card">
+    <div class="freport-label">รายจ่ายเฉลี่ยต่อ${distUnit()}</div>
+    <div class="freport-big">฿${fmt(toDisplayCostPerDist(r.costPerKm),3)}<span class="unit">/${distUnit()}</span></div>
+    ${freportMini([
+      {icon:'💲',value:'฿'+fmt(toDisplayCostPerDist(r.bestCostPerKm),3),label:'ดีที่สุดต่อ'+distUnit(),tone:'good'},
+      {icon:'💲',value:'฿'+fmt(toDisplayCostPerDist(r.worstCostPerKm),3),label:'แย่ที่สุดต่อ'+distUnit(),tone:'bad'},
+    ])}
+  </div>
+  <div class="freport-row2">
+    <div class="freport-card small center"><div class="freport-label">ค่าใช้จ่ายเฉลี่ยต่อวัน</div><div class="freport-big small">${money(r.avgPerDay)}</div></div>
+    <div class="freport-card small center"><div class="freport-label">ค่าใช้จ่ายเฉลี่ยต่อเดือน</div><div class="freport-big small">${money(r.avgPerMonth)}</div></div>
+  </div>`;
+}
+function renderDistanceTab(){
+  const r=distanceReport();
+  return `<div class="freport-hero-icons">${ILLUS_DISTANCE}</div>
+  <div class="freport-card"><div class="freport-label">ระยะทางที่ขับด้วย FuelLog Pro</div><div class="freport-big">${fmtDist(r.totalDistance)}</div></div>
+  ${freportHero('ค่าการนับเลข'+distUnit()+'สุดท้าย',fmtDist(r.lastOdo),[
+    {icon:'🧭',value:fmtDist(r.dThisYear),label:'ปีนี้'},{icon:'🧭',value:fmtDist(r.dLastYear),label:'ปีก่อนหน้านี้'},
+    {icon:'🧭',value:fmtDist(r.dThisMonth),label:'เดือนนี้'},{icon:'🧭',value:fmtDist(r.dLastMonth),label:'เดือนก่อนหน้า'},
+  ])}
+  <div class="freport-row2">
+    <div class="freport-card small center"><div class="freport-label">ระยะทางเฉลี่ยต่อวัน</div><div class="freport-big small">${fmtDist(r.avgPerDay,2)}</div></div>
+    <div class="freport-card small center"><div class="freport-label">ระยะทางเฉลี่ยต่อเดือน</div><div class="freport-big small">${fmtDist(r.avgPerMonth,2)}</div></div>
+  </div>`;
+}
+function renderOtherTab(){
+  const m=metrics(),exp=expenses().reduce((s,x)=>s+(+x.amount||0),0);
+  const segs=categoryBreakdown(), cmp=periodComparison();
+  return `<div class="freport-hero-icons">${ILLUS_OTHER}</div>
+  <div class="freport-card"><div class="freport-label">ค่าใช้จ่ายอื่นๆ (ไม่รวมน้ำมัน)</div><div class="freport-big">${money(exp)}</div><div class="freport-label" style="margin-top:4px;">${expenses().length} รายการ</div></div>
+  <div class="freport-card">
+    <div class="freport-label" style="margin-bottom:10px;">สัดส่วนค่าใช้จ่ายตามหมวด (รวมน้ำมัน)</div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      ${donutSVG(segs).replace('var(--surface)','var(--fr-card)')}
+      <div style="flex:1;min-width:140px;">${segs.length?segs.map(s=>`<div class="freport-compare-cell" style="margin-bottom:8px;"><span style="width:10px;height:10px;border-radius:50%;background:${s.color};display:inline-block;"></span><div><b>${money(s.value)}</b><small>${esc(s.label)}</small></div></div>`).join(''):'<div class="freport-empty">ยังไม่มีข้อมูล</div>'}</div>
+    </div>
+  </div>
+  <div class="freport-card">
+    <div class="freport-label">เทียบเดือนนี้กับเดือนก่อน (น้ำมัน+ค่าใช้จ่ายอื่น)</div>
+    <div class="freport-row2" style="margin-top:10px;">
+      <div class="freport-card small center" style="margin:0;"><div class="freport-label">เดือนนี้</div><div class="freport-big small">${money(cmp.cur)}</div></div>
+      <div class="freport-card small center" style="margin:0;"><div class="freport-label">เดือนก่อน</div><div class="freport-big small">${money(cmp.prev)}</div></div>
+    </div>
+    <div class="freport-label" style="margin-top:10px;">${cmp.diff===null?'ยังไม่มีข้อมูลเดือนก่อนสำหรับเทียบ':`${cmp.diff>=0?'▲ เพิ่มขึ้น':'▼ ลดลง'} ${fmt(Math.abs(cmp.diff),1)}%`}</div>
+  </div>`;
+}
+
 
 // ---------- Unified search across entries / expenses / reminders / trips ----------
 function searchPanel(){ return `<input id="globalSearchInput" placeholder="พิมพ์คำค้นหา เช่น ชื่อปั๊ม, หมวดหมู่, โน้ต…" style="margin-bottom:10px;"><div id="globalSearchResults" class="muted">พิมพ์เพื่อค้นหาในทุกรายการ (เติมน้ำมัน ค่าใช้จ่าย เตือนบำรุงรักษา ทริป)</div>`; }
@@ -716,7 +897,7 @@ async function join(){
 async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
-function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});if(user)loadMembers();}
+function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$$('[data-report-tab]').forEach(b=>b.onclick=()=>{reportTab=b.dataset.reportTab;renderPanel('reports');});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
 function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){

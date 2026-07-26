@@ -55,7 +55,7 @@ async function requireFirebase(){
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'fuellog-v5-data';
-const APP_VERSION = '6.8.0';
+const APP_VERSION = '6.9.0';
 const memoryStore = new Map();
 const store = (()=>{
   try{
@@ -342,8 +342,58 @@ function namedNumber(text,patterns){
 function guessMerchant(text){
   return String(text).split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>=3&&!/^\d[\d\s:./-]*$/.test(x)).slice(0,3).join(' ').slice(0,80);
 }
+async function scanReceiptWithClaude(file,type,status){
+  if(status) status.textContent='กำลังส่งรูปให้ AI อ่าน…';
+  const base64=await new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result.split(',')[1]);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+  const mediaType=file.type||'image/jpeg';
+  const isFuel=type==='fuel';
+  const schemaHint=isFuel
+    ? '{"date":"YYYY-MM-DD หรือ null","liters":number หรือ null,"pricePerLiter":number หรือ null,"total":number หรือ null,"station":string หรือ null}'
+    : '{"date":"YYYY-MM-DD หรือ null","title":string หรือ null,"amount":number หรือ null}';
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':state.anthropicApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,messages:[{role:'user',content:[
+      {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+      {type:'text',text:`นี่คือรูปใบเสร็จ${isFuel?'เติมน้ำมัน':''} อ่านข้อมูลแล้วตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ markdown fence รูปแบบ: ${schemaHint} ถ้าอ่านค่าใดไม่ได้ให้ใส่ null แปลงปี พ.ศ. เป็น ค.ศ. ถ้าจำเป็น`}
+    ]}]})
+  });
+  const data=await res.json();
+  if(data.error) throw new Error(data.error.message||'Anthropic API error');
+  const textBlock=(data.content||[]).find(c=>c.type==='text');
+  if(!textBlock) throw new Error('ไม่มีคำตอบจาก AI');
+  return JSON.parse(textBlock.text.replace(/```json|```/g,'').trim());
+}
 async function scanReceipt(file,type){
   const status=$('#ocrStatus');
+  if(state.anthropicApiKey){
+    try{
+      const parsed=await scanReceiptWithClaude(file,type,status);
+      if(parsed.date&&$('[name="date"]')) $('[name="date"]').value=parsed.date;
+      if(type==='fuel'){
+        if(parsed.liters&&$('[name="liters"]')) $('[name="liters"]').value=parsed.liters;
+        if(parsed.pricePerLiter&&$('[name="pricePerLiter"]')) $('[name="pricePerLiter"]').value=parsed.pricePerLiter;
+        if(parsed.total&&$('[name="grossTotal"]')) $('[name="grossTotal"]').value=parsed.total;
+        if(parsed.station&&$('#stationInput')&&!$('#stationInput').value) $('#stationInput').value=parsed.station;
+        $('[name="grossTotal"]')?.dispatchEvent(new Event('input',{bubbles:true}));
+      }else{
+        if(parsed.amount&&$('[name="amount"]')) $('[name="amount"]').value=parsed.amount;
+        if(parsed.title&&$('[name="title"]')&&!$('[name="title"]').value) $('[name="title"]').value=parsed.title;
+      }
+      const val=parsed.total||parsed.amount;
+      if(status) status.textContent=`อ่านบิลด้วย AI เสร็จแล้ว${val?` • พบยอด ฿${fmt(val,2)}`:' • กรุณาตรวจค่าที่กรอก'}`;
+      return;
+    }catch(e){
+      console.error('Claude OCR failed, falling back to Tesseract',e);
+      if(status) status.textContent='อ่านด้วย AI ไม่สำเร็จ กำลังลองด้วยตัวอ่านสำรอง…';
+      // fall through to the free local OCR below
+    }
+  }
   if(status) status.textContent='กำลังเตรียม OCR…';
   try{
     const T=await loadTesseract();
@@ -377,7 +427,7 @@ async function scanReceipt(file,type){
       const merchant=guessMerchant(text);
       if(merchant&&$('[name="title"]')&&!$('[name="title"]').value) $('[name="title"]').value=merchant;
     }
-    if(status) status.textContent=`อ่านบิลเสร็จแล้ว${total?` • พบยอด ฿${fmt(total,2)}`:' • กรุณาตรวจค่าที่กรอก'}`;
+    if(status) status.textContent=`อ่านบิลเสร็จแล้ว (ตัวอ่านฟรี)${total?` • พบยอด ฿${fmt(total,2)}`:' • กรุณาตรวจค่าที่กรอก'}`;
   }catch(e){
     console.error('OCR failed',e);
     if(status) status.textContent='สแกนไม่สำเร็จ กรุณากรอกข้อมูลเองหรือเลือกรูปใหม่';
@@ -484,53 +534,78 @@ async function refreshHomeNearby(){
 }
 
 
-function renderTodayPrices(data){
-  // Local GitHub Action format from oil-prices.json (Bangchak API snapshot)
-  if(data?.data?.[0]?.OilList){
+function extractBangchakGrades(list){
+  const find = pred => { const item = list.find(pred); const n = item ? Number(item.PriceToday) : null; return Number.isFinite(n) && n>0 ? n : null; };
+  return {
+    gasohol_95: find(x => x.OilName.includes('95') && x.OilName.includes('แก๊สโซฮอล์')),
+    gasohol_91: find(x => x.OilName.includes('91') && x.OilName.includes('แก๊สโซฮอล์')),
+    diesel_b7: find(x => x.OilName.includes('ไฮดีเซล') && !x.OilName.includes('พรีเมียม')),
+  };
+}
+function normalizeAggregatorStation(st){
+  if(!st) return null;
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) && n>0 ? n : null; };
+  return { gasohol_95:num(st.gasohol_95?.price), gasohol_91:num(st.gasohol_91?.price), diesel_b7:num(st.diesel_b7?.price) };
+}
+function gradeRow(label, grades){
+  if(!grades) return '';
+  const parts = [];
+  if(grades.gasohol_95) parts.push(`95 ฿${grades.gasohol_95.toFixed(2)}`);
+  if(grades.gasohol_91) parts.push(`91 ฿${grades.gasohol_91.toFixed(2)}`);
+  if(grades.diesel_b7) parts.push(`ดีเซล B7 ฿${grades.diesel_b7.toFixed(2)}`);
+  return parts.length ? `<div class="list-row"><b>${esc(label)}</b><span>${parts.join(' · ')}</span></div>` : '';
+}
+async function fetchBangchakLocal(){
+  try{
+    const res = await fetch(`./oil-prices.json?v=${Date.now()}`,{cache:'no-store'});
+    if(!res.ok) return null;
+    const data = await res.json();
+    const root = data?.data?.[0];
+    if(!root?.OilList) return null;
+    const list = JSON.parse(root.OilList);
+    return { grades: extractBangchakGrades(list), dateLabel: root.OilRemark2 || root.OilPriceDate || '' };
+  }catch(e){ return null; }
+}
+async function fetchAggregatorPrices(){
+  const urls = [
+    'https://api.chnwt.dev/thai-oil-api/latest',
+    'https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.chnwt.dev/thai-oil-api/latest'),
+  ];
+  for(const url of urls){
     try{
-      const root=data.data[0], list=JSON.parse(root.OilList);
-      const rows=list.filter(x=>Number(x.PriceToday)>0).map(x=>`<div class="list-row"><b>${esc(x.OilName)}</b><span>฿${fmt(x.PriceToday,2)}</span></div>`).join('');
-      if(rows) return `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(root.OilRemark2||root.OilPriceDate||'ข้อมูลราคาล่าสุด')}</div>${rows}`;
-    }catch(e){ console.warn('Invalid local oil-prices.json',e); }
-  }
-  // Legacy thai-oil-api format
-  if(data?.status==='success'&&data.response&&typeof data.response==='object'){
-    const r=data.response;
-    const brands=[{key:'ptt',label:'ปตท.'},{key:'bcp',label:'บางจาก'},{key:'shell',label:'เชลล์'},{key:'esso',label:'เอสโซ่'},{key:'caltex',label:'คาลเท็กซ์'},{key:'pt',label:'พีที'},{key:'susco',label:'ซัสโก้'}];
-    const fuels=[{key:'gasohol_95',label:'95'},{key:'gasohol_91',label:'91'},{key:'diesel_b7',label:'ดีเซล B7'}];
-    const rows=brands.map(b=>{
-      const st=r.stations?.[b.key]; if(!st)return '';
-      const parts=fuels.map(f=>{const n=parseFloat(st[f.key]?.price);return Number.isFinite(n)&&n>0?`${f.label} ฿${n.toFixed(2)}`:null}).filter(Boolean);
-      return parts.length?`<div class="list-row"><b>${b.label}</b><span>${parts.join(' · ')}</span></div>`:'';
-    }).join('');
-    if(rows)return rows;
+      const res = await fetch(url);
+      if(!res.ok) continue;
+      const data = await res.json();
+      if(data?.status==='success' && data.response?.stations) return data.response;
+    }catch(e){ /* try next */ }
   }
   return null;
 }
 async function loadTodayPrices(){
   const box=$('#todayPriceList'); if(!box)return;
   box.innerHTML='<div class="muted">กำลังโหลดราคาน้ำมัน…</div>';
-  const cached=store.getItem('fuellog-oil-cache');
-  const attempts=[
-    async()=>fetch(`./oil-prices.json?v=${Date.now()}`,{cache:'no-store'}),
-    async()=>fetch('https://api.chnwt.dev/thai-oil-api/latest'),
-    async()=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.chnwt.dev/thai-oil-api/latest'))
-  ];
-  for(const attempt of attempts){
-    try{
-      const res=await attempt(); if(!res.ok)continue;
-      const data=await res.json(), html=renderTodayPrices(data);
-      if(html){
-        box.innerHTML=html;
-        store.setItem('fuellog-oil-cache',JSON.stringify({html,time:Date.now()}));
-        return;
-      }
-    }catch(e){ console.warn('Oil source failed',e); }
-  }
+  try{
+    const [bangchak, aggregator] = await Promise.all([fetchBangchakLocal(), fetchAggregatorPrices()]);
+    const rows = [];
+    if(bangchak?.grades) rows.push(gradeRow('บางจาก (ทางการ)', bangchak.grades));
+    else if(aggregator?.stations?.bcp) rows.push(gradeRow('บางจาก', normalizeAggregatorStation(aggregator.stations.bcp)));
+    if(aggregator?.stations?.ptt) rows.push(gradeRow('ปตท.', normalizeAggregatorStation(aggregator.stations.ptt)));
+    if(aggregator?.stations?.shell) rows.push(gradeRow('เชลล์', normalizeAggregatorStation(aggregator.stations.shell)));
+    const html = rows.filter(Boolean).join('');
+    if(html){
+      const dateLine = bangchak?.dateLabel ? `<div class="muted" style="margin-bottom:6px;font-size:10.5px;">${esc(bangchak.dateLabel)}</div>` : '';
+      const note = !aggregator ? `<div class="muted" style="margin-top:6px;font-size:10px;">เทียบกับ ปตท./เชลล์ ไม่ได้ตอนนี้ (โหลดไม่สำเร็จ)</div>` : '';
+      const full = dateLine+html+note;
+      box.innerHTML = full;
+      store.setItem('fuellog-oil-cache', JSON.stringify({html:dateLine+html,time:Date.now()}));
+      return;
+    }
+  }catch(e){ console.warn('Oil price load failed', e); }
+  const cached = store.getItem('fuellog-oil-cache');
   if(cached){
     try{
-      const c=JSON.parse(cached);
-      if(c.html){box.innerHTML=`<div class="muted" style="margin-bottom:6px;">แสดงข้อมูลล่าสุดที่บันทึกไว้</div>${c.html}`;return;}
+      const c = JSON.parse(cached);
+      if(c.html){ box.innerHTML = `<div class="muted" style="margin-bottom:6px;">แสดงข้อมูลล่าสุดที่บันทึกไว้</div>${c.html}`; return; }
     }catch{}
   }
   box.innerHTML='<div class="muted">ยังโหลดราคาไม่ได้ กรุณาตรวจว่าไฟล์ oil-prices.json อยู่ที่รากโปรเจกต์และ GitHub Action อัปเดตสำเร็จ</div>';
@@ -827,7 +902,11 @@ function runGlobalSearch(){
 // ---------- Settings: display units ----------
 function settingsPanel(){
   const hc = state.homeCards || {};
-  return `<div class="card"><h2>รูปแบบและลักษณะ</h2>
+  return `<div class="card"><h2>สแกนบิลด้วย AI (แม่นยำกว่าตัวอ่านฟรี)</h2>
+    <p class="muted">ค่าเริ่มต้นแอปอ่านบิลด้วย Tesseract.js (ฟรี ทำงานในเครื่อง) ซึ่งความแม่นยำสำหรับภาษาไทยและบิลถ่ายเอียง/แสงไม่ดีจะสู้ AI ไม่ได้ — ใส่ Anthropic API key ของตัวเองเพื่อให้สแกนด้วย Claude แทน แม่นยำขึ้นมาก โดยแอปจะสลับกลับไปใช้ตัวอ่านฟรีให้อัตโนมัติถ้า AI อ่านไม่สำเร็จ</p>
+    <div class="field"><label>Anthropic API key</label><input type="password" id="anthropicApiKey" placeholder="sk-ant-..." value="${esc(state.anthropicApiKey||'')}"></div>
+    <p class="muted">เก็บไว้ในเครื่องนี้เท่านั้น ไม่ถูกส่งไปที่อื่นนอกจาก Anthropic API ตอนสแกนบิล — สมัคร/สร้าง key ได้ที่ <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> (มีค่าใช้จ่ายตามการใช้งานจริง ~เศษสตางค์ต่อการสแกน 1 ครั้ง) เว้นว่างไว้เพื่อใช้ตัวอ่านฟรีต่อไป</p></div>
+  <div class="card"><h2>รูปแบบและลักษณะ</h2>
     <div class="field"><label>แบบอักษร (Font)</label><select id="fontFamily">${Object.entries(FONT_OPTIONS).map(([k,v])=>`<option value="${k}" ${state.fontFamily===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
     <p class="muted">แบบอักษรนอกจาก "ระบบ" จะโหลดจาก Google Fonts ครั้งแรกที่เลือก (ต้องมีอินเทอร์เน็ต) หลังจากนั้นเบราว์เซอร์จะจำไว้ให้</p>
     <h3 style="font-size:13px;margin:16px 0 6px;color:var(--text)">การ์ดในหน้าแรก</h3>
@@ -845,6 +924,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>6.9</b> — เทียบราคาน้ำมัน ปตท./เชลล์ กับบางจากในหน้าแรก, เพิ่มตัวเลือกสแกนบิลด้วย Claude AI (แม่นยำกว่าตัวอ่านฟรี)</li>
       <li><b>6.8</b> — เลือกฟอนต์ของแอปได้ (Sarabun/Kanit/Prompt/ระบบ), ปิด/เปิดการ์ดในหน้าแรกได้เอง</li>
       <li><b>6.7</b> — เพิ่มหน้า "ข้อมูล" ในตั้งค่า (เวอร์ชัน, ประวัติอัปเดต, สิทธิ์การใช้งาน, นโยบายความเป็นส่วนตัว)</li>
       <li><b>6.6</b> — ธีมสลับตามระบบโทรศัพท์อัตโนมัติ, ตัดปั๊มใกล้ฉันออกจากหน้าเติมน้ำมัน (เหลือหน้าแรก/ฟอร์มเพิ่มรายการ)</li>
@@ -857,7 +937,9 @@ function settingsPanel(){
 
     <details class="about-item"><summary>บริการและซอฟต์แวร์ที่ใช้</summary><div class="about-body"><ul>
       <li><b>Firebase</b> (Google) — ระบบล็อกอิน, ฐานข้อมูลคลาวด์, พื้นที่เก็บรูปภาพ สำหรับซิงก์และแชร์รถกับครอบครัว</li>
-      <li><b>Tesseract.js</b> (สัญญาอนุญาต Apache 2.0) — อ่านข้อความจากรูปใบเสร็จ (OCR) ทำงานในเครื่องทั้งหมด ไม่ส่งรูปออกไปที่ไหน</li>
+      <li><b>Tesseract.js</b> (สัญญาอนุญาต Apache 2.0) — อ่านข้อความจากรูปใบเสร็จ (OCR) แบบฟรี ทำงานในเครื่องทั้งหมด ไม่ส่งรูปออกไปที่ไหน ใช้เป็นค่าเริ่มต้นหรือเป็นตัวสำรอง</li>
+      <li><b>Claude (Anthropic API)</b> — ทางเลือกสแกนบิลด้วย AI ที่แม่นยำกว่า ใช้เมื่อใส่ API key ของตัวเองในตั้งค่าเท่านั้น ไม่บังคับใช้</li>
+      <li><b>thai-oil-api (chnwt.dev)</b> — ราคาน้ำมัน ปตท./เชลล์ สำหรับเทียบกับราคาทางการของบางจาก</li>
       <li><b>JSZip</b> (สัญญาอนุญาต MIT) — ใช้แตกไฟล์สำรองข้อมูล .fuelio ตอนนำเข้า</li>
       <li><b>OpenStreetMap</b> ผ่าน Overpass API (สัญญาอนุญาต ODbL) — ข้อมูลตำแหน่งปั๊มน้ำมันใกล้เคียง</li>
       <li><b>ข้อมูลราคาน้ำมัน</b> จาก Bangchak Corporation PCL (Open Data)</li>
@@ -870,6 +952,7 @@ function settingsPanel(){
         <li>ไม่มีการขาย แชร์ หรือส่งข้อมูลให้บุคคล/บริษัทที่สาม ไม่มีโฆษณา ไม่มีการติดตามพฤติกรรมผู้ใช้ (analytics/tracking)</li>
         <li>ตำแหน่ง GPS ใช้เฉพาะตอนค้นหาปั๊มใกล้เคียงหรือบันทึกระยะทางทริปเท่านั้น ไม่ถูกเก็บสะสมหรือส่งไปนอกเหนือจากนั้น</li>
         <li>รูปภาพที่แนบ (ใบเสร็จ/เรือนไมล์) เก็บใน Firebase Storage เข้าถึงได้เฉพาะสมาชิกของรถคันนั้น</li>
+        <li>ถ้าตั้งค่า Anthropic API key เพื่อสแกนบิลด้วย AI รูปบิลที่สแกนจะถูกส่งไปยัง Anthropic เพื่อประมวลผลเท่านั้น (ไม่ได้เก็บถาวรฝั่งเขา) — ถ้าไม่ตั้งค่าไว้ การสแกนจะทำในเครื่องทั้งหมด ไม่มีรูปออกจากเครื่องเลย</li>
       </ul>
     </div></details>
 
@@ -1009,9 +1092,9 @@ async function join(){
 async function loadGallery(){const box=$('#galleryBody');await initFirebase();if(!user){box.innerHTML='กรุณาเข้าสู่ระบบก่อน';return;}try{const s=await getDocs(collection(db,'vehicles',state.currentVehicleId,'photos')),arr=s.docs.map(d=>({id:d.id,...d.data()}));box.innerHTML=`<div class="panel-actions"><label class="primary">＋ อัปโหลด<input hidden type="file" id="galleryUpload" accept="image/*,application/pdf"></label></div><div class="gallery">${arr.map(x=>`<article>${String(x.contentType||'').startsWith('image/')?`<img src="${esc(x.url)}">`:'<div style="padding:30px;text-align:center">📄</div>'}<div><b>${esc(x.name)}</b><br><a href="${esc(x.url)}" target="_blank">เปิด</a></div></article>`).join('')}</div>`;$('#galleryUpload')?.addEventListener('change',uploadGallery);}catch(e){box.textContent=e.message;}}
 async function uploadGallery(e){const f=e.target.files[0];if(!f)return;await ensureCloudVehicle();const path=`vehicles/${state.currentVehicleId}/gallery/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`,r=ref(storage,path);await uploadBytes(r,f,{contentType:f.type,customMetadata:{uploadedBy:user.uid}});const url=await getDownloadURL(r);await setDoc(doc(db,'vehicles',state.currentVehicleId,'photos',uid()),{name:f.name,path,url,contentType:f.type,uploadedBy:user.uid,createdAt:serverTimestamp()});loadGallery();}
 
-function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});if(user)loadMembers();}
+function bindPanel(){ $('#loginBtn')?.addEventListener('click',login);$('#signOutBtn')?.addEventListener('click',async()=>{try{await requireFirebase();await signOut(auth);}catch(e){alert(e.message);}});$('#syncBtn')?.addEventListener('click',syncVehicleWithStatus);$('#inviteBtn')?.addEventListener('click',invite);$('#joinBtn')?.addEventListener('click',join);$('#gpsStartBtn')?.addEventListener('click',startGpsTrip);$('#gpsStopBtn')?.addEventListener('click',stopGpsTrip);$('#saveTripBtn')?.addEventListener('click',()=>{const x={id:uid(),vehicleId:state.currentVehicleId,name:$('#tripName').value||'ทริป',date:$('#tripDate').value,distance:toCanonicalDist(+$('#tripDistance').value||0),fuel:+$('#tripFuel').value||0,toll:+$('#tripToll').value||0,parking:+$('#tripParking').value||0,food:+$('#tripFood').value||0,other:+$('#tripOther').value||0};state.trips.push(x);save();renderPanel('trips');if(user)syncVehicle();});$$('#exportJsonBtn').forEach(x=>x.onclick=exportJSON);$$('#exportCsvBtn').forEach(x=>x.onclick=exportCSV);$('#printBtn')?.addEventListener('click',()=>window.print());$('#importBtn')?.addEventListener('click',()=>$('#importFile').click());$('#importFile')?.addEventListener('change',e=>e.target.files[0]&&importFile(e.target.files[0]));$('#addVehicleBtn')?.addEventListener('click',()=>{const name=prompt('ชื่อรถ');if(name){const v={id:uid(),name};state.vehicles.push(v);state.currentVehicleId=v.id;save();renderAll();renderPanel('vehicles');}});$$('[data-rename-vehicle]').forEach(x=>x.onchange=()=>{state.vehicles.find(v=>v.id===x.dataset.renameVehicle).name=x.value||'รถ';save();renderAll();});$$('[data-delete-vehicle]').forEach(x=>x.onclick=()=>{if(state.vehicles.length<2)return alert('ต้องมีรถอย่างน้อย 1 คัน');if(confirm('ลบรถและข้อมูลในเครื่องของรถนี้?')){const idv=x.dataset.deleteVehicle;state.vehicles=state.vehicles.filter(v=>v.id!==idv);['entries','expenses','reminders','trips'].forEach(k=>state[k]=state[k].filter(a=>a.vehicleId!==idv));state.currentVehicleId=state.vehicles[0].id;save();renderAll();renderPanel('vehicles');}});$('#globalSearchInput')?.addEventListener('input',runGlobalSearch);$('#unitDistance')?.addEventListener('change',e=>{state.units=state.units||{};state.units.distance=e.target.value;save();renderAll();});$('#unitVolume')?.addEventListener('change',e=>{state.units=state.units||{};state.units.volume=e.target.value;save();renderAll();});$('#fontFamily')?.addEventListener('change',e=>{state.fontFamily=e.target.value;applyFont();save();});const homeCardMap={homeCardNearby:'nearby',homeCardTodayPrice:'todayPrice',homeCardChart:'chart',homeCardLatest:'latest',homeCardDue:'due'};Object.keys(homeCardMap).forEach(id=>{$('#'+id)?.addEventListener('change',e=>{state.homeCards=state.homeCards||{};state.homeCards[homeCardMap[id]]=e.target.checked;save();applyHomeCardVisibility();});});$('#anthropicApiKey')?.addEventListener('change',e=>{state.anthropicApiKey=e.target.value.trim();save();});if(user)loadMembers();}
 function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
-function exportJSON(){download(`fuellog-${today()}.json`,JSON.stringify({version:5,...state,exportedAt:new Date().toISOString()},null,2));}
+function exportJSON(){const {anthropicApiKey,...safeState}=state;download(`fuellog-${today()}.json`,JSON.stringify({version:5,...safeState,exportedAt:new Date().toISOString()},null,2));}
 function exportCSV(){
   const rows=[['type','vehicleId','date','odometer','liters','grossAmount','discount','netAmount','driver','paymentMethod','reason','previousFillMissed','category','title','station','note']];
   state.entries.forEach(x=>rows.push(['fuel',x.vehicleId,x.date,x.odometer,x.liters,x.grossTotal||((+x.total||0)+(+x.discount||0)),x.discount||0,x.total,x.driver||'',x.paymentMethod||'',x.reason||'',x.previousFillMissed?'yes':'no','','',x.station||'',x.note||'']));
@@ -1292,7 +1375,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.8.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6.9.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

@@ -3,7 +3,7 @@ import { captureWeather, weatherSummary } from './modules/weather.js';
 import { scanWithSecureBackend } from './modules/ocr-client.js';
 import { calculateFuelIntervals, compareFuelEntries, normalizeBoolean, normalizeFuelEntry } from './modules/fuel-metrics.js';
 
-const APP_VERSION = '7.7.0';
+const APP_VERSION = '7.8.0';
 
 // FuelLog starts locally first. Firebase is loaded lazily so a CDN/Auth problem
 // can never disable navigation, forms, theme switching, or local records.
@@ -1215,6 +1215,7 @@ function settingsPanel(){
     <details class="about-item"><summary>เวอร์ชันแอป<span class="about-val">${APP_VERSION}</span></summary><div class="about-body">FuelLog Pro รุ่น ${APP_VERSION} — พัฒนาเพื่อใช้งานส่วนตัว/ในครอบครัวเท่านั้น ไม่ได้เผยแพร่บน Play Store หรือ App Store</div></details>
 
     <details class="about-item"><summary>ประวัติการอัปเดต</summary><div class="about-body"><ul>
+      <li><b>7.8.0</b> — ปรับ app bar, navigation, รายการ และปุ่มเพิ่มให้มีลักษณะเป็นแอปมือถือมากขึ้น</li>
       <li><b>7.7.0</b> — ถอดเมนูสถานีบริการน้ำมันและไลบรารีแผนที่ พร้อมจัดราคาน้ำมันเป็นตารางเปรียบเทียบที่อ่านง่าย</li>
       <li><b>7.6.1</b> — ปั๊มบนเส้นทางเปิดในหน้าสถานี, ลบตัวเลือกรถซ้ำหน้าแรก และรองรับ Google Maps แบบใช้ Restricted Key</li>
       <li><b>7.6.0</b> — เพิ่มไอคอนแบรนด์ปั๊มในรายการเติมน้ำมัน รองรับ PTT/OR, Bangchak, Shell, Esso, Caltex, PT, Susco และ Pure</li>
@@ -1781,7 +1782,7 @@ function boot(){
   }
   // Cloud initialization is deliberately non-blocking.
   initFirebase();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.7.0').catch(console.warn);
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=7.8.0').catch(console.warn);
 }
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=7.7.0">
+  <link rel="stylesheet" href="styles.css?v=7.8.0">
 </head>
 <body>
   <header class="topbar">
@@ -46,21 +46,21 @@
       <article class="card" id="dueCard"><div class="card-head"><h2>ใกล้ถึงกำหนด</h2><button class="text-btn" data-go="maintenance">จัดการ</button></div><div id="dueList"></div></article>
     </section>
 
-    <section class="page" data-page="fuel">
-      <div class="section-head"><div><h2>เติมน้ำมัน</h2><p>ประวัติและประสิทธิภาพ</p></div><button class="primary small" id="addFuelBtn">＋ เพิ่ม</button></div>
+    <section class="page native-list-page" data-page="fuel">
+      <div class="section-head"><div><h2>ประวัติการเติม</h2><p>แตะรายการเพื่อดูหรือแก้ไข</p></div><button class="primary small app-fab" id="addFuelBtn" aria-label="เพิ่มการเติมน้ำมัน">＋</button></div>
       <div class="filters"><input id="fuelSearch" placeholder="ค้นหาปั๊ม หมายเหตุ ชนิดน้ำมัน"><select id="fuelPeriod"><option value="all">ทั้งหมด</option><option value="month">เดือนนี้</option><option value="year">ปีนี้</option></select></div>
       <div id="fuelList" class="records"></div>
     </section>
 
-    <section class="page" data-page="expense">
-      <div class="section-head"><div><h2>ค่าใช้จ่าย</h2><p>ซ่อม ประกัน ภาษี และค่าใช้จ่ายอื่น</p></div><button class="primary small" id="addExpenseBtn">＋ เพิ่ม</button></div>
+    <section class="page native-list-page" data-page="expense">
+      <div class="section-head"><div><h2>รายการค่าใช้จ่าย</h2><p>ซ่อม ประกัน ภาษี และค่าใช้จ่ายอื่น</p></div><button class="primary small app-fab" id="addExpenseBtn" aria-label="เพิ่มค่าใช้จ่าย">＋</button></div>
       <div class="filters"><input id="expenseSearch" placeholder="ค้นหารายการหรือหมวด"><select id="expensePeriod"><option value="all">ทั้งหมด</option><option value="month">เดือนนี้</option><option value="year">ปีนี้</option></select></div>
       <div class="metric-grid" id="expenseMetrics"></div>
       <div id="expenseList" class="records"></div>
     </section>
 
-    <section class="page" data-page="maintenance">
-      <div class="section-head"><div><h2>บำรุงรักษา</h2><p>เตือนตามเลขไมล์และวันที่</p></div><button class="primary small" id="addReminderBtn">＋ เพิ่ม</button></div>
+    <section class="page native-list-page" data-page="maintenance">
+      <div class="section-head"><div><h2>รายการบำรุงรักษา</h2><p>เตือนตามเลขไมล์และวันที่</p></div><button class="primary small app-fab" id="addReminderBtn" aria-label="เพิ่มรายการบำรุงรักษา">＋</button></div>
       <div id="maintenanceList" class="records"></div>
     </section>
 
@@ -108,6 +108,6 @@
   <div id="toast"></div>
   <noscript><div class="fatal-banner">ต้องเปิด JavaScript เพื่อใช้ FuelLog</div></noscript>
 
-  <script type="module" src="app.js?v=7.7.0"></script>
+  <script type="module" src="app.js?v=7.8.0"></script>
 </body>
 </html>

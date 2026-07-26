@@ -23,7 +23,7 @@ test('user monetary values do not hard-code the baht sign', () => {
 
 test('Firebase config and offline cache share the build version', () => {
   assert.match(app, /import\(`\.\/firebase-config\.js\?v=\$\{APP_VERSION\}`\)/);
-  for (const asset of ['styles.css?v=7.7.0', 'app.js?v=7.7.0', 'firebase-config.js?v=7.7.0']) {
+  for (const asset of ['styles.css?v=7.8.0', 'app.js?v=7.8.0', 'firebase-config.js?v=7.8.0']) {
     assert.ok(sw.includes(asset), `missing cached ${asset}`);
   }
 });
@@ -95,6 +95,15 @@ test('today oil prices use a compact brand comparison table', () => {
   assert.match(app, /class="oil-compare"/);
   for (const brand of ['บางจาก','PTT','Shell']) assert.match(app, new RegExp(`short:'${brand}'`));
   assert.match(styles, /\.oil-compare-row\{[^}]*grid-template-columns/);
+});
+
+test('primary record pages use a mobile app shell and floating add actions', () => {
+  assert.equal((index.match(/class="primary small app-fab"/g)||[]).length,3);
+  assert.match(index, /class="page native-list-page" data-page="fuel"/);
+  assert.match(styles, /\/\* V7\.8 mobile app shell \*\//);
+  assert.match(styles, /\.app-fab\{[^}]*position:fixed/);
+  assert.match(styles, /\.native-list-page \.record\{[^}]*border-radius:0/);
+  assert.match(styles, /\.bottom-nav button\.active::before/);
 });
 
 test('fuel records render recognizable offline station brand pictograms', () => {

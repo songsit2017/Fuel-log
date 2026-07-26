@@ -6,6 +6,11 @@ FuelLog Pro v6.2 Main Complete
 - Added extra image/PDF attachment
 - Included fields in list view and CSV export
 - Kept Fuelio, OCR, Family, Sync, oil price and Android-ready structure
+FuelLog Pro V7.8.0
+- ปรับส่วนหัวเป็น mobile app bar และทำแถบนำทางล่างให้ชัดแบบ native
+- เปลี่ยนหน้ารายการเติมน้ำมัน ค่าใช้จ่าย และบำรุงรักษาเป็นรายการเต็มพื้นที่
+- ย้ายปุ่มเพิ่มเป็นปุ่มลอยเหนือ navigation
+- ลดกรอบและเงาแบบหน้าเว็บ พร้อมเพิ่มสถานะกดสำหรับหน้าจอสัมผัส
 FuelLog Pro V7.7.0
 - ถอดเมนูสถานีบริการน้ำมัน หน้าค้นหาเส้นทาง และทรัพยากร Leaflet ออกจากหน้าจอ
 - เก็บฟังก์ชันปั๊มน้ำมันใกล้เคียงบนหน้าแรกไว้ตามเดิม

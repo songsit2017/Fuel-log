@@ -157,6 +157,54 @@ body.station-mode{padding-bottom:76px}body.station-mode>.bottom-nav{display:none
 .about-body li{margin-bottom:4px}
 .about-body b{color:var(--text)}
 
+/* V7.8 mobile app shell */
+:root{--appbar:#20283f;--appbar-text:#fff;--pressed:color-mix(in srgb,var(--accent) 14%,transparent)}
+body.light{--appbar:#334064;--appbar-text:#fff}
+html{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+body{overscroll-behavior-y:contain}
+button,.record,.menu-list>button{touch-action:manipulation}
+button:active,.record:active,.menu-list>button:active{transform:scale(.985);filter:brightness(.96)}
+.topbar{min-height:64px;padding:calc(8px + env(safe-area-inset-top)) 16px 9px;background:var(--appbar);color:var(--appbar-text);border-bottom:0;box-shadow:0 2px 10px rgba(0,0,0,.2);backdrop-filter:none}
+.topbar h1{font-size:21px;color:var(--appbar-text)}
+.topbar .eyebrow{color:rgba(255,255,255,.65)}
+.topbar .icon-btn{background:rgba(255,255,255,.1);color:#fff}
+.global-vehicle-picker{background:rgba(8,12,24,.28);border-color:rgba(255,255,255,.15);border-radius:999px;padding:5px 9px}
+.global-vehicle-picker select{color:#fff}
+.global-vehicle-picker select option{background:var(--surface);color:var(--text)}
+.page{padding:14px 14px 20px}
+.bottom-nav{min-height:68px;padding:7px 6px calc(7px + env(safe-area-inset-bottom));background:var(--appbar);border-top:0;box-shadow:0 -3px 14px rgba(0,0,0,.22);backdrop-filter:none}
+.bottom-nav button{position:relative;color:rgba(255,255,255,.62);border-radius:14px;transition:background .15s,color .15s,transform .1s}
+.bottom-nav span{font-size:20px}
+.bottom-nav button.active{color:var(--accent);font-weight:700}
+.bottom-nav button.active::before{content:"";position:absolute;left:50%;top:0;width:28px;height:3px;border-radius:0 0 4px 4px;background:var(--accent);transform:translateX(-50%)}
+.hero-card{border:0;border-radius:22px;padding:20px;background:linear-gradient(145deg,var(--surface2),var(--surface));box-shadow:0 4px 16px rgba(0,0,0,.16)}
+.metric{border:0;border-radius:18px;padding:15px;background:var(--surface);box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.card{border:0;border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,.11)}
+.native-list-page{padding:0 0 24px;max-width:760px}
+.native-list-page>.section-head{padding:14px 16px 10px;margin:0;background:var(--bg)}
+.native-list-page>.filters{position:sticky;top:64px;z-index:10;margin:0;padding:8px 14px 10px;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(12px)}
+.native-list-page>.metric-grid{padding:10px 14px 0;margin-bottom:6px}
+.native-list-page>.records{gap:0;padding-bottom:72px;background:var(--surface)}
+.native-list-page .month-header{margin:0;padding:16px 16px 7px;background:var(--bg);font-size:12px}
+.native-list-page .record{grid-template-columns:50px minmax(0,1fr) auto;gap:11px;margin:0;padding:14px 16px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:none;min-height:78px}
+.native-list-page .record:last-child{border-bottom:0}
+.native-list-page .record .ico{width:48px;height:48px;background:var(--surface2)}
+.native-list-page .record b{font-size:14px;line-height:1.35}
+.native-list-page .record small{font-size:11px;line-height:1.45}
+.native-list-page .record .amount{font-size:15px}
+.app-fab{position:fixed;right:18px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:25;display:grid;place-items:center;width:58px;height:58px;padding:0!important;border-radius:18px!important;font-size:31px;font-weight:400;box-shadow:0 8px 24px rgba(0,0,0,.36)}
+.filters input,.filters select{background:var(--surface2);border:0;border-radius:14px;min-height:44px}
+.menu-list{gap:0;margin:-14px;background:var(--surface)}
+.menu-list>button{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:15px 17px;background:var(--surface);min-height:72px}
+.menu-list>button:last-child{border-bottom:0}
+.menu-list>button>span{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--surface2);font-size:21px}
+dialog form,.dialog-wrap{border:0;box-shadow:0 18px 60px rgba(0,0,0,.38)}
+@media(max-width:430px){
+  .topbar{padding-inline:14px}
+  .global-vehicle-picker{max-width:58%}
+  .native-list-page>.filters{top:64px}
+}
+
 /* ---- Month group headers in fuel/expense lists ---- */
 .month-header{font-size:11.5px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;margin:18px 4px 8px}
 .month-header:first-child{margin-top:2px}

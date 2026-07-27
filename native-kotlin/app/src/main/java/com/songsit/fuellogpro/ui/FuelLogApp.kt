@@ -658,18 +658,15 @@ internal fun IconBadge(icon: ImageVector, modifier: Modifier = Modifier, size: a
     }
 }
 
-// Gas station brand detection from a free-text station name, so the fuel log list can show a
-// recognizable brand mark instead of a generic pump icon. Real logo artwork isn't bundled here
-// (no verified-source image assets/URLs for these trademarks were available to embed) — each
-// brand instead gets its own real-world corporate color + short mark, which reads at a glance
-// the same way a logo would. PTT is checked before the bare "PT" keyword so a PTT station name
-// (which contains "pt") never gets misclassified as the PT brand.
-private enum class StationBrand(val mark: String, val color: Color, val keywords: List<String>) {
-    PTT("ปตท", Color(0xFF01338D), listOf("ptt", "ปตท")),
-    BANGCHAK("บจ.", Color(0xFF00693C), listOf("bangchak", "บางจาก")),
-    CALTEX("CTX", Color(0xFFDA291C), listOf("caltex", "คาลเท็กซ์")),
-    SHELL("S", Color(0xFFED1C24), listOf("shell", "เชลล์")),
-    PT("PT", Color(0xFF1B75BC), listOf("pt", "พีที")),
+// Gas station brand detection from a free-text station name, so the fuel log list can show the
+// real brand logo instead of a generic pump icon. PTT is checked before the bare "PT" keyword so
+// a PTT station name (which contains "pt") never gets misclassified as the PT brand.
+private enum class StationBrand(val logoRes: Int, val keywords: List<String>) {
+    PTT(com.songsit.fuellogpro.R.drawable.ic_logo_ptt, listOf("ptt", "ปตท")),
+    BANGCHAK(com.songsit.fuellogpro.R.drawable.ic_logo_bangchak, listOf("bangchak", "บางจาก")),
+    CALTEX(com.songsit.fuellogpro.R.drawable.ic_logo_caltex, listOf("caltex", "คาลเท็กซ์")),
+    SHELL(com.songsit.fuellogpro.R.drawable.ic_logo_shell, listOf("shell", "เชลล์")),
+    PT(com.songsit.fuellogpro.R.drawable.ic_logo_pt, listOf("pt", "พีที")),
 }
 
 private fun detectStationBrand(stationName: String): StationBrand? {
@@ -689,11 +686,11 @@ private fun StationBadge(stationName: String, modifier: Modifier = Modifier, siz
         contentAlignment = Alignment.Center,
     ) {
         if (brand != null) {
-            Text(
-                brand.mark,
-                color = brand.color,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelSmall,
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = brand.logoRes),
+                contentDescription = null,
+                modifier = Modifier.size(size * 0.72f),
+                contentScale = ContentScale.Fit,
             )
         } else {
             Icon(

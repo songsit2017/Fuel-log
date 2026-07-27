@@ -22,6 +22,8 @@ import com.songsit.fuellogpro.data.FuelioImportRepository
 import com.songsit.fuellogpro.data.NearbyStationRepository
 import com.songsit.fuellogpro.data.OilPriceRepository
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
+import com.songsit.fuellogpro.data.firebase.VehicleSharingRepository
+import com.songsit.fuellogpro.data.firebase.VehicleMember
 import com.songsit.fuellogpro.auth.GoogleAuthRepository
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.ui.FuelLogApp
@@ -162,6 +164,7 @@ class MainActivity : ComponentActivity() {
         val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao(), deletionRecorder)
         val tripRepository = LocalTripRepository(database.tripDao(), deletionRecorder)
         val oilPriceRepository = OilPriceRepository()
+        val vehicleSharingRepository = VehicleSharingRepository()
         setContent {
             var cloudState by remember {
                 mutableStateOf(
@@ -203,6 +206,15 @@ class MainActivity : ComponentActivity() {
                 ),
             )
             val state by viewModel.state.collectAsState()
+            var vehicleMembers by remember { mutableStateOf<List<VehicleMember>>(emptyList()) }
+            LaunchedEffect(state.selectedVehicleId, cloudState.uid) {
+                val vehicleId = state.selectedVehicleId
+                vehicleMembers = if (vehicleId != null && cloudState.uid != null) {
+                    runCatching { vehicleSharingRepository.loadMembers(vehicleId) }.getOrDefault(emptyList())
+                } else {
+                    emptyList()
+                }
+            }
             FuelLogApp(
                 state = state,
                 onAddFuel = viewModel::addFuel,
@@ -246,6 +258,38 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 oilPriceSummary = oilPriceSummary,
+                vehicleMembers = vehicleMembers,
+                onCreateInvite = { email, role, onResult, onError ->
+                    val vehicleId = state.selectedVehicleId
+                    val ownerUid = authRepository.currentUid
+                    val vehicleName = state.selectedVehicle?.name ?: ""
+                    if (vehicleId == null || ownerUid == null) {
+                        onError("กรุณาเข้าสู่ระบบและเลือกรถก่อน")
+                    } else {
+                        composeScope.launch {
+                            runCatching {
+                                vehicleSharingRepository.createInvite(vehicleId, vehicleName, ownerUid, email, role)
+                            }.onSuccess { onResult(it.code) }
+                                .onFailure { onError(it.message ?: "สร้างคำเชิญไม่สำเร็จ") }
+                        }
+                    }
+                },
+                onJoinByCode = { code, onResult, onError ->
+                    val uid = authRepository.currentUid
+                    val email = authRepository.currentEmail
+                    if (uid == null || email == null) {
+                        onError("กรุณาเข้าสู่ระบบก่อน")
+                    } else {
+                        composeScope.launch {
+                            runCatching {
+                                vehicleSharingRepository.joinByCode(code, uid, email, authRepository.currentDisplayName ?: "")
+                            }.onSuccess { vehicleName ->
+                                onResult(vehicleName)
+                                runCatching { cloudRepository.sync(uid, email, authRepository.currentDisplayName) }
+                            }.onFailure { onError(it.message ?: "เข้าร่วมไม่สำเร็จ") }
+                        }
+                    }
+                },
                 cloudState = cloudState,
                 onGoogleSignIn = {
                     composeScope.launch {

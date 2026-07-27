@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.songsit.fuellogpro.data.NearbyStation
+import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -106,6 +107,9 @@ fun FuelLogApp(
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     oilPriceSummary: String? = null,
+    vehicleMembers: List<VehicleMember> = emptyList(),
+    onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
@@ -231,6 +235,9 @@ fun FuelLogApp(
                     onResolveConflict = onResolveConflict,
                     reminderSettings = reminderSettings,
                     onReminderSettingsChange = onReminderSettingsChange,
+                    vehicleMembers = vehicleMembers,
+                    onCreateInvite = onCreateInvite,
+                    onJoinByCode = onJoinByCode,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -716,6 +723,9 @@ private fun VehicleList(
     onResolveConflict: (String, Boolean) -> Unit,
     reminderSettings: ReminderSettings,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
+    vehicleMembers: List<VehicleMember> = emptyList(),
+    onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -723,6 +733,15 @@ private fun VehicleList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (cloudState.uid != null && selectedVehicleId != null && (onCreateInvite != null || onJoinByCode != null)) {
+            item {
+                VehicleSharingCard(
+                    members = vehicleMembers,
+                    onCreateInvite = onCreateInvite,
+                    onJoinByCode = onJoinByCode,
+                )
+            }
+        }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(
@@ -849,6 +868,102 @@ private fun VehicleList(
                     if (vehicle.id == selectedVehicleId) Text("กำลังใช้", color = MaterialTheme.colorScheme.primary)
                     TextButton(onClick = { onDelete(vehicle.id) }) { Text("ลบ") }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleSharingCard(
+    members: List<VehicleMember>,
+    onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+) {
+    var inviteEmail by remember { mutableStateOf("") }
+    var inviteRole by remember { mutableStateOf("editor") }
+    var inviteResult by remember { mutableStateOf<String?>(null) }
+    var inviteError by remember { mutableStateOf<String?>(null) }
+    var inviteBusy by remember { mutableStateOf(false) }
+    var joinCode by remember { mutableStateOf("") }
+    var joinResult by remember { mutableStateOf<String?>(null) }
+    var joinError by remember { mutableStateOf<String?>(null) }
+    var joinBusy by remember { mutableStateOf(false) }
+
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("แชร์รถกับสมาชิกครอบครัว", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (members.isNotEmpty()) {
+                Text("สมาชิกปัจจุบัน", style = MaterialTheme.typography.labelLarge)
+                members.forEach { member ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(member.displayName.ifBlank { member.email }, fontWeight = FontWeight.SemiBold)
+                            if (member.email.isNotBlank()) Text(member.email, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(member.role, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            } else {
+                Text("ยังไม่มีสมาชิกร่วมดูแลรถคันนี้", style = MaterialTheme.typography.bodySmall)
+            }
+            if (onCreateInvite != null) {
+                HorizontalDivider()
+                Text("สร้างคำเชิญ", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = inviteEmail,
+                    onValueChange = { inviteEmail = it },
+                    label = { Text("อีเมล Google ของสมาชิก") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("editor" to "แก้ไขได้", "viewer" to "ดูอย่างเดียว").forEach { (value, label) ->
+                        if (inviteRole == value) Button(onClick = { inviteRole = value }) { Text(label) }
+                        else TextButton(onClick = { inviteRole = value }) { Text(label) }
+                    }
+                }
+                Button(
+                    enabled = !inviteBusy && inviteEmail.isNotBlank(),
+                    onClick = {
+                        inviteBusy = true
+                        inviteError = null
+                        inviteResult = null
+                        onCreateInvite(
+                            inviteEmail,
+                            inviteRole,
+                            { code -> inviteBusy = false; inviteResult = code },
+                            { message -> inviteBusy = false; inviteError = message },
+                        )
+                    },
+                ) { Text(if (inviteBusy) "กำลังสร้าง…" else "สร้างรหัสเชิญ") }
+                inviteResult?.let { Text("รหัสเชิญ: $it (7 วัน)", fontWeight = FontWeight.Bold) }
+                inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+            if (onJoinByCode != null) {
+                HorizontalDivider()
+                Text("เข้าร่วมด้วยรหัสเชิญ", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = joinCode,
+                    onValueChange = { joinCode = it },
+                    label = { Text("รหัสเชิญ 8 ตัว") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    enabled = !joinBusy && joinCode.isNotBlank(),
+                    onClick = {
+                        joinBusy = true
+                        joinError = null
+                        joinResult = null
+                        onJoinByCode(
+                            joinCode,
+                            { vehicleName -> joinBusy = false; joinResult = "เข้าร่วม $vehicleName สำเร็จ"; joinCode = "" },
+                            { message -> joinBusy = false; joinError = message },
+                        )
+                    },
+                ) { Text(if (joinBusy) "กำลังตรวจสอบ…" else "เข้าร่วม") }
+                joinResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                joinError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }

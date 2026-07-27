@@ -27,7 +27,11 @@ class NearbyStationRepository {
 
     suspend fun fetchNearbyStations(lat: Double, lon: Double, radiusMeters: Int = 7000): List<NearbyStation> =
         withContext(Dispatchers.IO) {
-            if (BuildConfig.MAPS_API_KEY.isBlank()) return@withContext emptyList()
+            // Builds without a real key configured (e.g. CI, or a fresh checkout with no
+            // local.properties) get the "MISSING" placeholder from local.defaults.properties —
+            // real Google API keys always start with "AIza", so this check works for both that
+            // placeholder and a genuinely blank value.
+            if (!BuildConfig.MAPS_API_KEY.startsWith("AIza")) return@withContext emptyList()
             val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
                 "?location=${URLEncoder.encode("$lat,$lon", "UTF-8")}" +
                 "&radius=$radiusMeters" +

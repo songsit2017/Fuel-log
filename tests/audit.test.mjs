@@ -31,6 +31,7 @@ const nativeNotificationPreferences = await readFile(new URL('../native-kotlin/a
 const nativeTripDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/TripDao.kt', import.meta.url), 'utf8');
 const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/TripSummary.kt', import.meta.url), 'utf8');
 const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalBackupRepository.kt', import.meta.url), 'utf8');
+const nativeCsvExportRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalCsvExportRepository.kt', import.meta.url), 'utf8');
 const nativeCloudSync = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/firebase/FirestoreSyncRepository.kt', import.meta.url), 'utf8');
 const nativeSyncDecision = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/SyncDecision.kt', import.meta.url), 'utf8');
 const nativeConflictDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/SyncConflictDao.kt', import.meta.url), 'utf8');
@@ -336,6 +337,21 @@ test('native backup is versioned, complete and restores without deleting local d
   assert.match(nativeMain, /readTextLimited\(20_000_000\)/);
   assert.match(nativeFuelApp, /สำรองข้อมูล/);
   assert.match(nativeFuelApp, /นำเข้าข้อมูล/);
+});
+
+test('native minimal reports export complete and safe UTF-8 CSV', () => {
+  assert.match(nativeCsvExportRepository, /database\.withTransaction/);
+  assert.match(nativeCsvExportRepository, /"\\uFEFF"/);
+  assert.match(nativeCsvExportRepository, /replace\("\\"", "\\"\\""\)/);
+  assert.match(nativeCsvExportRepository, /first in setOf\('=', '\+', '-', '@'\)/);
+  for (const dao of ['fuelEntryDao', 'expenseDao', 'maintenanceDao', 'tripDao']) {
+    assert.match(nativeCsvExportRepository, new RegExp(`database\\.${dao}\\(\\)\\.getAll\\(\\)`));
+  }
+  assert.match(nativeMain, /CreateDocument\("text\/csv"\)/);
+  assert.match(nativeMain, /FuelLog-Report-/);
+  assert.match(nativeFuelApp, /ส่งออกรายงาน CSV/);
+  assert.match(nativeFuelApp, /ค่าใช้จ่ายรวม/);
+  assert.match(nativeFuelApp, /สุทธิหลังรายรับ/);
 });
 
 test('native Cloud sync never overwrites divergent records automatically', () => {

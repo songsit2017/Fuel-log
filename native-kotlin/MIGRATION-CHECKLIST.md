@@ -26,5 +26,6 @@
 - [ ] Photos and Fuelio import.
 - [ ] Family sharing.
 - [ ] OCR, weather and oil prices.
-- [ ] Reports and export.
+- [x] Minimal report summary with complete JSON/CSV export.
+- [ ] Global search and printable/PDF reports.
 - [ ] Signed APK parity test before replacing Capacitor.

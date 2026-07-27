@@ -79,6 +79,7 @@ fun FuelLogApp(
     onDeleteMaintenance: (String) -> Unit,
     onAddTrip: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onDeleteTrip: (String) -> Unit,
+    onExportCsv: () -> Unit,
     reminderSettings: ReminderSettings,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     onExportBackup: () -> Unit,
@@ -149,7 +150,7 @@ fun FuelLogApp(
             },
         ) { padding ->
             when (tab) {
-                0 -> Dashboard(state, Modifier.padding(padding))
+                0 -> Dashboard(state, onExportCsv, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, Modifier.padding(padding))
                 2 -> RecordsPage(
                     mode = recordsMode,
@@ -235,7 +236,11 @@ fun FuelLogApp(
 }
 
 @Composable
-private fun Dashboard(state: NativeAppState, modifier: Modifier = Modifier) {
+private fun Dashboard(
+    state: NativeAppState,
+    onExportCsv: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -280,6 +285,47 @@ private fun Dashboard(state: NativeAppState, modifier: Modifier = Modifier) {
                 state.summary.latestOdometerKm?.let { "${number.format(it)} กม." } ?: "ยังไม่มีข้อมูล",
                 Modifier.fillMaxWidth(),
             )
+        }
+        item {
+            val operatingCost = state.summary.totalSpent + state.totalExpenses + state.tripSummary.totalCost
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("รายงาน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MetricCard(
+                            "ค่าใช้จ่ายรวม",
+                            thaiCurrency.format(operatingCost),
+                            Modifier.weight(1f),
+                        )
+                        MetricCard(
+                            "สุทธิหลังรายรับ",
+                            thaiCurrency.format(operatingCost - state.totalIncome),
+                            Modifier.weight(1f),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MetricCard(
+                            "ระยะทางทริป",
+                            "${number.format(state.tripSummary.totalDistanceKm)} กม.",
+                            Modifier.weight(1f),
+                        )
+                        MetricCard(
+                            "จำนวนรายการ",
+                            number.format(
+                                state.entries.size + state.expenses.size +
+                                    state.maintenanceTasks.size + state.trips.size,
+                            ),
+                            Modifier.weight(1f),
+                        )
+                    }
+                    Button(onClick = onExportCsv, modifier = Modifier.fillMaxWidth()) {
+                        Text("ส่งออกรายงาน CSV")
+                    }
+                }
+            }
         }
         item { Text("รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
         if (state.entries.isEmpty()) item { EmptyFuelState() }

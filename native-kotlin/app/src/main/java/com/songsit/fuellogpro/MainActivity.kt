@@ -17,6 +17,7 @@ import com.songsit.fuellogpro.data.LocalVehicleRepository
 import com.songsit.fuellogpro.data.LocalMaintenanceRepository
 import com.songsit.fuellogpro.data.LocalTripRepository
 import com.songsit.fuellogpro.data.LocalBackupRepository
+import com.songsit.fuellogpro.data.LocalCsvExportRepository
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
 import com.songsit.fuellogpro.auth.GoogleAuthRepository
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 
 class MainActivity : ComponentActivity() {
     private lateinit var backupRepository: LocalBackupRepository
+    private lateinit var csvExportRepository: LocalCsvExportRepository
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -78,6 +80,26 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private val createCsvExport = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        lifecycleScope.launch {
+            runCatching {
+                val csv = csvExportRepository.exportCsv()
+                contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(csv) }
+                    ?: error("ไม่สามารถเปิดไฟล์ปลายทางได้")
+            }.onSuccess {
+                Toast.makeText(this@MainActivity, "ส่งออก CSV เรียบร้อย", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(
+                    this@MainActivity,
+                    it.message ?: "ส่งออก CSV ไม่สำเร็จ",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +110,7 @@ class MainActivity : ComponentActivity() {
         val database = FuelLogDatabase.get(this)
         val notificationPreferences = NotificationPreferences(this)
         backupRepository = LocalBackupRepository(database)
+        csvExportRepository = LocalCsvExportRepository(database)
         val authRepository = GoogleAuthRepository()
         val cloudRepository = FirestoreSyncRepository(database)
         val deletionRecorder = LocalDeletionRecorder(database)
@@ -132,6 +155,9 @@ class MainActivity : ComponentActivity() {
                 onDeleteMaintenance = viewModel::deleteMaintenance,
                 onAddTrip = viewModel::addTrip,
                 onDeleteTrip = viewModel::deleteTrip,
+                onExportCsv = {
+                    createCsvExport.launch("FuelLog-Report-${LocalDate.now()}.csv")
+                },
                 reminderSettings = reminderSettings,
                 onReminderSettingsChange = { settings: ReminderSettings ->
                     reminderSettings = settings

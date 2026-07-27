@@ -16,6 +16,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Maintenance reminders by date or odometer with overdue/soon status and recurrence.
 - Daily Android notifications for upcoming date-based maintenance.
 - Immediate odometer reminder refresh with separate date, mileage and payment toggles.
+- Minimal operating-cost report with safe UTF-8 CSV export through Android's file picker.
 - Offline trips with distance, fuel, toll, parking, food and other costs.
 - Versioned JSON backup/restore for every Room collection using Android's file picker.
 - Manual Google/Firebase sync that preserves divergent copies as explicit conflicts.

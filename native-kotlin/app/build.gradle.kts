@@ -83,6 +83,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+    // Calls the existing `scanReceipt` Cloud Function (functions/index.js) that already backs
+    // V8's Claude OCR — the Anthropic key stays server-side as a Secret, never in the app.
+    implementation("com.google.firebase:firebase-functions")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.core:core-ktx:1.15.0")

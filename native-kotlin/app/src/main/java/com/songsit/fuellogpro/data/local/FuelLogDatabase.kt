@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncConflictEntity::class,
         DeletionTombstoneEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -178,6 +178,14 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
+        // Fuelio-style expense form gains a time-of-day field alongside date, matching the
+        // fuel log's existing date+time pair.
+        private val migration10To11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN time TEXT NOT NULL DEFAULT '00:00'")
+            }
+        }
+
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -194,6 +202,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration7To8,
                     migration8To9,
                     migration9To10,
+                    migration10To11,
                 )
                     .build()
                     .also { instance = it }

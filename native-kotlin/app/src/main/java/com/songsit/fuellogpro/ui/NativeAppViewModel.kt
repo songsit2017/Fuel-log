@@ -278,6 +278,7 @@ class NativeAppViewModel(
 
     fun addExpense(
         date: String,
+        time: String,
         category: String,
         description: String,
         amount: Double,
@@ -304,6 +305,7 @@ class NativeAppViewModel(
                 expenseRepository.add(
                     vehicleId,
                     date,
+                    time,
                     category,
                     description,
                     amount,
@@ -325,6 +327,7 @@ class NativeAppViewModel(
     fun updateExpense(
         id: String,
         date: String,
+        time: String,
         category: String,
         description: String,
         amount: Double,
@@ -349,7 +352,7 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                expenseRepository.update(id, vehicleId, date, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri)
+                expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri)
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()

@@ -13,4 +13,5 @@ data class Expense(
     val reminderDate: String?,
     val photoUri: String? = null,
     val photoUrls: List<String> = emptyList(),
+    val time: String = "00:00",
 )

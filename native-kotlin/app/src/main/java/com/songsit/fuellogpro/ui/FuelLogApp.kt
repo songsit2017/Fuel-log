@@ -35,8 +35,10 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
@@ -52,6 +54,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -75,6 +78,7 @@ import androidx.compose.runtime.setValue
 import com.songsit.fuellogpro.settings.DisplaySettings
 import com.songsit.fuellogpro.data.NearbyStation
 import com.songsit.fuellogpro.data.OilPriceInfo
+import com.songsit.fuellogpro.data.ReceiptScanResult
 import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
@@ -197,8 +201,8 @@ fun FuelLogApp(
     onAddFuel: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
     onUpdateFuel: (String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdateExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdateMaintenance: (String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
@@ -224,8 +228,8 @@ fun FuelLogApp(
     onDeleteVehicle: (String) -> Unit,
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
-    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
-    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -246,7 +250,7 @@ fun FuelLogApp(
     var editingVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึก", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {
@@ -314,7 +318,7 @@ fun FuelLogApp(
                         Icons.Filled.BarChart,
                         Icons.Filled.History,
                     )
-                    listOf("หน้าหลัก", "น้ำมัน", "บันทึก", "ดูแลรถ", "รถ", "สถิติ", "ไทม์ไลน์").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "บันทึกค่าใช้จ่าย", "ดูแลรถ", "รถ", "สถิติ", "ไทม์ไลน์").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
@@ -707,6 +711,16 @@ private fun ExpenseList(
     onEdit: ((Expense) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val categoryTotals = remember(expenses) {
+        expenses.filterNot(Expense::income)
+            .groupBy { it.category.ifBlank { "อื่นๆ" } }
+            .mapValues { (_, items) -> items.sumOf { it.amount } }
+            .entries.sortedByDescending { it.value }
+    }
+    val categoryTotalSum = categoryTotals.sumOf { it.value }
+    val groups = remember(expenses) {
+        expenses.groupBy { expense -> runCatching { LocalDate.parse(expense.date) }.getOrNull()?.let { it.year to it.monthValue } }
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -727,6 +741,28 @@ private fun ExpenseList(
                 }
             }
         }
+        if (categoryTotals.isNotEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("แยกตามหมวดหมู่", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        categoryTotals.take(6).forEach { (category, total) ->
+                            val fraction = if (categoryTotalSum > 0) (total / categoryTotalSum).toFloat() else 0f
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(category, style = MaterialTheme.typography.bodyMedium)
+                                    Text(thaiCurrency.format(total), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                LinearProgressIndicator(
+                                    progress = { fraction },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if (expenses.isEmpty()) {
             item {
                 Card(shape = RoundedCornerShape(18.dp)) {
@@ -737,29 +773,67 @@ private fun ExpenseList(
                 }
             }
         }
-        items(expenses, key = { it.id }) { expense ->
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                modifier = if (onEdit != null) Modifier.clickable { onEdit(expense) } else Modifier,
-            ) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(expense.category, fontWeight = FontWeight.Bold)
-                        Text(
-                            listOf(expense.date, expense.description).filter(String::isNotBlank).joinToString(" • "),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+        groups.forEach { (yearMonth, groupExpenses) ->
+            item {
+                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: "ไม่ทราบวันที่"
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                )
+            }
+            items(groupExpenses, key = { it.id }) { expense ->
+                ExpenseRow(expense, onDelete, onEdit)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpenseRow(
+    expense: Expense,
+    onDelete: (String) -> Unit,
+    onEdit: ((Expense) -> Unit)? = null,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        modifier = if (onEdit != null) Modifier.clickable { onEdit(expense) } else Modifier,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
+            IconBadge(if (expense.income) Icons.Filled.Savings else Icons.Filled.Receipt)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${expense.date} • ${expense.description.ifBlank { expense.category }}",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                expense.odometerKm?.let {
+                    Text("${number.format(it)} กม.", style = MaterialTheme.typography.labelSmall)
+                }
+                val notes = listOfNotNull(
+                    "รายการประจำ".takeIf { expense.recurring },
+                    expense.reminderDate?.let { "เตือน $it" },
+                )
+                if (notes.isNotEmpty()) {
+                    Text(notes.joinToString(" • "), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "${if (expense.income) "+" else "−"}${thaiCurrency.format(expense.amount)}",
+                    fontWeight = FontWeight.Bold,
+                    color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                )
+                Box {
+                    IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "เมนู")
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "${if (expense.income) "+" else "−"}${thaiCurrency.format(expense.amount)}",
-                            fontWeight = FontWeight.Bold,
-                            color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (expense.recurring) Text("รายการประจำ", style = MaterialTheme.typography.labelSmall)
-                        expense.reminderDate?.let { Text("เตือน $it", style = MaterialTheme.typography.labelSmall) }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(text = { Text("ลบ") }, onClick = { menuExpanded = false; onDelete(expense.id) })
                     }
-                    TextButton(onClick = { onDelete(expense.id) }) { Text("ลบ") }
                 }
             }
         }
@@ -1450,8 +1524,8 @@ private fun UnitDropdownField(label: String, value: String, options: List<String
 private fun VehicleEditScreen(
     saving: Boolean,
     editing: Vehicle?,
-    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)?,
-    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)?,
+    onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)?,
+    onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
     onSave: (VehicleFormValues, () -> Unit) -> Unit,
     onUpdate: (String, VehicleFormValues, () -> Unit) -> Unit,
@@ -1531,11 +1605,11 @@ private fun VehicleEditScreen(
                         }
                     }
                     if (onPickPhoto != null) {
-                        val handlePicked = { picked: List<String>, _: Double? -> imageUri = picked.firstOrNull() ?: imageUri }
+                        val handlePicked = { picked: List<String>, _: ReceiptScanResult? -> imageUri = picked.firstOrNull() ?: imageUri }
                         Box(Modifier.align(Alignment.BottomEnd).padding(12.dp)) {
                             FilledIconButton(
                                 onClick = {
-                                    if (onPickCameraPhoto != null) photoSourceMenuExpanded = true else onPickPhoto(handlePicked)
+                                    if (onPickCameraPhoto != null) photoSourceMenuExpanded = true else onPickPhoto(null, handlePicked)
                                 },
                             ) {
                                 Icon(Icons.Filled.PhotoCamera, contentDescription = "เปลี่ยนรูปรถ")
@@ -1546,11 +1620,11 @@ private fun VehicleEditScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("ถ่ายรูป") },
-                                    onClick = { photoSourceMenuExpanded = false; onPickCameraPhoto?.invoke(handlePicked) },
+                                    onClick = { photoSourceMenuExpanded = false; onPickCameraPhoto?.invoke(null, handlePicked) },
                                 )
                                 DropdownMenuItem(
                                     text = { Text("เลือกจากแกลอรี่") },
-                                    onClick = { photoSourceMenuExpanded = false; onPickPhoto(handlePicked) },
+                                    onClick = { photoSourceMenuExpanded = false; onPickPhoto(null, handlePicked) },
                                 )
                             }
                         }
@@ -1608,8 +1682,8 @@ private fun AddFuelDialog(
     latestOdometer: Double?,
     editing: FuelEntry? = null,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
-    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
-    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit)? = null,
@@ -1791,20 +1865,23 @@ private fun AddFuelDialog(
                 }
                 if (onPickPhoto != null) {
                     item {
+                        val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+                            photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                            // Claude OCR (functions/index.js scanReceipt) fills these when signed
+                            // in and reachable; falls back to on-device amount-only OCR otherwise.
+                            scanResult?.date?.let { date = it }
+                            scanResult?.station?.let { station = it }
+                            scanResult?.liters?.let { onLitersChange("%.2f".format(Locale.US, it)) }
+                            scanResult?.pricePerLiter?.let { onPriceChange("%.2f".format(Locale.US, it)) }
+                            scanResult?.total?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+                            if (scanResult?.total == null) {
+                                scanResult?.amount?.takeIf { total.isBlank() }?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+                            }
+                        }
                         PhotoAttachmentRow(
                             photoUris = photoUris,
-                            onPickGallery = {
-                                onPickPhoto { picked, _ ->
-                                    photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                                }
-                            },
-                            onPickCamera = onPickCameraPhoto?.let { pick ->
-                                {
-                                    pick { picked, _ ->
-                                        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                                    }
-                                }
-                            },
+                            onPickGallery = { onPickPhoto("fuel", handlePicked) },
+                            onPickCamera = onPickCameraPhoto?.let { pick -> { pick("fuel", handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
                     }
@@ -1906,13 +1983,14 @@ private fun AddExpenseDialog(
     latestOdometer: Double?,
     editing: Expense? = null,
     categorySuggestions: List<String> = emptyList(),
-    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
-    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
+    onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
+    var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
     var category by remember { mutableStateOf(editing?.category ?: "บำรุงรักษา") }
     var description by remember { mutableStateOf(editing?.description ?: "") }
@@ -1929,49 +2007,75 @@ private fun AddExpenseDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editing != null) "แก้ไขค่าใช้จ่าย" else "เพิ่มค่าใช้จ่าย") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AutocompleteTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = "หมวดหมู่",
-                    options = categoryOptions,
-                    expanded = categoryMenuExpanded,
-                    onExpandedChange = { categoryMenuExpanded = it },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(description, { description = it }, label = { Text("รายละเอียด") }, singleLine = true)
-                OutlinedTextField(amount, { amount = it }, label = { Text("จำนวนเงิน") }, singleLine = true)
-                OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true)
-                OutlinedTextField(odometer, { odometer = it }, label = { Text("เลขไมล์ (ไม่บังคับ)") }, singleLine = true)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(income, { income = it })
-                    Text("เป็นรายรับ")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(recurring, { recurring = it })
-                    Text("รายการประจำ")
-                }
-                OutlinedTextField(
-                    reminderDate,
-                    { reminderDate = it },
-                    label = { Text("วันเตือนชำระ (ไม่บังคับ)") },
-                    singleLine = true,
-                )
-                if (onPickPhoto != null) {
-                    val handlePicked = { picked: List<String>, extractedAmount: Double? ->
-                        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                        // Item 3: mirrors V8's OCR auto-fill (autoOcrEnabled) — only
-                        // pre-fills the amount field if the user hasn't typed one yet.
-                        if (amount.isBlank() && extractedAmount != null) {
-                            amount = "%.2f".format(Locale.US, extractedAmount)
-                        }
-                    }
-                    PhotoAttachmentRow(
-                        photoUris = photoUris,
-                        onPickGallery = { onPickPhoto(handlePicked) },
-                        onPickCamera = onPickCameraPhoto?.let { pick -> { pick(handlePicked) } },
-                        onRemove = { uri -> photoUris = photoUris - uri },
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { Text("ข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item {
+                    AutocompleteTextField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = "หมวดหมู่",
+                        options = categoryOptions,
+                        expanded = categoryMenuExpanded,
+                        onExpandedChange = { categoryMenuExpanded = it },
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                }
+                item { OutlinedTextField(description, { description = it }, label = { Text("ชื่อเรื่อง") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item { OutlinedTextField(amount, { amount = it }, label = { Text("ราคารวม") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(date, { date = it }, label = { Text("วันที่") }, singleLine = true, modifier = Modifier.weight(1f))
+                        OutlinedTextField(time, { time = it }, label = { Text("เวลา") }, singleLine = true, modifier = Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("ค่าใช้จ่ายเชิงลบ (รายได้)")
+                        Switch(checked = income, onCheckedChange = { income = it })
+                    }
+                }
+                item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item { OutlinedTextField(odometer, { odometer = it }, label = { Text("มาตรวัดระยะทางรวม") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item {
+                    OutlinedTextField(
+                        reminderDate,
+                        { reminderDate = it },
+                        label = { Text("วันเตือนชำระ (ไม่บังคับ)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(recurring, { recurring = it })
+                        Text("รายการประจำ")
+                    }
+                }
+                if (onPickPhoto != null) {
+                    item { Text("รูปภาพ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    item {
+                        val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+                            photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                            // Claude OCR (functions/index.js scanReceipt) fills these when signed
+                            // in and reachable; falls back to on-device amount-only OCR otherwise.
+                            scanResult?.date?.let { date = it }
+                            scanResult?.title?.takeIf { description.isBlank() }?.let { description = it }
+                            val extractedAmount = scanResult?.amount ?: scanResult?.total
+                            if (amount.isBlank() && extractedAmount != null) {
+                                amount = "%.2f".format(Locale.US, extractedAmount)
+                            }
+                        }
+                        PhotoAttachmentRow(
+                            photoUris = photoUris,
+                            onPickGallery = { onPickPhoto("expense", handlePicked) },
+                            onPickCamera = onPickCameraPhoto?.let { pick -> { pick("expense", handlePicked) } },
+                            onRemove = { uri -> photoUris = photoUris - uri },
+                        )
+                    }
                 }
             }
         },
@@ -1984,9 +2088,9 @@ private fun AddExpenseDialog(
                     val reminderValue = reminderDate.takeIf(String::isNotBlank)
                     val photoUri = PhotoUris.join(photoUris)
                     if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, date, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+                        onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
                     } else {
-                        onSave(date, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+                        onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
                     }
                 },
             ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }

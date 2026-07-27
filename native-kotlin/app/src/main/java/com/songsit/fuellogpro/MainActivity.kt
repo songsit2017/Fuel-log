@@ -23,6 +23,8 @@ import com.songsit.fuellogpro.data.NearbyStationRepository
 import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.OilPriceRepository
 import com.songsit.fuellogpro.data.OcrRepository
+import com.songsit.fuellogpro.data.ClaudeOcrRepository
+import com.songsit.fuellogpro.data.ReceiptScanResult
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
 import com.songsit.fuellogpro.data.firebase.VehicleSharingRepository
 import com.songsit.fuellogpro.data.firebase.VehicleMember
@@ -71,12 +73,29 @@ class MainActivity : ComponentActivity() {
     // through on-device OCR to try to pre-fill an amount. PickMultipleVisualMedia (a stable,
     // non-experimental androidx.activity contract, available since minSdk 26 here) lets the
     // user pick up to MAX_PICK_PHOTOS at once instead of one at a time.
-    private var pendingPhotoResult: ((uris: List<String>, extractedAmount: Double?) -> Unit)? = null
+    private var pendingPhotoResult: ((uris: List<String>, scanResult: ReceiptScanResult?) -> Unit)? = null
+    private var pendingPhotoType: String? = null
     private val ocrRepository = OcrRepository()
+    private val claudeOcrRepository = ClaudeOcrRepository()
+
+    // Tries the Claude/Anthropic-backed scanReceipt Cloud Function (functions/index.js) first —
+    // it needs the user signed in (the function itself rejects anonymous calls) — falling back
+    // to on-device ML Kit amount-only extraction otherwise. `type` null means "don't scan at
+    // all" (used for vehicle photos, which aren't receipts).
+    private suspend fun scanFirstPhoto(path: String, type: String?): ReceiptScanResult? {
+        if (type == null) return null
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
+            claudeOcrRepository.scanReceipt(path, type)?.let { return it }
+        }
+        val amount = runCatching { ocrRepository.extractAmount(path) }.getOrNull()
+        return amount?.let { ReceiptScanResult(amount = it) }
+    }
+
     private val pickPhoto = registerForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK_PHOTOS),
     ) { uris ->
         val onPicked = pendingPhotoResult
+        val type = pendingPhotoType
         pendingPhotoResult = null
         if (uris.isEmpty() || onPicked == null) return@registerForActivityResult
         lifecycleScope.launch {
@@ -91,10 +110,8 @@ class MainActivity : ComponentActivity() {
                 }
             }.onSuccess { paths ->
                 lifecycleScope.launch {
-                    val amount = paths.firstOrNull()?.let { path ->
-                        runCatching { ocrRepository.extractAmount(path) }.getOrNull()
-                    }
-                    onPicked(paths, amount)
+                    val scanResult = paths.firstOrNull()?.let { path -> scanFirstPhoto(path, type) }
+                    onPicked(paths, scanResult)
                 }
             }.onFailure {
                 Toast.makeText(this@MainActivity, it.message ?: "แนบรูปไม่สำเร็จ", Toast.LENGTH_LONG).show()
@@ -107,26 +124,29 @@ class MainActivity : ComponentActivity() {
     // filesDir/photos file we hand it via FileProvider, so the result path already matches the
     // gallery flow's storage convention with no extra copy step.
     private var pendingCameraFile: java.io.File? = null
-    private var pendingCameraResult: ((uris: List<String>, extractedAmount: Double?) -> Unit)? = null
+    private var pendingCameraResult: ((uris: List<String>, scanResult: ReceiptScanResult?) -> Unit)? = null
+    private var pendingCameraType: String? = null
     private val takePicture = registerForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { success ->
         val onCaptured = pendingCameraResult
+        val type = pendingCameraType
         val destFile = pendingCameraFile
         pendingCameraResult = null
         pendingCameraFile = null
         if (!success || onCaptured == null || destFile == null) return@registerForActivityResult
         lifecycleScope.launch {
-            val amount = runCatching { ocrRepository.extractAmount(destFile.absolutePath) }.getOrNull()
-            onCaptured(listOf(destFile.absolutePath), amount)
+            val scanResult = scanFirstPhoto(destFile.absolutePath, type)
+            onCaptured(listOf(destFile.absolutePath), scanResult)
         }
     }
 
-    private fun launchCameraCapture(onCaptured: (uris: List<String>, extractedAmount: Double?) -> Unit) {
+    private fun launchCameraCapture(type: String?, onCaptured: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) {
         val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
         val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
         pendingCameraFile = destFile
         pendingCameraResult = onCaptured
+        pendingCameraType = type
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", destFile)
         takePicture.launch(uri)
     }
@@ -323,15 +343,16 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 },
-                onPickPhoto = { onPicked ->
+                onPickPhoto = { type, onPicked ->
                     pendingPhotoResult = onPicked
+                    pendingPhotoType = type
                     pickPhoto.launch(
                         androidx.activity.result.PickVisualMediaRequest(
                             ActivityResultContracts.PickVisualMedia.ImageOnly,
                         ),
                     )
                 },
-                onPickCameraPhoto = { onPicked -> launchCameraCapture(onPicked) },
+                onPickCameraPhoto = { type, onPicked -> launchCameraCapture(type, onPicked) },
                 oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->

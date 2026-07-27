@@ -17,4 +17,5 @@ data class ExpenseEntity(
     val reminderDate: String?,
     val createdAt: Long,
     val photoUri: String? = null,
+    val time: String = "00:00",
 )

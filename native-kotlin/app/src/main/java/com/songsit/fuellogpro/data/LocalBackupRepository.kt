@@ -118,7 +118,7 @@ private fun fuelJson(item: FuelEntryEntity) = JSONObject()
     .put("fullTank", item.fullTank).put("station", item.station).put("createdAt", item.createdAt)
 
 private fun expenseJson(item: ExpenseEntity) = JSONObject()
-    .put("id", item.id).put("vehicleId", item.vehicleId).put("date", item.date)
+    .put("id", item.id).put("vehicleId", item.vehicleId).put("date", item.date).put("time", item.time)
     .put("category", item.category).put("description", item.description).put("amount", item.amount)
     .put("odometerKm", item.odometerKm ?: JSONObject.NULL).put("income", item.income)
     .put("recurring", item.recurring).put("reminderDate", item.reminderDate ?: JSONObject.NULL)
@@ -164,6 +164,7 @@ private fun parseExpense(json: JSONObject) = ExpenseEntity(
     id = json.requiredString("id"),
     vehicleId = json.requiredString("vehicleId"),
     date = json.requiredString("date"),
+    time = json.optString("time", "00:00"),
     category = json.requiredString("category"),
     description = json.optString("description"),
     amount = json.getDouble("amount"),

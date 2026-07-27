@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AttachMoney
@@ -294,6 +296,19 @@ fun FuelLogApp(
             onSave = onAddVehicle,
             onUpdate = onUpdateVehicle,
         )
+    } else if (showAddExpense || editingExpense != null) {
+        AddExpenseScreen(
+            saving = state.saving,
+            latestOdometer = state.summary.latestOdometerKm,
+            editing = editingExpense,
+            selectedVehicleLabel = state.selectedVehicle?.name,
+            selectedVehicleOdometer = state.summary.latestOdometerKm,
+            onPickPhoto = onPickPhoto,
+            onPickCameraPhoto = onPickCameraPhoto,
+            onDismiss = { showAddExpense = false; editingExpense = null },
+            onSave = onAddExpense,
+            onUpdate = onUpdateExpense,
+        )
     } else {
         val drawerDestinations = listOf(
             "บ้าน" to Icons.Filled.Home,
@@ -494,19 +509,6 @@ fun FuelLogApp(
                 onDismiss = { showAddFuel = false; editingFuel = null },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
-            )
-        }
-        if (showAddExpense || editingExpense != null) {
-            AddExpenseDialog(
-                saving = state.saving,
-                latestOdometer = state.summary.latestOdometerKm,
-                editing = editingExpense,
-                categorySuggestions = state.expenseCategorySuggestions,
-                onPickPhoto = onPickPhoto,
-                onPickCameraPhoto = onPickCameraPhoto,
-                onDismiss = { showAddExpense = false; editingExpense = null },
-                onSave = onAddExpense,
-                onUpdate = onUpdateExpense,
             )
         }
         if (showAddMaintenance || editingMaintenance != null) {
@@ -2362,12 +2364,18 @@ private fun PhotoAttachmentRow(
     }
 }
 
+private val expenseCategories = listOf(
+    "บริการ", "บำรุงรักษา", "ทะเบียน", "ที่จอดรถ", "ล้างรถ", "ทางด่วน", "ตั๋ว/ค่าปรับ", "ปรับแต่ง", "การประกันภัย",
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddExpenseDialog(
+private fun AddExpenseScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: Expense? = null,
-    categorySuggestions: List<String> = emptyList(),
+    selectedVehicleLabel: String? = null,
+    selectedVehicleOdometer: Double? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
@@ -2377,7 +2385,7 @@ private fun AddExpenseDialog(
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
-    var category by remember { mutableStateOf(editing?.category ?: "บำรุงรักษา") }
+    var category by remember { mutableStateOf(editing?.category ?: expenseCategories.first()) }
     var description by remember { mutableStateOf(editing?.description ?: "") }
     var amount by remember { mutableStateOf(editing?.amount?.let { "%.2f".format(Locale.US, it) } ?: "") }
     var odometer by remember {
@@ -2385,114 +2393,233 @@ private fun AddExpenseDialog(
     }
     var income by remember { mutableStateOf(editing?.income ?: false) }
     var recurring by remember { mutableStateOf(editing?.recurring ?: false) }
+    var saveAsTemplate by remember { mutableStateOf(false) }
     var reminderDate by remember { mutableStateOf(editing?.reminderDate ?: "") }
+    var reminderEnabled by remember { mutableStateOf(!editing?.reminderDate.isNullOrBlank()) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
-    val categoryOptions = categorySuggestions.filter { category.isBlank() || it.contains(category, ignoreCase = true) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (editing != null) "แก้ไขค่าใช้จ่าย" else "เพิ่มค่าใช้จ่าย") },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { Text("ข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+
+    fun save() {
+        val amountValue = amount.toDoubleOrNull() ?: 0.0
+        val odometerValue = odometer.toDoubleOrNull()
+        val reminderValue = reminderDate.takeIf { reminderEnabled && it.isNotBlank() }
+        val photoUri = PhotoUris.join(photoUris)
+        if (editing != null && onUpdate != null) {
+            onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+        } else {
+            onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+        }
+    }
+
+    val expenseHandlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+        // Claude Vision OCR (functions/index.js scanReceipt) fills these when signed in and
+        // reachable; falls back to on-device amount-only OCR otherwise.
+        scanResult?.date?.let { date = it }
+        scanResult?.title?.takeIf { description.isBlank() }?.let { description = it }
+        val extractedAmount = scanResult?.amount ?: scanResult?.total
+        if (amount.isBlank() && extractedAmount != null) {
+            amount = "%.2f".format(Locale.US, extractedAmount)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                    }
+                },
+                title = { Text(if (editing != null) "แก้ไขค่าใช้จ่าย" else "เพิ่มค่าใช้จ่าย") },
+                actions = {
+                    IconButton(enabled = !saving, onClick = { save() }) {
+                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (selectedVehicleLabel != null) {
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("ค่าทางด่วน", "ค่าที่จอด", "ค่าประกัน", "ค่าซ่อม").forEach { quickCategory ->
-                            androidx.compose.material3.FilterChip(
-                                selected = category == quickCategory,
-                                onClick = { category = quickCategory },
-                                label = { Text(quickCategory) },
-                            )
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                            Text(selectedVehicleLabel, fontWeight = FontWeight.SemiBold)
+                            selectedVehicleOdometer?.let {
+                                Text("${"%.0f".format(Locale.US, it)} km", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }
-                item {
-                    AutocompleteTextField(
+            }
+            item {
+                Box {
+                    OutlinedTextField(
                         value = category,
-                        onValueChange = { category = it },
-                        label = "หมวดหมู่",
-                        options = categoryOptions,
-                        expanded = categoryMenuExpanded,
-                        onExpandedChange = { categoryMenuExpanded = it },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("หมวดหมู่") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { categoryMenuExpanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกหมวดหมู่")
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                }
-                item { OutlinedTextField(description, { description = it }, label = { Text("ชื่อเรื่อง") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { OutlinedTextField(amount, { amount = it }, label = { Text("ราคารวม") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(date, { date = it }, label = { Text("วันที่") }, singleLine = true, modifier = Modifier.weight(1f))
-                        OutlinedTextField(time, { time = it }, label = { Text("เวลา") }, singleLine = true, modifier = Modifier.weight(1f))
+                    DropdownMenu(expanded = categoryMenuExpanded, onDismissRequest = { categoryMenuExpanded = false }) {
+                        expenseCategories.forEach { option ->
+                            DropdownMenuItem(text = { Text(option) }, onClick = { category = option; categoryMenuExpanded = false })
+                        }
                     }
                 }
-                item {
-                    Row(
+            }
+            item { Text("ข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                OutlinedTextField(
+                    description, { description = it },
+                    label = { Text("ชื่อเรื่อง") },
+                    leadingIcon = { Text("T", fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    amount, { amount = it },
+                    label = { Text("ราคารวม") },
+                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        date, { date = it },
+                        label = { Text("วันที่") },
+                        leadingIcon = { Icon(Icons.Filled.CalendarToday, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(time, { time = it }, label = { Text("เวลา") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("ค่าใช้จ่ายเชิงลบ (รายได้)")
+                    Switch(checked = income, onCheckedChange = { income = it })
+                }
+            }
+            item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                OutlinedTextField(
+                    reminderDate, { reminderDate = it },
+                    label = { Text("หมายเหตุ") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    odometer, { odometer = it },
+                    label = { Text("เลขไมล์ / มาตรวัดระยะทางรวม") },
+                    leadingIcon = { Icon(Icons.Filled.Speed, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("บันทึกเป็นแม่แบบ")
+                    Switch(checked = saveAsTemplate, onCheckedChange = { saveAsTemplate = it })
+                }
+            }
+            item { Text("เกิดขึ้นประจำ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                Box {
+                    var recurringMenuExpanded by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = if (recurring) "ทำซ้ำทุกเดือน" else "ค่าใช้จ่ายเพียงครั้งเดียว",
+                        onValueChange = {},
+                        readOnly = true,
+                        leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { recurringMenuExpanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกความถี่")
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("ค่าใช้จ่ายเชิงลบ (รายได้)")
-                        Switch(checked = income, onCheckedChange = { income = it })
+                    )
+                    DropdownMenu(expanded = recurringMenuExpanded, onDismissRequest = { recurringMenuExpanded = false }) {
+                        DropdownMenuItem(text = { Text("ค่าใช้จ่ายเพียงครั้งเดียว") }, onClick = { recurring = false; recurringMenuExpanded = false })
+                        DropdownMenuItem(text = { Text("ทำซ้ำทุกเดือน") }, onClick = { recurring = true; recurringMenuExpanded = false })
                     }
                 }
-                item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-                item { OutlinedTextField(odometer, { odometer = it }, label = { Text("มาตรวัดระยะทางรวม") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            }
+            if (onPickPhoto != null) {
+                item { Text("รูปภาพ & สแกนบิล", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item {
+                    PhotoAttachmentRow(
+                        photoUris = photoUris,
+                        onPickGallery = { onPickPhoto("expense", expenseHandlePicked) },
+                        onPickCamera = onPickCameraPhoto?.let { pick -> { pick("expense", expenseHandlePicked) } },
+                        onRemove = { uri -> photoUris = photoUris - uri },
+                    )
+                }
+                item {
+                    Button(
+                        onClick = {
+                            val scanPicker = onPickCameraPhoto ?: onPickPhoto
+                            scanPicker.invoke("expense", expenseHandlePicked)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("สแกนบิล/ใบเสร็จด้วย AI")
+                    }
+                }
+            }
+            item { Text("จดหมายเตือนชำระเงิน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("เพิ่มการเตือน")
+                    Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+                }
+            }
+            if (reminderEnabled) {
                 item {
                     OutlinedTextField(
-                        reminderDate,
-                        { reminderDate = it },
-                        label = { Text("วันเตือนชำระ (ไม่บังคับ)") },
+                        reminderDate, { reminderDate = it },
+                        label = { Text("วันเตือนชำระ") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(recurring, { recurring = it })
-                        Text("รายการประจำ")
-                    }
-                }
-                if (onPickPhoto != null) {
-                    item { Text("รูปภาพ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-                    item {
-                        val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
-                            photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                            // Claude OCR (functions/index.js scanReceipt) fills these when signed
-                            // in and reachable; falls back to on-device amount-only OCR otherwise.
-                            scanResult?.date?.let { date = it }
-                            scanResult?.title?.takeIf { description.isBlank() }?.let { description = it }
-                            val extractedAmount = scanResult?.amount ?: scanResult?.total
-                            if (amount.isBlank() && extractedAmount != null) {
-                                amount = "%.2f".format(Locale.US, extractedAmount)
-                            }
-                        }
-                        PhotoAttachmentRow(
-                            photoUris = photoUris,
-                            onPickGallery = { onPickPhoto("expense", handlePicked) },
-                            onPickCamera = onPickCameraPhoto?.let { pick -> { pick("expense", handlePicked) } },
-                            onRemove = { uri -> photoUris = photoUris - uri },
-                        )
-                    }
+            }
+            item {
+                Button(enabled = !saving, onClick = { save() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (saving) "กำลังบันทึก…" else "บันทึก")
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                enabled = !saving,
-                onClick = {
-                    val amountValue = amount.toDoubleOrNull() ?: 0.0
-                    val odometerValue = odometer.toDoubleOrNull()
-                    val reminderValue = reminderDate.takeIf(String::isNotBlank)
-                    val photoUri = PhotoUris.join(photoUris)
-                    if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
-                    } else {
-                        onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
-                    }
-                },
-            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
-    )
+        }
+    }
 }
 
 @Composable

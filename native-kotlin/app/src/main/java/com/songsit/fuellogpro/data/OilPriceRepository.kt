@@ -7,10 +7,15 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class OilPriceInfo(
+data class BrandOilPrices(
+    val brand: String,
     val gasohol95: Double?,
     val gasohol91: Double?,
     val dieselB7: Double?,
+)
+
+data class OilPriceInfo(
+    val brands: List<BrandOilPrices>,
     val dateLabel: String,
 )
 
@@ -19,8 +24,10 @@ data class OilPriceInfo(
  * `oil-prices.json` file kept at the repo root and refreshed by a GitHub Action scraping
  * https://oil-price.bangchak.co.th/ApiOilPrice2/th. The native app has no bundled copy of
  * that file, so this repository fetches the same JSON from the project's GitHub raw content
- * URL (the file is auto-updated on the `main` branch) and parses it the same way V8 did:
- * data[0].OilList is itself a JSON string listing every grade with a `PriceToday` field.
+ * URL (the file is auto-updated on the `main` branch). Alongside Bangchak's own `data[0].OilList`
+ * (a JSON string listing every grade with a `PriceToday` field), the same file's `comparison`
+ * object (populated by scripts/update_oil_price.py's fetch_ptt()/fetch_shell()) carries PTT's
+ * and Shell's official grade prices, so all three brands come from one fetch.
  */
 class OilPriceRepository {
 
@@ -54,10 +61,33 @@ class OilPriceRepository {
             }
             return null
         }
-        return OilPriceInfo(
+        val bangchak = BrandOilPrices(
+            brand = "บางจาก",
             gasohol95 = findPrice { it.contains("95") && it.contains("แก๊สโซฮอล์") },
             gasohol91 = findPrice { it.contains("91") && it.contains("แก๊สโซฮอล์") },
             dieselB7 = findPrice { it.contains("ไฮดีเซล") && !it.contains("พรีเมียม") },
+        )
+        val comparison = root.optJSONObject("comparison")
+        fun comparisonBrand(key: String, label: String): BrandOilPrices? {
+            val grades = comparison?.optJSONObject(key)?.optJSONObject("grades") ?: return null
+            fun grade(name: String): Double? =
+                grades.optDouble(name, Double.NaN).takeIf { !it.isNaN() && it > 0 }
+            val prices = BrandOilPrices(
+                brand = label,
+                gasohol95 = grade("gasohol_95"),
+                gasohol91 = grade("gasohol_91"),
+                dieselB7 = grade("diesel_b7"),
+            )
+            return prices.takeIf { it.gasohol95 != null || it.gasohol91 != null || it.dieselB7 != null }
+        }
+        val brands = listOfNotNull(
+            comparisonBrand("ptt", "ปตท."),
+            bangchak,
+            comparisonBrand("shell", "Shell"),
+        )
+        if (brands.isEmpty()) return null
+        return OilPriceInfo(
+            brands = brands,
             dateLabel = first.optString("OilRemark2", first.optString("OilPriceDate", "")),
         )
     }

@@ -48,6 +48,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.songsit.fuellogpro.settings.DisplaySettings
 import com.songsit.fuellogpro.data.NearbyStation
+import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
@@ -184,7 +187,7 @@ fun FuelLogApp(
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
-    oilPriceSummary: String? = null,
+    oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -290,7 +293,7 @@ fun FuelLogApp(
             },
         ) { padding ->
             when (tab) {
-                0 -> Dashboard(state, onExportCsv, oilPriceSummary, Modifier.padding(padding))
+                0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
                 1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
                 2 -> RecordsPage(
                     mode = recordsMode,
@@ -406,7 +409,7 @@ fun FuelLogApp(
 private fun Dashboard(
     state: NativeAppState,
     onExportCsv: () -> Unit,
-    oilPriceSummary: String? = null,
+    oilPriceInfo: OilPriceInfo? = null,
     modifier: Modifier = Modifier,
 ) {
     val displaySettings = LocalDisplaySettings.current
@@ -427,19 +430,8 @@ private fun Dashboard(
             }
             return@LazyColumn
         }
-        if (!oilPriceSummary.isNullOrBlank()) {
-            item {
-                Card(shape = RoundedCornerShape(20.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text(
-                            "ราคาน้ำมันวันนี้",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(oilPriceSummary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
+        if (oilPriceInfo != null && oilPriceInfo.brands.isNotEmpty()) {
+            item { OilPriceCard(oilPriceInfo) }
         }
         item {
             Card(
@@ -528,6 +520,47 @@ private fun Dashboard(
         } else {
             items(state.entries.take(3), key = { it.id }) { FuelRow(it, kmPerLiter = kmPerLiterByEntry[it.id]) }
         }
+    }
+}
+
+@Composable
+private fun OilPriceCard(info: OilPriceInfo) {
+    var tab by remember { mutableIntStateOf(0) }
+    val selectedTab = tab.coerceIn(0, info.brands.lastIndex)
+    val selected = info.brands[selectedTab]
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth()) {
+            TabRow(selectedTabIndex = selectedTab) {
+                info.brands.forEachIndexed { index, brand ->
+                    Tab(selected = index == selectedTab, onClick = { tab = index }, text = { Text(brand.brand) })
+                }
+            }
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("ราคาน้ำมันวันนี้", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
+                OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
+                OilPriceRow("ดีเซล B7", selected.dieselB7)
+                if (info.dateLabel.isNotBlank()) {
+                    Text(
+                        info.dateLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OilPriceRow(label: String, price: Double?) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            price?.let { thaiCurrency.format(it) } ?: "—",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

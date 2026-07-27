@@ -20,6 +20,7 @@ import com.songsit.fuellogpro.data.LocalBackupRepository
 import com.songsit.fuellogpro.data.LocalCsvExportRepository
 import com.songsit.fuellogpro.data.FuelioImportRepository
 import com.songsit.fuellogpro.data.NearbyStationRepository
+import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.OilPriceRepository
 import com.songsit.fuellogpro.data.OcrRepository
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
@@ -40,9 +41,7 @@ import android.widget.Toast
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.tasks.await
-import java.text.NumberFormat
 import java.time.LocalDate
-import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -251,21 +250,9 @@ class MainActivity : ComponentActivity() {
             var reminderSettings by remember { mutableStateOf(notificationPreferences.load()) }
             var displaySettings by remember { mutableStateOf(displayPreferences.load()) }
             val syncConflicts by database.syncConflictDao().observeAll().collectAsState(emptyList())
-            var oilPriceSummary by remember { mutableStateOf<String?>(null) }
+            var oilPriceInfo by remember { mutableStateOf<OilPriceInfo?>(null) }
             LaunchedEffect(Unit) {
-                val info = oilPriceRepository.fetchTodayPrices()
-                if (info != null) {
-                    val currency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
-                    val parts = buildList {
-                        info.gasohol95?.let { add("แก๊สโซฮอล์ 95: ${currency.format(it)}") }
-                        info.gasohol91?.let { add("แก๊สโซฮอล์ 91: ${currency.format(it)}") }
-                        info.dieselB7?.let { add("ดีเซล B7: ${currency.format(it)}") }
-                    }
-                    if (parts.isNotEmpty()) {
-                        oilPriceSummary = parts.joinToString(" • ") +
-                            if (info.dateLabel.isNotBlank()) "\n${info.dateLabel}" else ""
-                    }
-                }
+                oilPriceInfo = oilPriceRepository.fetchTodayPrices()
             }
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
@@ -345,7 +332,7 @@ class MainActivity : ComponentActivity() {
                     )
                 },
                 onPickCameraPhoto = { onPicked -> launchCameraCapture(onPicked) },
-                oilPriceSummary = oilPriceSummary,
+                oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->
                     val vehicleId = state.selectedVehicleId

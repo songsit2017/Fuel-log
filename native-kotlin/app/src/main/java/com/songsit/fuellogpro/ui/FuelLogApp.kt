@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,8 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -48,6 +51,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -97,6 +101,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 
+private val fuelTypeOptions = listOf(
+    "แก๊สโซฮอล์ 91", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ E20", "แก๊สโซฮอล์ E85", "ดีเซล B7", "ดีเซล B20", "เบนซิน",
+)
+
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
     maximumFractionDigits = 2
@@ -142,6 +150,21 @@ private fun AutocompleteTextField(
                 )
             }
         }
+    }
+}
+
+// Keeps an icon and its field(s) locked to one line across the "add fuel" form — each
+// FormRow call supplies the leading icon and the row's field(s) as trailing content, so
+// multi-field rows (e.g. price/total) can weight() their children evenly.
+@Composable
+private fun FormRow(icon: ImageVector, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        content()
     }
 }
 
@@ -1369,6 +1392,36 @@ private fun AddFuelDialog(
     }
     var liters by remember { mutableStateOf(editing?.liters?.let { "%.2f".format(Locale.US, it) } ?: "") }
     var price by remember { mutableStateOf(editing?.pricePerLiter?.let { "%.2f".format(Locale.US, it) } ?: "") }
+    var total by remember {
+        mutableStateOf(
+            editing?.amount?.let { "%.2f".format(Locale.US, it) }
+                ?: run {
+                    val l = liters.toDoubleOrNull()
+                    val p = price.toDoubleOrNull()
+                    if (l != null && p != null) "%.2f".format(Locale.US, l * p) else ""
+                },
+        )
+    }
+    var fuelType by remember { mutableStateOf("") }
+    var fuelTypeMenuExpanded by remember { mutableStateOf(false) }
+    val onLitersChange: (String) -> Unit = { value ->
+        liters = value
+        val l = value.toDoubleOrNull()
+        val p = price.toDoubleOrNull()
+        if (l != null && p != null) total = "%.2f".format(Locale.US, l * p)
+    }
+    val onPriceChange: (String) -> Unit = { value ->
+        price = value
+        val l = liters.toDoubleOrNull()
+        val p = value.toDoubleOrNull()
+        if (l != null && p != null) total = "%.2f".format(Locale.US, l * p)
+    }
+    val onTotalChange: (String) -> Unit = { value ->
+        total = value
+        val l = liters.toDoubleOrNull()
+        val t = value.toDoubleOrNull()
+        if (l != null && l > 0 && t != null) price = "%.2f".format(Locale.US, t / l)
+    }
     var station by remember { mutableStateOf(editing?.station ?: "") }
     var fullTank by remember { mutableStateOf(editing?.fullTank ?: true) }
     var stationMenuExpanded by remember { mutableStateOf(false) }
@@ -1429,15 +1482,71 @@ private fun AddFuelDialog(
                         }
                     }
                 }
-                item { OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true) }
-                item { OutlinedTextField(time, { time = it }, label = { Text("เวลา HH:MM") }, singleLine = true) }
-                item { OutlinedTextField(odometer, { odometer = it }, label = { Text("เลขไมล์ กม.") }, singleLine = true) }
-                item { OutlinedTextField(liters, { liters = it }, label = { Text("จำนวนลิตร") }, singleLine = true) }
-                item { OutlinedTextField(price, { price = it }, label = { Text("ราคาต่อลิตร") }, singleLine = true) }
                 item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(fullTank, { fullTank = it })
-                        Text("เติมเต็มถัง")
+                    FormRow(Icons.Filled.Speed) {
+                        OutlinedTextField(
+                            odometer,
+                            { odometer = it },
+                            label = { Text("มาตรวัดระยะทางรวม (km)") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                item {
+                    FormRow(Icons.Filled.LocalGasStation) {
+                        OutlinedTextField(
+                            liters,
+                            onLitersChange,
+                            label = { Text("เชื้อเพลิง (L)") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        AutocompleteTextField(
+                            value = fuelType,
+                            onValueChange = { fuelType = it },
+                            label = "ชนิดเชื้อเพลิง",
+                            options = fuelTypeOptions,
+                            expanded = fuelTypeMenuExpanded,
+                            onExpandedChange = { fuelTypeMenuExpanded = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                item {
+                    FormRow(Icons.Filled.AttachMoney) {
+                        OutlinedTextField(
+                            price,
+                            onPriceChange,
+                            label = { Text("ราคา/L") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            total,
+                            onTotalChange,
+                            label = { Text("ราคารวม") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                item {
+                    FormRow(Icons.Filled.CalendarToday) {
+                        OutlinedTextField(
+                            date,
+                            { date = it },
+                            label = { Text("วันที่") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            time,
+                            { time = it },
+                            label = { Text("เวลา") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
                 if (onPickPhoto != null) {
@@ -1458,6 +1567,16 @@ private fun AddFuelDialog(
                             },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
+                    }
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("เติมเต็มถัง")
+                        Switch(checked = fullTank, onCheckedChange = { fullTank = it })
                     }
                 }
             }

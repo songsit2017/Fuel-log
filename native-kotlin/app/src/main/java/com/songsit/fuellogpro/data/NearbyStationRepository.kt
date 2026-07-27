@@ -31,7 +31,9 @@ class NearbyStationRepository {
             // local.properties) get the "MISSING" placeholder from local.defaults.properties —
             // real Google API keys always start with "AIza", so this check works for both that
             // placeholder and a genuinely blank value.
-            if (!BuildConfig.MAPS_API_KEY.startsWith("AIza")) return@withContext emptyList()
+            if (!BuildConfig.MAPS_API_KEY.startsWith("AIza")) {
+                error("ไม่ได้ตั้งค่า Google Maps API Key (MAPS_API_KEY)")
+            }
             val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
                 "?location=${URLEncoder.encode("$lat,$lon", "UTF-8")}" +
                 "&radius=$radiusMeters" +
@@ -41,17 +43,27 @@ class NearbyStationRepository {
             connection.requestMethod = "GET"
             connection.connectTimeout = 10_000
             connection.readTimeout = 15_000
-            runCatching {
+            try {
                 val responseCode = connection.responseCode
-                if (responseCode !in 200..299) return@withContext emptyList()
-                val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
+                val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                if (responseCode !in 200..299) {
+                    error("เรียก Google Places API ไม่สำเร็จ (HTTP $responseCode)")
+                }
                 parsePlacesResponse(body, lat, lon)
-            }.getOrElse { emptyList() }.also { connection.disconnect() }
+            } finally {
+                connection.disconnect()
+            }
         }
 
     private fun parsePlacesResponse(body: String, lat: Double, lon: Double): List<NearbyStation> {
         val root = JSONObject(body)
-        if (root.optString("status") != "OK") return emptyList()
+        val status = root.optString("status")
+        if (status == "ZERO_RESULTS") return emptyList()
+        if (status != "OK") {
+            val errorMessage = root.optString("error_message").takeIf { it.isNotBlank() }
+            error("Google Places API: $status${errorMessage?.let { " ($it)" } ?: ""}")
+        }
         val results = root.optJSONArray("results") ?: return emptyList()
         val stations = mutableListOf<NearbyStation>()
         for (i in 0 until results.length()) {

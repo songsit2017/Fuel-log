@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -118,6 +119,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 
 private val fuelTypeOptions = listOf(
     "เบนซิน", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ 91", "E20", "E85", "ดีเซล", "ดีเซล B7", "ดีเซล B20", "LPG", "NGV", "EV",
@@ -254,6 +256,8 @@ fun FuelLogApp(
     var showVehicleMenu by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
+    val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
+    val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {
@@ -288,9 +292,59 @@ fun FuelLogApp(
             onUpdate = onUpdateVehicle,
         )
     } else {
+        val drawerDestinations = listOf(
+            "บ้าน" to Icons.Filled.Home,
+            "บันทึกการใช้เชื้อเพลิง" to Icons.Filled.LocalGasStation,
+            "สถิติ" to Icons.Filled.BarChart,
+            "บันทึกค่าใช้จ่าย" to Icons.Filled.ReceiptLong,
+            "บำรุงรักษา" to Icons.Filled.Build,
+            "รถของฉัน" to Icons.Filled.DirectionsCar,
+            "ไทม์ไลน์" to Icons.Filled.History,
+        )
+        val drawerTabTargets = listOf(0, 1, 5, 2, 3, 4, 6)
+        androidx.compose.material3.ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                androidx.compose.material3.ModalDrawerSheet {
+                    Text(
+                        "Fuel Log",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                    HorizontalDivider()
+                    drawerDestinations.forEachIndexed { index, (label, icon) ->
+                        androidx.compose.material3.NavigationDrawerItem(
+                            label = { Text(label) },
+                            icon = { Icon(icon, contentDescription = label) },
+                            selected = tab == drawerTabTargets[index],
+                            onClick = {
+                                tab = drawerTabTargets[index]
+                                drawerScope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                    }
+                    androidx.compose.material3.NavigationDrawerItem(
+                        label = { Text("ตั้งค่า") },
+                        icon = { Icon(Icons.Filled.Settings, contentDescription = "ตั้งค่า") },
+                        selected = false,
+                        onClick = {
+                            showSettings = true
+                            drawerScope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+            },
+        ) {
         Scaffold(
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = { drawerScope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "เมนู")
+                        }
+                    },
                     title = {
                         Column {
                             Text(titles[tab], fontWeight = FontWeight.SemiBold)
@@ -462,6 +516,7 @@ fun FuelLogApp(
                 title = { Text("ตรวจสอบข้อมูล") },
                 text = { Text(message) },
             )
+        }
         }
     }
     }

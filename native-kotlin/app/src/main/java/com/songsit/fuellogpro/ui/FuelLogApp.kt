@@ -73,6 +73,7 @@ import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -119,6 +120,7 @@ private fun AutocompleteTextField(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onFocus: (() -> Unit)? = null,
 ) {
     var fieldWidthPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -133,7 +135,8 @@ private fun AutocompleteTextField(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .onGloballyPositioned { fieldWidthPx = it.size.width },
+                .onGloballyPositioned { fieldWidthPx = it.size.width }
+                .onFocusChanged { if (it.isFocused) onFocus?.invoke() },
         )
         DropdownMenu(
             expanded = expanded && options.isNotEmpty(),
@@ -1467,6 +1470,9 @@ private fun AddFuelDialog(
                         expanded = stationMenuExpanded,
                         onExpandedChange = { stationMenuExpanded = it },
                         modifier = Modifier.fillMaxWidth(),
+                        onFocus = {
+                            if (onFindNearbyStations != null && !nearbySearching && nearbyStations.isEmpty()) runNearbySearch()
+                        },
                     )
                 }
                 if (onFindNearbyStations != null) {
@@ -1475,7 +1481,7 @@ private fun AddFuelDialog(
                             TextButton(
                                 enabled = !nearbySearching,
                                 onClick = { runNearbySearch() },
-                            ) { Text(if (nearbySearching) "กำลังค้นหา…" else "หาปั๊มใกล้ฉัน") }
+                            ) { Text(if (nearbySearching) "กำลังค้นหา GPS..." else "หาปั๊มใกล้ฉัน") }
                             nearbyError?.let {
                                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                             }

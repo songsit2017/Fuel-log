@@ -4,11 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
@@ -19,9 +26,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.songsit.fuellogpro.ui.IconBadge
 import com.songsit.fuellogpro.domain.distanceByMonth
 import com.songsit.fuellogpro.domain.distanceByYear
 import com.songsit.fuellogpro.domain.expenseTotalByMonth
@@ -58,10 +68,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StatCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun StatCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Card(shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconBadge(icon, size = 26.dp)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
             content()
         }
     }
@@ -87,19 +100,19 @@ private fun FillUpStatsTab(state: NativeAppState, modifier: Modifier = Modifier)
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StatCard("จำนวนครั้งเติมน้ำมัน") {
+            StatCard("จำนวนครั้งเติมน้ำมัน", Icons.Filled.LocalGasStation) {
                 Text(compareLine(fuelCountByYear(entries, thisYear), fuelCountByYear(entries, lastYear), "ปีนี้", "ปีก่อนหน้านี้"))
                 Text(compareLine(fuelCountByMonth(entries, thisYear, thisMonth), fuelCountByMonth(entries, prevYear, prevMonth), "เดือนนี้", "เดือนก่อนหน้านี้"))
             }
         }
         item {
-            StatCard("ปริมาณน้ำมันรวม") {
+            StatCard("ปริมาณน้ำมันรวม", Icons.Filled.WaterDrop) {
                 Text(compareLine(fuelLitersByYear(entries, thisYear), fuelLitersByYear(entries, lastYear), "ลิตร ปีนี้", "ลิตร ปีก่อนหน้านี้"))
                 Text(compareLine(fuelLitersByMonth(entries, thisYear, thisMonth), fuelLitersByMonth(entries, prevYear, prevMonth), "ลิตร เดือนนี้", "ลิตร เดือนก่อนหน้านี้"))
             }
         }
         item {
-            StatCard("ปริมาณต่อครั้ง") {
+            StatCard("ปริมาณต่อครั้ง", Icons.Filled.LocalGasStation) {
                 val minLiters = entries.minOfOrNull { it.liters }
                 val maxLiters = entries.maxOfOrNull { it.liters }
                 Text("เติมต่ำสุด: ${minLiters?.let { "${statsNumber.format(it)} ลิตร" } ?: "—"}")
@@ -107,7 +120,7 @@ private fun FillUpStatsTab(state: NativeAppState, modifier: Modifier = Modifier)
             }
         }
         item {
-            StatCard("อัตราสิ้นเปลืองเฉลี่ย") {
+            StatCard("อัตราสิ้นเปลืองเฉลี่ย", Icons.Filled.Speed) {
                 // Reuses NativeAppState.summary (calculateFuelSummary() in NativeAppViewModel) —
                 // not recomputed here.
                 Text(
@@ -134,7 +147,7 @@ private fun ExpenseStatsTab(state: NativeAppState, modifier: Modifier = Modifier
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StatCard("ค่าใช้จ่ายรวม") {
+            StatCard("ค่าใช้จ่ายรวม", Icons.Filled.Payments) {
                 Text(
                     "${statsCurrency.format(expenseTotalByYear(expenses, thisYear))} ปีนี้ / " +
                         "${statsCurrency.format(expenseTotalByYear(expenses, lastYear))} ปีก่อนหน้านี้",
@@ -162,7 +175,7 @@ private fun DistanceStatsTab(state: NativeAppState, modifier: Modifier = Modifie
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StatCard("ระยะทางที่ขับ") {
+            StatCard("ระยะทางที่ขับ", Icons.Filled.Route) {
                 Text(compareLine(distanceByYear(entries, thisYear), distanceByYear(entries, lastYear), "กม. ปีนี้", "กม. ปีก่อนหน้านี้"))
                 Text(compareLine(distanceByMonth(entries, thisYear, thisMonth), distanceByMonth(entries, prevYear, prevMonth), "กม. เดือนนี้", "กม. เดือนก่อนหน้านี้"))
             }

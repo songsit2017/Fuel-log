@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +14,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -24,6 +42,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -32,6 +51,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -230,11 +250,20 @@ fun FuelLogApp(
             },
             bottomBar = {
                 NavigationBar {
+                    val tabIcons = listOf(
+                        Icons.Filled.Home,
+                        Icons.Filled.LocalGasStation,
+                        Icons.Filled.ReceiptLong,
+                        Icons.Filled.Build,
+                        Icons.Filled.DirectionsCar,
+                        Icons.Filled.BarChart,
+                        Icons.Filled.History,
+                    )
                     listOf("หน้าหลัก", "น้ำมัน", "บันทึก", "ดูแลรถ", "รถ", "สถิติ", "ไทม์ไลน์").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
-                            icon = { Text(listOf("⌂", "⛽", "฿", "✓", "●", "📈", "🕘")[index]) },
+                            icon = { Icon(tabIcons[index], contentDescription = label) },
                             label = { Text(label) },
                         )
                     }
@@ -432,8 +461,8 @@ private fun Dashboard(
             // below) to "ค่าน้ำมัน" — this card is fuel-only spend, the report card below is
             // the combined fuel+expense+trip total. Two distinct numbers, now two distinct labels.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("⛽ ค่าน้ำมัน", formatCurrencyAmount(state.summary.totalSpent, displaySettings), Modifier.weight(1f))
-                MetricCard("🛢️ ปริมาณน้ำมัน", formatVolumeLiters(state.summary.totalLiters, displaySettings), Modifier.weight(1f))
+                MetricCard("ค่าน้ำมัน", formatCurrencyAmount(state.summary.totalSpent, displaySettings), Modifier.weight(1f), Icons.Filled.LocalGasStation)
+                MetricCard("ปริมาณน้ำมัน", formatVolumeLiters(state.summary.totalLiters, displaySettings), Modifier.weight(1f), Icons.Filled.WaterDrop)
             }
         }
         item {
@@ -441,6 +470,7 @@ private fun Dashboard(
                 "เลขไมล์ล่าสุด",
                 state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: "ยังไม่มีข้อมูล",
                 Modifier.fillMaxWidth(),
+                Icons.Filled.Speed,
             )
         }
         item {
@@ -450,17 +480,19 @@ private fun Dashboard(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("📊 รายงานสรุป", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    SectionHeader(Icons.Filled.BarChart, "รายงานสรุป")
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
                             "ค่าใช้จ่ายรวมทั้งหมด",
                             formatCurrencyAmount(operatingCost, displaySettings),
                             Modifier.weight(1f),
+                            Icons.Filled.Payments,
                         )
                         MetricCard(
                             "สุทธิหลังรายรับ",
                             formatCurrencyAmount(operatingCost - state.totalIncome, displaySettings),
                             Modifier.weight(1f),
+                            Icons.Filled.AccountBalanceWallet,
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -468,6 +500,7 @@ private fun Dashboard(
                             "ระยะทางทริป",
                             formatDistanceKm(state.tripSummary.totalDistanceKm, displaySettings),
                             Modifier.weight(1f),
+                            Icons.Filled.Route,
                         )
                         MetricCard(
                             "จำนวนรายการ",
@@ -476,6 +509,7 @@ private fun Dashboard(
                                     state.maintenanceTasks.size + state.trips.size,
                             ),
                             Modifier.weight(1f),
+                            Icons.Filled.ListAlt,
                         )
                     }
                     Button(onClick = onExportCsv, modifier = Modifier.fillMaxWidth()) {
@@ -486,7 +520,7 @@ private fun Dashboard(
         }
         item {
             Spacer(Modifier.height(4.dp))
-            Text("⛽ รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            SectionHeader(Icons.Filled.LocalGasStation, "รายการล่าสุด")
         }
         if (state.entries.isEmpty()) {
             item { EmptyFuelState() }
@@ -496,16 +530,51 @@ private fun Dashboard(
     }
 }
 
+// Small tinted circle behind a Material icon — the recurring "icon badge" look used across
+// MetricCard, section headers, and FuelRow, replacing the ad-hoc emoji glyphs that used to
+// stand in for icons.
 @Composable
-private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
+internal fun IconBadge(icon: ImageVector, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 32.dp) {
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(size * 0.55f),
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(icon: ImageVector, title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconBadge(icon, size = 26.dp)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Card(modifier, shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.padding(16.dp)) {
+            if (icon != null) {
+                IconBadge(icon, size = 26.dp)
+                Spacer(Modifier.height(8.dp))
+            }
             Text(label, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(6.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
     }
 }
+
+private val fuelListThaiMonthNames = listOf(
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+)
 
 @Composable
 private fun FuelList(
@@ -515,13 +584,30 @@ private fun FuelList(
     modifier: Modifier = Modifier,
 ) {
     val kmPerLiterByEntry = remember(entries) { calculatePerEntryKmPerLiter(entries) }
+    // Grouped by month like the Timeline screen, so a long fuel history reads in the same
+    // "month header + cards" shape Fuelio uses instead of one unbroken list.
+    val groups = remember(entries) {
+        entries.groupBy { entry -> runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { it.year to it.monthValue } }
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (entries.isEmpty()) item { EmptyFuelState() }
-        items(entries, key = { it.id }) { FuelRow(it, onDelete, onEdit, kmPerLiterByEntry[it.id]) }
+        groups.forEach { (yearMonth, groupEntries) ->
+            item {
+                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: "ไม่ทราบวันที่"
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                )
+            }
+            items(groupEntries, key = { it.id }) { FuelRow(it, onDelete, onEdit, kmPerLiterByEntry[it.id]) }
+        }
     }
 }
 
@@ -582,7 +668,7 @@ private fun ExpenseList(
                         Text(
                             "${if (expense.income) "+" else "−"}${thaiCurrency.format(expense.amount)}",
                             fontWeight = FontWeight.Bold,
-                            color = if (expense.income) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                         )
                         if (expense.recurring) Text("รายการประจำ", style = MaterialTheme.typography.labelSmall)
                         expense.reminderDate?.let { Text("เตือน $it", style = MaterialTheme.typography.labelSmall) }
@@ -772,14 +858,19 @@ private fun FuelRow(
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("⛽", style = MaterialTheme.typography.titleLarge)
+                IconBadge(Icons.Filled.LocalGasStation)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(entry.station.ifBlank { "เติมน้ำมัน" }, fontWeight = FontWeight.SemiBold)
                         if (!entry.photoUri.isNullOrBlank()) {
                             Spacer(Modifier.width(4.dp))
-                            Text("🖼️", style = MaterialTheme.typography.labelSmall)
+                            Icon(
+                                Icons.Filled.Image,
+                                contentDescription = "มีรูปแนบ",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     Text("${entry.date} • ${number.format(entry.odometerKm)} กม.", style = MaterialTheme.typography.bodySmall)
@@ -796,7 +887,7 @@ private fun FuelRow(
                     Text("${number.format(entry.liters)} ลิตร • ${number.format(entry.pricePerLiter)}/ลิตร")
                     kmPerLiter?.let { Text("${number.format(it)} กม./ลิตร", style = MaterialTheme.typography.labelSmall) }
                 }
-                if (entry.fullTank) Text("เต็มถัง", color = MaterialTheme.colorScheme.secondary)
+                if (entry.fullTank) Text("เต็มถัง", color = MaterialTheme.colorScheme.tertiary)
                 onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text("ลบ") } }
             }
         }
@@ -1385,7 +1476,9 @@ private fun PhotoAttachmentRow(
             var showSourceMenu by remember { mutableStateOf(false) }
             Box {
                 TextButton(onClick = { if (onPickCamera != null) showSourceMenu = true else onPickGallery() }) {
-                    Text(if (photoUris.isEmpty()) "📷 แนบรูป/ใบเสร็จ" else "📷 เพิ่มรูป")
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (photoUris.isEmpty()) "แนบรูป/ใบเสร็จ" else "เพิ่มรูป")
                 }
                 if (onPickCamera != null) {
                     DropdownMenu(

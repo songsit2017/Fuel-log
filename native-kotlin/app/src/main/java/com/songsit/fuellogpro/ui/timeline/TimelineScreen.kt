@@ -21,8 +21,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,11 +47,6 @@ import java.util.Locale
 
 private val timelineCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val timelineNumber = NumberFormat.getNumberInstance(Locale("th", "TH")).apply { maximumFractionDigits = 2 }
-
-// Item E: app's own lavender/plum palette (matches ic_launcher_background #F3E9F7 used
-// elsewhere in the app) — deliberately not Fuelio's blue branding.
-private val LavenderContainer = Color(0xFFF3E9F7)
-private val PlumAccent = Color(0xFF8E4585)
 
 private val thaiMonthNames = listOf(
     "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -94,7 +93,7 @@ fun TimelineScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     label,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = PlumAccent,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
@@ -123,20 +122,20 @@ private fun TimelineEntryRow(row: TimelineRow) {
                     .padding(top = 18.dp)
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(PlumAccent),
+                    .background(MaterialTheme.colorScheme.secondary),
             )
             Box(
                 modifier = Modifier
                     .width(2.dp)
                     .fillMaxHeight()
-                    .background(LavenderContainer),
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
             )
         }
         Spacer(Modifier.width(8.dp))
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = LavenderContainer),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
             when (row) {
                 is TimelineRow.FuelRow -> FuelTimelineContent(row.entry)
@@ -150,10 +149,10 @@ private fun TimelineEntryRow(row: TimelineRow) {
 private fun FuelTimelineContent(entry: FuelEntry) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("⛽", style = MaterialTheme.typography.titleMedium)
+            Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(entry.date, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text(timelineCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = PlumAccent)
+            Text(timelineCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
         }
         val detail = listOfNotNull(
             entry.station.takeIf(String::isNotBlank),
@@ -168,13 +167,18 @@ private fun FuelTimelineContent(entry: FuelEntry) {
 private fun ExpenseTimelineContent(expense: Expense) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (expense.income) "💰" else "🧾", style = MaterialTheme.typography.titleMedium)
+            Icon(
+                if (expense.income) Icons.Filled.Savings else Icons.Filled.Receipt,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp),
+            )
             Spacer(Modifier.width(6.dp))
             Text(expense.date, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Text(
                 "${if (expense.income) "+" else "−"}${timelineCurrency.format(expense.amount)}",
                 fontWeight = FontWeight.Bold,
-                color = PlumAccent,
+                color = MaterialTheme.colorScheme.secondary,
             )
         }
         val detail = listOf(expense.category, expense.description).filter(String::isNotBlank).joinToString(" • ")

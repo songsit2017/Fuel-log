@@ -7,19 +7,47 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// Brand palette: matches the app launcher icon (fuellog_icon.xml / colors.xml
+// ic_launcher_background) — lavender background with a deep-plum ink accent — applied
+// app-wide so every screen's cards/badges/nav share one identity instead of the default
+// M3 gray. Deliberately not Fuelio's navy-blue branding (that decision predates this pass);
+// Fuelio is used as a reference for layout/organization, not for hue.
 private val FuelOrange = Color(0xFFFFA726)
+private val DeepPlum = Color(0xFF241B33)
+private val PlumAccent = Color(0xFF8E4585)
+private val Lavender = Color(0xFFF3E9F7)
+
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF171717),
-    onPrimary = Color.White,
-    secondary = FuelOrange,
-    surface = Color(0xFFFFFBFF),
-    surfaceContainer = Color(0xFFF4F1F4),
+    primary = DeepPlum,
+    onPrimary = Lavender,
+    primaryContainer = Color(0xFFE4D3EC),
+    onPrimaryContainer = DeepPlum,
+    secondary = PlumAccent,
+    onSecondary = Color.White,
+    tertiary = FuelOrange,
+    background = Color(0xFFFBF7FC),
+    surface = Color(0xFFFBF7FC),
+    surfaceContainer = Lavender,
+    surfaceContainerHigh = Color(0xFFEADCF0),
+    surfaceContainerLow = Color(0xFFF8F1FA),
+    onSurface = DeepPlum,
+    onSurfaceVariant = Color(0xFF4A3B57),
 )
 private val DarkColors = darkColorScheme(
-    primary = FuelOrange,
-    secondary = FuelOrange,
-    surface = Color(0xFF121316),
-    surfaceContainer = Color(0xFF1C1D21),
+    primary = Color(0xFFD8BEE0),
+    onPrimary = DeepPlum,
+    primaryContainer = Color(0xFF3A2E47),
+    onPrimaryContainer = Color(0xFFEDE3F2),
+    secondary = Color(0xFFCB8FC0),
+    onSecondary = DeepPlum,
+    tertiary = FuelOrange,
+    background = Color(0xFF1B1620),
+    surface = Color(0xFF1B1620),
+    surfaceContainer = Color(0xFF2A2233),
+    surfaceContainerHigh = Color(0xFF352B40),
+    surfaceContainerLow = Color(0xFF221C29),
+    onSurface = Color(0xFFEDE3F2),
+    onSurfaceVariant = Color(0xFFC9BBD1),
 )
 
 /**

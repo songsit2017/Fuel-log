@@ -16,4 +16,5 @@ data class ExpenseEntity(
     val recurring: Boolean,
     val reminderDate: String?,
     val createdAt: Long,
+    val photoUri: String? = null,
 )

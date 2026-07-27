@@ -11,4 +11,6 @@ data class Expense(
     val income: Boolean,
     val recurring: Boolean,
     val reminderDate: String?,
+    val photoUri: String? = null,
+    val photoUrls: List<String> = emptyList(),
 )

@@ -49,8 +49,8 @@ class FuelioImportRepository(
                         vehicles += VehicleEntity(
                             id = vehicleId,
                             name = vehicleName,
-                            registration = "",
-                            fuelType = "",
+                            registration = parsed.vehicleRegistration ?: "",
+                            fuelType = parsed.vehicleFuelType ?: "",
                             createdAt = System.currentTimeMillis(),
                         )
                         parsed.fuelRows.forEach { row ->
@@ -111,8 +111,8 @@ class FuelioImportRepository(
         val vehicle = VehicleEntity(
             id = vehicleId,
             name = parsed.vehicleName ?: "รถนำเข้า",
-            registration = "",
-            fuelType = "",
+            registration = parsed.vehicleRegistration ?: "",
+            fuelType = parsed.vehicleFuelType ?: "",
             createdAt = System.currentTimeMillis(),
         )
         val fuelEntries = parsed.fuelRows.map { row ->
@@ -176,6 +176,8 @@ private data class FuelioCostRow(
 
 private data class FuelioParseResult(
     val vehicleName: String?,
+    val vehicleRegistration: String?,
+    val vehicleFuelType: String?,
     val fuelRows: List<FuelioFuelRow>,
     val costRows: List<FuelioCostRow>,
 )
@@ -206,6 +208,8 @@ private fun parseFuelioDate(raw: String): String {
 private fun parseFuelioCsv(text: String): FuelioParseResult {
     val rawLines = text.split('\n').map { it.trimEnd('\r') }
     var vehicleName: String? = null
+    var vehicleRegistration: String? = null
+    var vehicleFuelType: String? = null
     val fuelRows = mutableListOf<FuelioFuelRow>()
     val costRows = mutableListOf<FuelioCostRow>()
     val costCategories = mutableMapOf<String, String>()
@@ -235,12 +239,21 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
             headerColumns = emptyList()
             continue
         }
-        // Vehicle name is often on a metadata line before the "##Log" header, e.g. "Car;MyCar"
-        if (vehicleName == null && line.contains("Car", ignoreCase = true) && section.isEmpty()) {
+        // Vehicle metadata is often on lines before the "##Log" header, e.g. "Car;MyCar",
+        // "Plate;1กก1234", "Fuel;Gasoline". Ported alongside the vehicle name lookup so
+        // registration/fuel type aren't silently dropped when the source file has them.
+        if (section.isEmpty() && (vehicleName == null || vehicleRegistration == null || vehicleFuelType == null)) {
             val delimiter = detectDelimiter(line)
             val fields = splitLine(line, delimiter)
-            if (fields.size >= 2 && fields[0].equals("car", ignoreCase = true)) {
-                vehicleName = fields[1].takeIf { it.isNotBlank() }
+            if (fields.size >= 2) {
+                when {
+                    fields[0].equals("car", ignoreCase = true) ->
+                        vehicleName = vehicleName ?: fields[1].takeIf { it.isNotBlank() }
+                    fields[0].equals("plate", ignoreCase = true) || fields[0].equals("license", ignoreCase = true) ->
+                        vehicleRegistration = vehicleRegistration ?: fields[1].takeIf { it.isNotBlank() }
+                    fields[0].equals("fuel", ignoreCase = true) || fields[0].equals("fueltype", ignoreCase = true) ->
+                        vehicleFuelType = vehicleFuelType ?: fields[1].takeIf { it.isNotBlank() }
+                }
             }
         }
         val delimiter = detectDelimiter(line)
@@ -309,5 +322,5 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
             }
         }
     }
-    return FuelioParseResult(vehicleName, fuelRows, costRows)
+    return FuelioParseResult(vehicleName, vehicleRegistration, vehicleFuelType, fuelRows, costRows)
 }

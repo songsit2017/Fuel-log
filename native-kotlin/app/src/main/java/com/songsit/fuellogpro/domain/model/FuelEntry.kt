@@ -13,5 +13,6 @@ data class FuelEntry(
     val station: String = "",
     val driver: String = "",
     val photoUrls: List<String> = emptyList(),
+    val photoUri: String? = null,
 )
 

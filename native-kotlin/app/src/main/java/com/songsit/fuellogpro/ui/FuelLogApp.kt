@@ -33,11 +33,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.songsit.fuellogpro.settings.DisplaySettings
 import com.songsit.fuellogpro.data.NearbyStation
 import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.foundation.layout.width
@@ -55,12 +57,21 @@ import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
 import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.domain.model.Trip
 import com.songsit.fuellogpro.domain.model.totalCost
+import com.songsit.fuellogpro.domain.calculatePerEntryKmPerLiter
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
+import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.notifications.ReminderSettings
+import com.songsit.fuellogpro.ui.stats.StatsScreen
+import com.songsit.fuellogpro.ui.timeline.TimelineScreen
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
@@ -121,11 +132,11 @@ data class CloudUiState(
 @Composable
 fun FuelLogApp(
     state: NativeAppState,
-    onAddFuel: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
-    onUpdateFuel: (String, String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
+    onAddFuel: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
+    onUpdateFuel: (String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit,
-    onUpdateExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onUpdateExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdateMaintenance: (String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
@@ -150,10 +161,13 @@ fun FuelLogApp(
     onDeleteVehicle: (String) -> Unit,
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     oilPriceSummary: String? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    displaySettings: DisplaySettings = DisplaySettings(),
+    onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
@@ -167,9 +181,10 @@ fun FuelLogApp(
     var editingTrip by remember { mutableStateOf<Trip?>(null) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึก", "บำรุงรักษา", "รถของฉัน")
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึก", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
 
-    FuelLogTheme {
+    CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
+    FuelLogTheme(themeMode = displaySettings.themeMode) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -214,11 +229,11 @@ fun FuelLogApp(
             },
             bottomBar = {
                 NavigationBar {
-                    listOf("หน้าหลัก", "น้ำมัน", "บันทึก", "ดูแลรถ", "รถ").forEachIndexed { index, label ->
+                    listOf("หน้าหลัก", "น้ำมัน", "บันทึก", "ดูแลรถ", "รถ", "สถิติ", "ไทม์ไลน์").forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
-                            icon = { Text(listOf("⌂", "⛽", "฿", "✓", "●")[index]) },
+                            icon = { Text(listOf("⌂", "⛽", "฿", "✓", "●", "📈", "🕘")[index]) },
                             label = { Text(label) },
                         )
                     }
@@ -264,7 +279,7 @@ fun FuelLogApp(
                     onEdit = { editingMaintenance = it },
                     modifier = Modifier.padding(padding),
                 )
-                else -> VehicleList(
+                4 -> VehicleList(
                     vehicles = state.vehicles,
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
@@ -282,8 +297,12 @@ fun FuelLogApp(
                     vehicleMembers = vehicleMembers,
                     onCreateInvite = onCreateInvite,
                     onJoinByCode = onJoinByCode,
+                    displaySettings = displaySettings,
+                    onDisplaySettingsChange = onDisplaySettingsChange,
                     modifier = Modifier.padding(padding),
                 )
+                5 -> StatsScreen(state, Modifier.padding(padding))
+                else -> TimelineScreen(state, Modifier.padding(padding))
             }
         }
         if (showAddFuel || editingFuel != null) {
@@ -293,6 +312,7 @@ fun FuelLogApp(
                 editing = editingFuel,
                 stationSuggestions = state.stationSuggestions,
                 onFindNearbyStations = onFindNearbyStations,
+                onPickPhoto = onPickPhoto,
                 onDismiss = { showAddFuel = false; editingFuel = null },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
@@ -311,6 +331,7 @@ fun FuelLogApp(
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingExpense,
                 categorySuggestions = state.expenseCategorySuggestions,
+                onPickPhoto = onPickPhoto,
                 onDismiss = { showAddExpense = false; editingExpense = null },
                 onSave = onAddExpense,
                 onUpdate = onUpdateExpense,
@@ -345,6 +366,7 @@ fun FuelLogApp(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -354,6 +376,7 @@ private fun Dashboard(
     oilPriceSummary: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val displaySettings = LocalDisplaySettings.current
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -392,7 +415,7 @@ private fun Dashboard(
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
                     Text("อัตราสิ้นเปลืองเฉลี่ย", color = MaterialTheme.colorScheme.onPrimary)
                     Text(
-                        state.summary.averageKmPerLiter?.let { "${number.format(it)} กม./ลิตร" } ?: "—",
+                        state.summary.averageKmPerLiter?.let { formatEconomyKmPerLiter(it, displaySettings) } ?: "—",
                         color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
@@ -401,15 +424,18 @@ private fun Dashboard(
             }
         }
         item {
+            // Renamed from the generic "ค่าใช้จ่าย" (which duplicated the "ค่าใช้จ่ายรวม" card
+            // below) to "ค่าน้ำมัน" — this card is fuel-only spend, the report card below is
+            // the combined fuel+expense+trip total. Two distinct numbers, now two distinct labels.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("ค่าใช้จ่าย", thaiCurrency.format(state.summary.totalSpent), Modifier.weight(1f))
-                MetricCard("น้ำมัน", "${number.format(state.summary.totalLiters)} ลิตร", Modifier.weight(1f))
+                MetricCard("⛽ ค่าน้ำมัน", formatCurrencyAmount(state.summary.totalSpent, displaySettings), Modifier.weight(1f))
+                MetricCard("🛢️ ปริมาณน้ำมัน", formatVolumeLiters(state.summary.totalLiters, displaySettings), Modifier.weight(1f))
             }
         }
         item {
             MetricCard(
                 "เลขไมล์ล่าสุด",
-                state.summary.latestOdometerKm?.let { "${number.format(it)} กม." } ?: "ยังไม่มีข้อมูล",
+                state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: "ยังไม่มีข้อมูล",
                 Modifier.fillMaxWidth(),
             )
         }
@@ -420,23 +446,23 @@ private fun Dashboard(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("รายงาน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("📊 รายงานสรุป", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
-                            "ค่าใช้จ่ายรวม",
-                            thaiCurrency.format(operatingCost),
+                            "ค่าใช้จ่ายรวมทั้งหมด",
+                            formatCurrencyAmount(operatingCost, displaySettings),
                             Modifier.weight(1f),
                         )
                         MetricCard(
                             "สุทธิหลังรายรับ",
-                            thaiCurrency.format(operatingCost - state.totalIncome),
+                            formatCurrencyAmount(operatingCost - state.totalIncome, displaySettings),
                             Modifier.weight(1f),
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
                             "ระยะทางทริป",
-                            "${number.format(state.tripSummary.totalDistanceKm)} กม.",
+                            formatDistanceKm(state.tripSummary.totalDistanceKm, displaySettings),
                             Modifier.weight(1f),
                         )
                         MetricCard(
@@ -454,9 +480,16 @@ private fun Dashboard(
                 }
             }
         }
-        item { Text("รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-        if (state.entries.isEmpty()) item { EmptyFuelState() }
-        else items(state.entries.take(3), key = { it.id }) { FuelRow(it) }
+        item {
+            Spacer(Modifier.height(4.dp))
+            Text("⛽ รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
+        if (state.entries.isEmpty()) {
+            item { EmptyFuelState() }
+        } else {
+            val kmPerLiterByEntry = remember(state.entries) { calculatePerEntryKmPerLiter(state.entries) }
+            items(state.entries.take(3), key = { it.id }) { FuelRow(it, kmPerLiter = kmPerLiterByEntry[it.id]) }
+        }
     }
 }
 
@@ -478,13 +511,14 @@ private fun FuelList(
     onEdit: ((FuelEntry) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val kmPerLiterByEntry = remember(entries) { calculatePerEntryKmPerLiter(entries) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (entries.isEmpty()) item { EmptyFuelState() }
-        items(entries, key = { it.id }) { FuelRow(it, onDelete, onEdit) }
+        items(entries, key = { it.id }) { FuelRow(it, onDelete, onEdit, kmPerLiterByEntry[it.id]) }
     }
 }
 
@@ -724,6 +758,10 @@ private fun FuelRow(
     entry: FuelEntry,
     onDelete: ((String) -> Unit)? = null,
     onEdit: ((FuelEntry) -> Unit)? = null,
+    // Item A: distance-since-previous-fill-up / liters for this specific fill-up, from
+    // calculatePerEntryKmPerLiter() (domain/FuelSummary.kt) — the same formula the dashboard's
+    // overall average uses, just keyed per entry instead of summed.
+    kmPerLiter: Double? = null,
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -731,8 +769,16 @@ private fun FuelRow(
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("⛽", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(entry.station.ifBlank { "เติมน้ำมัน" }, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(entry.station.ifBlank { "เติมน้ำมัน" }, fontWeight = FontWeight.SemiBold)
+                        if (!entry.photoUri.isNullOrBlank()) {
+                            Spacer(Modifier.width(4.dp))
+                            Text("🖼️", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                     Text("${entry.date} • ${number.format(entry.odometerKm)} กม.", style = MaterialTheme.typography.bodySmall)
                 }
                 Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
@@ -743,9 +789,102 @@ private fun FuelRow(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("${number.format(entry.liters)} ลิตร • ${number.format(entry.pricePerLiter)}/ลิตร", modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("${number.format(entry.liters)} ลิตร • ${number.format(entry.pricePerLiter)}/ลิตร")
+                    kmPerLiter?.let { Text("${number.format(it)} กม./ลิตร", style = MaterialTheme.typography.labelSmall) }
+                }
                 if (entry.fullTank) Text("เต็มถัง", color = MaterialTheme.colorScheme.secondary)
                 onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text("ลบ") } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisplaySettingsCard(
+    settings: DisplaySettings,
+    onChange: (DisplaySettings) -> Unit,
+) {
+    var currencyMenuExpanded by remember { mutableStateOf(false) }
+    val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == settings.currency } ?: CURRENCY_OPTIONS[0]
+
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("การตั้งค่าการแสดงผล", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            Text("สกุลเงิน", style = MaterialTheme.typography.labelLarge)
+            Box {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { currencyMenuExpanded = true },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(currencyOption.label, modifier = Modifier.weight(1f))
+                    Text("▾")
+                }
+                DropdownMenu(
+                    expanded = currencyMenuExpanded,
+                    onDismissRequest = { currencyMenuExpanded = false },
+                ) {
+                    CURRENCY_OPTIONS.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.label) },
+                            onClick = {
+                                onChange(settings.copy(currency = option.code))
+                                currencyMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            Text("จำนวนทศนิยม", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (0..3).forEach { d ->
+                    if (settings.decimals == d) {
+                        Button(onClick = { onChange(settings.copy(decimals = d)) }) { Text("$d") }
+                    } else {
+                        TextButton(onClick = { onChange(settings.copy(decimals = d)) }) { Text("$d") }
+                    }
+                }
+            }
+
+            HorizontalDivider()
+            Text("ระยะทาง", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("km" to "กิโลเมตร (กม.)", "mi" to "ไมล์ (mi)").forEach { (value, label) ->
+                    if (settings.distanceUnit == value) {
+                        Button(onClick = { onChange(settings.copy(distanceUnit = value)) }) { Text(label) }
+                    } else {
+                        TextButton(onClick = { onChange(settings.copy(distanceUnit = value)) }) { Text(label) }
+                    }
+                }
+            }
+
+            Text("ปริมาตรน้ำมัน", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("liters" to "ลิตร (L)", "gal" to "แกลลอน (US gal)").forEach { (value, label) ->
+                    if (settings.volumeUnit == value) {
+                        Button(onClick = { onChange(settings.copy(volumeUnit = value)) }) { Text(label) }
+                    } else {
+                        TextButton(onClick = { onChange(settings.copy(volumeUnit = value)) }) { Text(label) }
+                    }
+                }
+            }
+            Text(
+                "ข้อมูลยังเก็บเป็นกิโลเมตร/ลิตรเสมอ แค่แสดงผลตามหน่วยที่เลือก เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            HorizontalDivider()
+            Text("ธีม", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("light" to "สว่าง", "dark" to "มืด", "system" to "ตามระบบ").forEach { (value, label) ->
+                    if (settings.themeMode == value) {
+                        Button(onClick = { onChange(settings.copy(themeMode = value)) }) { Text(label) }
+                    } else {
+                        TextButton(onClick = { onChange(settings.copy(themeMode = value)) }) { Text(label) }
+                    }
+                }
             }
         }
     }
@@ -770,6 +909,8 @@ private fun VehicleList(
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    displaySettings: DisplaySettings = DisplaySettings(),
+    onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -777,6 +918,12 @@ private fun VehicleList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            DisplaySettingsCard(
+                settings = displaySettings,
+                onChange = onDisplaySettingsChange,
+            )
+        }
         if (cloudState.uid != null && selectedVehicleId != null && (onCreateInvite != null || onJoinByCode != null)) {
             item {
                 VehicleSharingCard(
@@ -1081,9 +1228,10 @@ private fun AddFuelDialog(
     editing: FuelEntry? = null,
     stationSuggestions: List<String> = emptyList(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, Double, Double, Double, Boolean, String, () -> Unit) -> Unit)? = null,
+    onSave: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
+    onUpdate: ((String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
@@ -1098,6 +1246,7 @@ private fun AddFuelDialog(
     var nearbyStations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
     val stationOptions = (nearbyStations.map { it.name } + stationSuggestions).distinct()
         .filter { station.isBlank() || it.contains(station, ignoreCase = true) }
     AlertDialog(
@@ -1155,6 +1304,19 @@ private fun AddFuelDialog(
                         Text("เติมเต็มถัง")
                     }
                 }
+                if (onPickPhoto != null) {
+                    item {
+                        PhotoAttachmentRow(
+                            photoUris = photoUris,
+                            onPick = {
+                                onPickPhoto { picked, _ ->
+                                    photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                                }
+                            },
+                            onRemove = { uri -> photoUris = photoUris - uri },
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1164,10 +1326,11 @@ private fun AddFuelDialog(
                     val odometerValue = odometer.toDoubleOrNull() ?: 0.0
                     val litersValue = liters.toDoubleOrNull() ?: 0.0
                     val priceValue = price.toDoubleOrNull() ?: 0.0
+                    val photoUri = PhotoUris.join(photoUris)
                     if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, date, time, odometerValue, litersValue, priceValue, fullTank, station, onDismiss)
+                        onUpdate(editing.id, date, time, odometerValue, litersValue, priceValue, fullTank, station, photoUri, onDismiss)
                     } else {
-                        onSave(date, time, odometerValue, litersValue, priceValue, fullTank, station, onDismiss)
+                        onSave(date, time, odometerValue, litersValue, priceValue, fullTank, station, photoUri, onDismiss)
                     }
                 },
             ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
@@ -1176,17 +1339,57 @@ private fun AddFuelDialog(
     )
 }
 
+// Item C (multi-photo): shows up to MAX_PHOTOS thumbnails of attached receipts/photos (each
+// decoded from its local file path), each individually removable, plus a pick button that's
+// hidden once the cap is reached. Ported from V8's per-record photo attachment UI (app.js
+// loadExistingLogPhotos()/photo-pick buttons), extended from the original single-photo version.
+private const val MAX_PHOTOS = 3
+
+@Composable
+private fun PhotoAttachmentRow(
+    photoUris: List<String>,
+    onPick: () -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        photoUris.forEach { uri ->
+            val bitmap = remember(uri) {
+                runCatching { BitmapFactory.decodeFile(uri) }.getOrNull()
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "รูปที่แนบ",
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+                TextButton(onClick = { onRemove(uri) }) { Text("ลบ") }
+            }
+        }
+        if (photoUris.size < MAX_PHOTOS) {
+            TextButton(onClick = onPick) {
+                Text(if (photoUris.isEmpty()) "📷 แนบรูป/ใบเสร็จ" else "📷 เพิ่มรูป")
+            }
+        }
+    }
+}
+
 @Composable
 private fun AddExpenseDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: Expense? = null,
     categorySuggestions: List<String> = emptyList(),
+    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, String, Double, Double?, Boolean, Boolean, String?, () -> Unit) -> Unit)? = null,
+    onSave: (String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onUpdate: ((String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
     var category by remember { mutableStateOf(editing?.category ?: "บำรุงรักษา") }
     var description by remember { mutableStateOf(editing?.description ?: "") }
     var amount by remember { mutableStateOf(editing?.amount?.let { "%.2f".format(Locale.US, it) } ?: "") }
@@ -1230,6 +1433,22 @@ private fun AddExpenseDialog(
                     label = { Text("วันเตือนชำระ (ไม่บังคับ)") },
                     singleLine = true,
                 )
+                if (onPickPhoto != null) {
+                    PhotoAttachmentRow(
+                        photoUris = photoUris,
+                        onPick = {
+                            onPickPhoto { picked, extractedAmount ->
+                                photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                                // Item 3: mirrors V8's OCR auto-fill (autoOcrEnabled) — only
+                                // pre-fills the amount field if the user hasn't typed one yet.
+                                if (amount.isBlank() && extractedAmount != null) {
+                                    amount = "%.2f".format(Locale.US, extractedAmount)
+                                }
+                            }
+                        },
+                        onRemove = { uri -> photoUris = photoUris - uri },
+                    )
+                }
             }
         },
         confirmButton = {
@@ -1239,10 +1458,11 @@ private fun AddExpenseDialog(
                     val amountValue = amount.toDoubleOrNull() ?: 0.0
                     val odometerValue = odometer.toDoubleOrNull()
                     val reminderValue = reminderDate.takeIf(String::isNotBlank)
+                    val photoUri = PhotoUris.join(photoUris)
                     if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, date, category, description, amountValue, odometerValue, income, recurring, reminderValue, onDismiss)
+                        onUpdate(editing.id, date, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
                     } else {
-                        onSave(date, category, description, amountValue, odometerValue, income, recurring, reminderValue, onDismiss)
+                        onSave(date, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
                     }
                 },
             ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }

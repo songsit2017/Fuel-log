@@ -2,6 +2,7 @@ package com.songsit.fuellogpro.data
 
 import com.songsit.fuellogpro.data.local.FuelEntryDao
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
+import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -26,6 +27,7 @@ class LocalFuelRepository(
         pricePerLiter: Double,
         fullTank: Boolean,
         station: String,
+        photoUri: String? = null,
     ) {
         dao.upsert(
             FuelEntryEntity(
@@ -40,6 +42,7 @@ class LocalFuelRepository(
                 fullTank = fullTank,
                 station = station.trim(),
                 createdAt = System.currentTimeMillis(),
+                photoUri = photoUri,
             ),
         )
     }
@@ -54,6 +57,7 @@ class LocalFuelRepository(
         pricePerLiter: Double,
         fullTank: Boolean,
         station: String,
+        photoUri: String? = null,
     ) {
         val existing = dao.getById(id)
         dao.upsert(
@@ -69,6 +73,7 @@ class LocalFuelRepository(
                 fullTank = fullTank,
                 station = station.trim(),
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                photoUri = photoUri ?: existing?.photoUri,
             ),
         )
     }
@@ -94,4 +99,6 @@ private fun FuelEntryEntity.toDomain() = FuelEntry(
     amount = amount,
     fullTank = fullTank,
     station = station,
+    photoUri = photoUri,
+    photoUrls = PhotoUris.split(photoUri),
 )

@@ -9,9 +9,11 @@ data class FuelSummary(
     val averageKmPerLiter: Double?,
 )
 
+private fun orderedFullTankEntries(entries: List<FuelEntry>): List<FuelEntry> =
+    entries.sortedWith(compareBy<FuelEntry>({ it.date }, { it.time }, { it.odometerKm })).filter { it.fullTank }
+
 fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
-    val ordered = entries.sortedWith(compareBy<FuelEntry>({ it.date }, { it.time }, { it.odometerKm }))
-    val fullEntries = ordered.filter { it.fullTank }
+    val fullEntries = orderedFullTankEntries(entries)
     var distance = 0.0
     var liters = 0.0
     for (index in 1 until fullEntries.size) {
@@ -29,4 +31,24 @@ fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
         latestOdometerKm = entries.maxOfOrNull { it.odometerKm },
         averageKmPerLiter = if (liters > 0) distance / liters else null,
     )
+}
+
+/**
+ * Item A (per-entry km/L): keyed by fill-up id instead of summed across all fill-ups, using
+ * the exact same "distance since previous full-tank fill-up / liters of the current fill-up"
+ * formula calculateFuelSummary() aggregates above — so a fuel-list row can show its own figure
+ * without reimplementing the math.
+ */
+fun calculatePerEntryKmPerLiter(entries: List<FuelEntry>): Map<String, Double> {
+    val fullEntries = orderedFullTankEntries(entries)
+    val result = mutableMapOf<String, Double>()
+    for (index in 1 until fullEntries.size) {
+        val previous = fullEntries[index - 1]
+        val current = fullEntries[index]
+        val intervalDistance = current.odometerKm - previous.odometerKm
+        if (intervalDistance > 0 && current.liters > 0) {
+            result[current.id] = intervalDistance / current.liters
+        }
+    }
+    return result
 }

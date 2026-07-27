@@ -16,4 +16,5 @@ data class FuelEntryEntity(
     val fullTank: Boolean,
     val station: String,
     val createdAt: Long,
+    val photoUri: String? = null,
 )

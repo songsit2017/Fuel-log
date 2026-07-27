@@ -7,7 +7,7 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/fuellog_launcher"
-        android:label="FuelLog Pro Native Preview"
+        android:label="FuelLog Pro"
         android:roundIcon="@mipmap/fuellog_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FuelLogPro">

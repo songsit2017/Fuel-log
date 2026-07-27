@@ -188,6 +188,7 @@ class NativeAppViewModel(
         pricePerLiter: Double,
         fullTank: Boolean,
         station: String,
+        photoUri: String? = null,
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.selectedVehicle?.id
@@ -212,6 +213,7 @@ class NativeAppViewModel(
                     pricePerLiter = pricePerLiter,
                     fullTank = fullTank,
                     station = station,
+                    photoUri = photoUri,
                 )
             }.onSuccess {
                 onReminderDataChanged()
@@ -231,6 +233,7 @@ class NativeAppViewModel(
         pricePerLiter: Double,
         fullTank: Boolean,
         station: String,
+        photoUri: String? = null,
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.entries.firstOrNull { it.id == id }?.vehicleId
@@ -247,7 +250,7 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                fuelRepository.update(id, vehicleId, date, time, odometerKm, liters, pricePerLiter, fullTank, station)
+                fuelRepository.update(id, vehicleId, date, time, odometerKm, liters, pricePerLiter, fullTank, station, photoUri)
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()
@@ -273,6 +276,7 @@ class NativeAppViewModel(
         income: Boolean,
         recurring: Boolean,
         reminderDate: String?,
+        photoUri: String? = null,
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.selectedVehicle?.id
@@ -298,6 +302,7 @@ class NativeAppViewModel(
                     income,
                     recurring,
                     reminderDate,
+                    photoUri,
                 )
             }.onSuccess {
                 onReminderDataChanged()
@@ -318,6 +323,7 @@ class NativeAppViewModel(
         income: Boolean,
         recurring: Boolean,
         reminderDate: String?,
+        photoUri: String? = null,
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.expenses.firstOrNull { it.id == id }?.vehicleId
@@ -334,7 +340,7 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                expenseRepository.update(id, vehicleId, date, category, description, amount, odometerKm, income, recurring, reminderDate)
+                expenseRepository.update(id, vehicleId, date, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri)
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()

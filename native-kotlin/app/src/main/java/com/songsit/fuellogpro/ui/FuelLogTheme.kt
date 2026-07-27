@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -21,10 +22,19 @@ private val DarkColors = darkColorScheme(
     surfaceContainer = Color(0xFF1C1D21),
 )
 
+/**
+ * [themeMode] mirrors the web app's theme setting: "light", "dark", or "system" (follow the
+ * device setting). Any other/unknown value falls back to "system".
+ */
 @Composable
-fun FuelLogTheme(content: @Composable () -> Unit) {
+fun FuelLogTheme(themeMode: String = "system", content: @Composable () -> Unit) {
+    val useDark = when (themeMode) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
     MaterialTheme(
-        colorScheme = LightColors,
+        colorScheme = if (useDark) DarkColors else LightColors,
         content = content,
     )
 }

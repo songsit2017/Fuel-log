@@ -21,6 +21,7 @@ import com.songsit.fuellogpro.data.LocalCsvExportRepository
 import com.songsit.fuellogpro.data.FuelioImportRepository
 import com.songsit.fuellogpro.data.NearbyStationRepository
 import com.songsit.fuellogpro.data.OilPriceRepository
+import com.songsit.fuellogpro.data.OcrRepository
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
 import com.songsit.fuellogpro.data.firebase.VehicleSharingRepository
 import com.songsit.fuellogpro.data.firebase.VehicleMember
@@ -33,6 +34,8 @@ import com.songsit.fuellogpro.ui.CloudUiState
 import com.songsit.fuellogpro.notifications.MaintenanceReminderWorker
 import com.songsit.fuellogpro.notifications.NotificationPreferences
 import com.songsit.fuellogpro.notifications.ReminderSettings
+import com.songsit.fuellogpro.settings.DisplayPreferences
+import com.songsit.fuellogpro.settings.DisplaySettings
 import android.widget.Toast
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -47,6 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 
+// Item C (multi-photo): cap matches PhotoAttachmentRow's MAX_PHOTOS in ui/FuelLogApp.kt.
+private const val MAX_PICK_PHOTOS = 3
+
 class MainActivity : ComponentActivity() {
     private lateinit var backupRepository: LocalBackupRepository
     private lateinit var csvExportRepository: LocalCsvExportRepository
@@ -59,6 +65,43 @@ class MainActivity : ComponentActivity() {
     // result/error callbacks and re-run the location lookup once permission is granted.
     private var pendingNearbyResult: ((List<com.songsit.fuellogpro.data.NearbyStation>) -> Unit)? = null
     private var pendingNearbyError: ((String) -> Unit)? = null
+
+    // Item 2/3/C (photo attachment + OCR + multi-photo): each picked image is copied into
+    // app-private storage (context.filesDir/photos) so it survives even if the source
+    // content:// URI's permission grant is later revoked, then the first picked photo is run
+    // through on-device OCR to try to pre-fill an amount. PickMultipleVisualMedia (a stable,
+    // non-experimental androidx.activity contract, available since minSdk 26 here) lets the
+    // user pick up to MAX_PICK_PHOTOS at once instead of one at a time.
+    private var pendingPhotoResult: ((uris: List<String>, extractedAmount: Double?) -> Unit)? = null
+    private val ocrRepository = OcrRepository()
+    private val pickPhoto = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK_PHOTOS),
+    ) { uris ->
+        val onPicked = pendingPhotoResult
+        pendingPhotoResult = null
+        if (uris.isEmpty() || onPicked == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            runCatching {
+                val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+                uris.map { uri ->
+                    val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    } ?: error("ไม่สามารถเปิดไฟล์รูปได้")
+                    destFile.absolutePath
+                }
+            }.onSuccess { paths ->
+                lifecycleScope.launch {
+                    val amount = paths.firstOrNull()?.let { path ->
+                        runCatching { ocrRepository.extractAmount(path) }.getOrNull()
+                    }
+                    onPicked(paths, amount)
+                }
+            }.onFailure {
+                Toast.makeText(this@MainActivity, it.message ?: "แนบรูปไม่สำเร็จ", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     private val locationPermission = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
@@ -152,6 +195,7 @@ class MainActivity : ComponentActivity() {
         }
         val database = FuelLogDatabase.get(this)
         val notificationPreferences = NotificationPreferences(this)
+        val displayPreferences = DisplayPreferences(this)
         backupRepository = LocalBackupRepository(database)
         csvExportRepository = LocalCsvExportRepository(database)
         fuelioImportRepository = FuelioImportRepository(database)
@@ -176,6 +220,7 @@ class MainActivity : ComponentActivity() {
             }
             val composeScope = rememberCoroutineScope()
             var reminderSettings by remember { mutableStateOf(notificationPreferences.load()) }
+            var displaySettings by remember { mutableStateOf(displayPreferences.load()) }
             val syncConflicts by database.syncConflictDao().observeAll().collectAsState(emptyList())
             var oilPriceSummary by remember { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
@@ -239,6 +284,11 @@ class MainActivity : ComponentActivity() {
                     notificationPreferences.save(settings)
                     MaintenanceReminderWorker.refresh(applicationContext)
                 },
+                displaySettings = displaySettings,
+                onDisplaySettingsChange = { settings: DisplaySettings ->
+                    displaySettings = settings
+                    displayPreferences.save(settings)
+                },
                 onExportBackup = {
                     createBackup.launch("FuelLog-Native-${LocalDate.now()}.json")
                 },
@@ -256,6 +306,14 @@ class MainActivity : ComponentActivity() {
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
                         )
                     }
+                },
+                onPickPhoto = { onPicked ->
+                    pendingPhotoResult = onPicked
+                    pickPhoto.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        ),
+                    )
                 },
                 oilPriceSummary = oilPriceSummary,
                 vehicleMembers = vehicleMembers,

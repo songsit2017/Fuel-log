@@ -2,6 +2,7 @@ package com.songsit.fuellogpro.data
 
 import com.songsit.fuellogpro.data.local.ExpenseDao
 import com.songsit.fuellogpro.data.local.ExpenseEntity
+import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.domain.model.Expense
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -27,6 +28,7 @@ class LocalExpenseRepository(
         income: Boolean,
         recurring: Boolean,
         reminderDate: String?,
+        photoUri: String? = null,
     ) {
         dao.upsert(
             ExpenseEntity(
@@ -41,6 +43,7 @@ class LocalExpenseRepository(
                 recurring = recurring,
                 reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = System.currentTimeMillis(),
+                photoUri = photoUri,
             ),
         )
     }
@@ -56,6 +59,7 @@ class LocalExpenseRepository(
         income: Boolean,
         recurring: Boolean,
         reminderDate: String?,
+        photoUri: String? = null,
     ) {
         val existing = dao.getById(id)
         dao.upsert(
@@ -71,6 +75,7 @@ class LocalExpenseRepository(
                 recurring = recurring,
                 reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                photoUri = photoUri ?: existing?.photoUri,
             ),
         )
     }
@@ -95,4 +100,6 @@ private fun ExpenseEntity.toDomain() = Expense(
     income = income,
     recurring = recurring,
     reminderDate = reminderDate,
+    photoUri = photoUri,
+    photoUrls = PhotoUris.split(photoUri),
 )

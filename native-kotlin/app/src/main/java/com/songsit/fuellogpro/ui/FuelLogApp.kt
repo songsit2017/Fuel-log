@@ -252,6 +252,7 @@ fun FuelLogApp(
     var editingVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showVehicleMenu by remember { mutableStateOf(false) }
+    var dashboardFabExpanded by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
@@ -380,16 +381,30 @@ fun FuelLogApp(
                             }
                         }
                     },
-                    actions = {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(Icons.Filled.Settings, contentDescription = "ตั้งค่า")
-                        }
-                    },
                 )
             },
             floatingActionButton = {
                 when (tab) {
-                    0, 1 -> FloatingActionButton(
+                    0 -> Box {
+                        FloatingActionButton(
+                            onClick = {
+                                if (state.vehicles.isEmpty()) showAddVehicle = true else dashboardFabExpanded = true
+                            },
+                        ) { Text("+") }
+                        DropdownMenu(expanded = dashboardFabExpanded, onDismissRequest = { dashboardFabExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("เพิ่มการเติมน้ำมัน") },
+                                leadingIcon = { Icon(Icons.Filled.LocalGasStation, contentDescription = null) },
+                                onClick = { dashboardFabExpanded = false; showAddFuel = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("เพิ่มค่าใช้จ่าย") },
+                                leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
+                                onClick = { dashboardFabExpanded = false; showAddExpense = true },
+                            )
+                        }
+                    }
+                    1 -> FloatingActionButton(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddFuel = true },
                     ) { Text("+") }
                     2 -> FloatingActionButton(

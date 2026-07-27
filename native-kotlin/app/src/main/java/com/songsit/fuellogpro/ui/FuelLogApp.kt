@@ -58,8 +58,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -388,27 +386,6 @@ fun FuelLogApp(
                         }
                     },
                 )
-            },
-            bottomBar = {
-                NavigationBar {
-                    val tabIcons = listOf(
-                        Icons.Filled.Home,
-                        Icons.Filled.LocalGasStation,
-                        Icons.Filled.ReceiptLong,
-                        Icons.Filled.Build,
-                        Icons.Filled.DirectionsCar,
-                        Icons.Filled.BarChart,
-                        Icons.Filled.History,
-                    )
-                    listOf("หน้าหลัก", "น้ำมัน", "บันทึกค่าใช้จ่าย", "ดูแลรถ", "รถ", "สถิติ", "ไทม์ไลน์").forEachIndexed { index, label ->
-                        NavigationBarItem(
-                            selected = tab == index,
-                            onClick = { tab = index },
-                            icon = { Icon(tabIcons[index], contentDescription = label) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
             },
             floatingActionButton = {
                 when (tab) {
@@ -943,7 +920,7 @@ private fun ExpenseRow(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "${if (expense.income) "+" else "−"}${thaiCurrency.format(expense.amount)}",
+                    "${if (expense.income) "+" else ""}${thaiCurrency.format(kotlin.math.abs(expense.amount))}",
                     fontWeight = FontWeight.Bold,
                     color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                 )

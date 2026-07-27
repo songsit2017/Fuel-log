@@ -119,7 +119,7 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 
 private val fuelTypeOptions = listOf(
-    "แก๊สโซฮอล์ 91", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ E20", "แก๊สโซฮอล์ E85", "ดีเซล B7", "ดีเซล B20", "เบนซิน",
+    "เบนซิน", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ 91", "E20", "E85", "ดีเซล", "ดีเซล B7", "ดีเซล B20", "LPG", "NGV", "EV",
 )
 
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
@@ -412,6 +412,7 @@ fun FuelLogApp(
                 saving = state.saving,
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingFuel,
+                vehicleFuelType = state.selectedVehicle?.fuelType ?: "",
                 onFindNearbyStations = onFindNearbyStations,
                 onPickPhoto = onPickPhoto,
                 onPickCameraPhoto = onPickCameraPhoto,
@@ -1534,9 +1535,15 @@ private fun SimplePage(title: String, body: String, modifier: Modifier = Modifie
 // Read-only OutlinedTextField + manual DropdownMenu (not ExposedDropdownMenuBox — that combo
 // broke the build once before in this project) for the unit pickers below.
 @Composable
-private fun UnitDropdownField(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
+private fun UnitDropdownField(
+    label: String,
+    value: String,
+    options: List<String>,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    onSelect: (String) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth()) {
+    Box(modifier) {
         OutlinedTextField(
             value = value,
             onValueChange = {},
@@ -1674,7 +1681,7 @@ private fun VehicleEditScreen(
             item { UnitDropdownField("หน่วยปริมาตร", volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
             item { UnitDropdownField("หน่วยอัตราการใช้งาน", consumptionUnit, listOf("km/l", "l/100km", "mpg")) { consumptionUnit = it } }
             item { Text("ชนิดเชื้อเพลิง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            item { OutlinedTextField(fuelType, { fuelType = it }, label = { Text("ชนิดเชื้อเพลิง") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { UnitDropdownField("ชนิดเชื้อเพลิง", fuelType, fuelTypeOptions) { fuelType = it } }
             item {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -1718,6 +1725,7 @@ private fun AddFuelDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: FuelEntry? = null,
+    vehicleFuelType: String = "",
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
@@ -1742,8 +1750,7 @@ private fun AddFuelDialog(
                 },
         )
     }
-    var fuelType by remember { mutableStateOf("") }
-    var fuelTypeMenuExpanded by remember { mutableStateOf(false) }
+    var fuelType by remember { mutableStateOf(vehicleFuelType.ifBlank { "เบนซิน" }) }
     val onLitersChange: (String) -> Unit = { value ->
         liters = value
         val l = value.toDoubleOrNull()
@@ -1853,15 +1860,12 @@ private fun AddFuelDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
-                        AutocompleteTextField(
-                            value = fuelType,
-                            onValueChange = { fuelType = it },
-                            label = "ชนิดเชื้อเพลิง",
-                            options = fuelTypeOptions,
-                            expanded = fuelTypeMenuExpanded,
-                            onExpandedChange = { fuelTypeMenuExpanded = it },
+                        UnitDropdownField(
+                            "ชนิดเชื้อเพลิง",
+                            fuelType,
+                            fuelTypeOptions,
                             modifier = Modifier.weight(1f),
-                        )
+                        ) { fuelType = it }
                     }
                 }
                 item {

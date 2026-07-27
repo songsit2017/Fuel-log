@@ -42,6 +42,36 @@ class LocalTripRepository(
         )
     }
 
+    suspend fun update(
+        id: String,
+        vehicleId: String,
+        name: String,
+        date: String,
+        distanceKm: Double,
+        fuelCost: Double,
+        tollCost: Double,
+        parkingCost: Double,
+        foodCost: Double,
+        otherCost: Double,
+    ) {
+        val existing = dao.getById(id)
+        dao.upsert(
+            TripEntity(
+                id = id,
+                vehicleId = vehicleId,
+                name = name.trim(),
+                date = date,
+                distanceKm = distanceKm,
+                fuelCost = fuelCost,
+                tollCost = tollCost,
+                parkingCost = parkingCost,
+                foodCost = foodCost,
+                otherCost = otherCost,
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            ),
+        )
+    }
+
     suspend fun delete(id: String) = deletionRecorder.delete(
         collectionName = "trips",
         recordId = id,

@@ -14,6 +14,9 @@ class LocalExpenseRepository(
     fun observe(vehicleId: String): Flow<List<Expense>> =
         dao.observeForVehicle(vehicleId).map { expenses -> expenses.map(ExpenseEntity::toDomain) }
 
+    fun observeCategorySuggestions(vehicleId: String): Flow<List<String>> =
+        dao.observeDistinctCategories(vehicleId)
+
     suspend fun add(
         vehicleId: String,
         date: String,
@@ -38,6 +41,36 @@ class LocalExpenseRepository(
                 recurring = recurring,
                 reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun update(
+        id: String,
+        vehicleId: String,
+        date: String,
+        category: String,
+        description: String,
+        amount: Double,
+        odometerKm: Double?,
+        income: Boolean,
+        recurring: Boolean,
+        reminderDate: String?,
+    ) {
+        val existing = dao.getById(id)
+        dao.upsert(
+            ExpenseEntity(
+                id = id,
+                vehicleId = vehicleId,
+                date = date,
+                category = category.trim(),
+                description = description.trim(),
+                amount = amount,
+                odometerKm = odometerKm,
+                income = income,
+                recurring = recurring,
+                reminderDate = reminderDate?.takeIf(String::isNotBlank),
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             ),
         )
     }

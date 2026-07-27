@@ -77,6 +77,8 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("androidx.core:core-ktx:1.15.0")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

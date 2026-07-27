@@ -16,6 +16,9 @@ interface FuelEntryDao {
     @Query("SELECT * FROM fuel_entries WHERE id = :id")
     suspend fun getById(id: String): FuelEntryEntity?
 
+    @Query("SELECT DISTINCT station FROM fuel_entries WHERE vehicleId = :vehicleId AND station != '' ORDER BY createdAt DESC")
+    fun observeDistinctStations(vehicleId: String): Flow<List<String>>
+
     @Upsert
     suspend fun upsert(entry: FuelEntryEntity)
 

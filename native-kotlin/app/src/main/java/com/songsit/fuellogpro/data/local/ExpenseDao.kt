@@ -19,6 +19,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getById(id: String): ExpenseEntity?
 
+    @Query("SELECT DISTINCT category FROM expenses WHERE vehicleId = :vehicleId AND category != '' ORDER BY createdAt DESC")
+    fun observeDistinctCategories(vehicleId: String): Flow<List<String>>
+
     @Upsert
     suspend fun upsert(expense: ExpenseEntity)
 

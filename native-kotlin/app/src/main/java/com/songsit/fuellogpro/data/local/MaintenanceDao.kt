@@ -19,6 +19,9 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance_tasks WHERE id = :id")
     suspend fun getById(id: String): MaintenanceEntity?
 
+    @Query("SELECT DISTINCT category FROM maintenance_tasks WHERE vehicleId = :vehicleId AND category != '' ORDER BY createdAt DESC")
+    fun observeDistinctCategories(vehicleId: String): Flow<List<String>>
+
     @Upsert
     suspend fun upsert(task: MaintenanceEntity)
 

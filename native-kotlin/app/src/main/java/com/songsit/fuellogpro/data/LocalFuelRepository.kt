@@ -14,6 +14,9 @@ class LocalFuelRepository(
     fun observe(vehicleId: String): Flow<List<FuelEntry>> =
         dao.observeForVehicle(vehicleId).map { entries -> entries.map(FuelEntryEntity::toDomain) }
 
+    fun observeStationSuggestions(vehicleId: String): Flow<List<String>> =
+        dao.observeDistinctStations(vehicleId)
+
     suspend fun add(
         vehicleId: String,
         date: String,
@@ -37,6 +40,35 @@ class LocalFuelRepository(
                 fullTank = fullTank,
                 station = station.trim(),
                 createdAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun update(
+        id: String,
+        vehicleId: String,
+        date: String,
+        time: String,
+        odometerKm: Double,
+        liters: Double,
+        pricePerLiter: Double,
+        fullTank: Boolean,
+        station: String,
+    ) {
+        val existing = dao.getById(id)
+        dao.upsert(
+            FuelEntryEntity(
+                id = id,
+                vehicleId = vehicleId,
+                date = date,
+                time = time,
+                odometerKm = odometerKm,
+                liters = liters,
+                pricePerLiter = pricePerLiter,
+                amount = liters * pricePerLiter,
+                fullTank = fullTank,
+                station = station.trim(),
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             ),
         )
     }

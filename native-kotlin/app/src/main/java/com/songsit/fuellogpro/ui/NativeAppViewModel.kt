@@ -35,6 +35,9 @@ data class NativeAppState(
     val maintenanceTasks: List<MaintenanceTask> = emptyList(),
     val trips: List<Trip> = emptyList(),
     val summary: FuelSummary = calculateFuelSummary(emptyList()),
+    val stationSuggestions: List<String> = emptyList(),
+    val expenseCategorySuggestions: List<String> = emptyList(),
+    val maintenanceCategorySuggestions: List<String> = emptyList(),
     val saving: Boolean = false,
     val errorMessage: String? = null,
 ) {
@@ -55,6 +58,12 @@ private data class VehicleRecords(
     val expenses: List<Expense>,
     val maintenanceTasks: List<MaintenanceTask>,
     val trips: List<Trip>,
+)
+
+private data class Suggestions(
+    val stations: List<String>,
+    val expenseCategories: List<String>,
+    val maintenanceCategories: List<String>,
 )
 
 class NativeAppViewModel(
@@ -86,14 +95,37 @@ class NativeAppViewModel(
             fuelEntries, vehicleExpenses, tasks, vehicleTrips ->
         VehicleRecords(fuelEntries, vehicleExpenses, tasks, vehicleTrips)
     }
+    private val stationSuggestions = selectedVehicleId.flatMapLatest { vehicleId ->
+        vehicleId?.let(fuelRepository::observeStationSuggestions) ?: flowOf(emptyList())
+    }
+    private val expenseCategorySuggestions = selectedVehicleId.flatMapLatest { vehicleId ->
+        vehicleId?.let(expenseRepository::observeCategorySuggestions) ?: flowOf(emptyList())
+    }
+    private val maintenanceCategorySuggestions = selectedVehicleId.flatMapLatest { vehicleId ->
+        vehicleId?.let(maintenanceRepository::observeCategorySuggestions) ?: flowOf(emptyList())
+    }
+    private val suggestions = combine(
+        stationSuggestions,
+        expenseCategorySuggestions,
+        maintenanceCategorySuggestions,
+    ) { stations, expenseCategories, maintenanceCategories ->
+        Suggestions(stations, expenseCategories, maintenanceCategories)
+    }
 
     val state: StateFlow<NativeAppState> = combine(
         vehicles,
         selectedVehicleId,
         records,
+        suggestions,
         saving,
         error,
-    ) { vehicleList, selectedId, recordsForVehicle, isSaving, message ->
+    ) { values ->
+        val vehicleList = values[0] as List<Vehicle>
+        val selectedId = values[1] as String?
+        val recordsForVehicle = values[2] as VehicleRecords
+        val suggestionsForVehicle = values[3] as Suggestions
+        val isSaving = values[4] as Boolean
+        val message = values[5] as String?
         val (fuelEntries, vehicleExpenses, tasks, vehicleTrips) = recordsForVehicle
         val validId = selectedId?.takeIf { id -> vehicleList.any { it.id == id } }
             ?: vehicleList.firstOrNull()?.id
@@ -106,6 +138,9 @@ class NativeAppViewModel(
             maintenanceTasks = if (validId == selectedId) tasks else emptyList(),
             trips = if (validId == selectedId) vehicleTrips else emptyList(),
             summary = calculateFuelSummary(if (validId == selectedId) fuelEntries else emptyList()),
+            stationSuggestions = if (validId == selectedId) suggestionsForVehicle.stations else emptyList(),
+            expenseCategorySuggestions = if (validId == selectedId) suggestionsForVehicle.expenseCategories else emptyList(),
+            maintenanceCategorySuggestions = if (validId == selectedId) suggestionsForVehicle.maintenanceCategories else emptyList(),
             saving = isSaving,
             errorMessage = message,
         )
@@ -187,6 +222,40 @@ class NativeAppViewModel(
         }
     }
 
+    fun updateFuel(
+        id: String,
+        date: String,
+        time: String,
+        odometerKm: Double,
+        liters: Double,
+        pricePerLiter: Double,
+        fullTank: Boolean,
+        station: String,
+        onSaved: () -> Unit,
+    ) {
+        val vehicleId = state.value.entries.firstOrNull { it.id == id }?.vehicleId
+            ?: state.value.selectedVehicle?.id
+        if (vehicleId == null) {
+            error.value = "ไม่พบรถสำหรับรายการนี้"
+            return
+        }
+        if (odometerKm <= 0 || liters <= 0 || pricePerLiter <= 0) {
+            error.value = "กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching {
+                fuelRepository.update(id, vehicleId, date, time, odometerKm, liters, pricePerLiter, fullTank, station)
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }.onFailure { error.value = it.message ?: "แก้ไขไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
     fun deleteFuel(id: String) {
         viewModelScope.launch {
             runCatching { fuelRepository.delete(id) }
@@ -239,6 +308,41 @@ class NativeAppViewModel(
         }
     }
 
+    fun updateExpense(
+        id: String,
+        date: String,
+        category: String,
+        description: String,
+        amount: Double,
+        odometerKm: Double?,
+        income: Boolean,
+        recurring: Boolean,
+        reminderDate: String?,
+        onSaved: () -> Unit,
+    ) {
+        val vehicleId = state.value.expenses.firstOrNull { it.id == id }?.vehicleId
+            ?: state.value.selectedVehicle?.id
+        if (vehicleId == null) {
+            error.value = "ไม่พบรถสำหรับรายการนี้"
+            return
+        }
+        if (amount <= 0 || category.isBlank()) {
+            error.value = "กรุณาระบุหมวดหมู่และจำนวนเงินให้ถูกต้อง"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching {
+                expenseRepository.update(id, vehicleId, date, category, description, amount, odometerKm, income, recurring, reminderDate)
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }.onFailure { error.value = it.message ?: "แก้ไขค่าใช้จ่ายไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
     fun deleteExpense(id: String) {
         viewModelScope.launch {
             runCatching { expenseRepository.delete(id) }
@@ -287,6 +391,52 @@ class NativeAppViewModel(
                 onSaved()
             }
                 .onFailure { error.value = it.message ?: "บันทึกรายการเตือนไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
+    fun updateMaintenance(
+        id: String,
+        name: String,
+        category: String,
+        nextDate: String?,
+        nextOdometerKm: Double?,
+        warningDays: Int,
+        warningOdometerKm: Double,
+        repeatMonths: Int?,
+        repeatOdometerKm: Double?,
+        onSaved: () -> Unit,
+    ) {
+        val vehicleId = state.value.maintenanceTasks.firstOrNull { it.id == id }?.vehicleId
+            ?: state.value.selectedVehicle?.id
+        if (vehicleId == null) {
+            error.value = "ไม่พบรถสำหรับรายการนี้"
+            return
+        }
+        if (name.isBlank() || (nextDate.isNullOrBlank() && nextOdometerKm == null)) {
+            error.value = "กรุณาระบุรายการและกำหนดวันที่หรือเลขไมล์"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching {
+                maintenanceRepository.update(
+                    id = id,
+                    vehicleId = vehicleId,
+                    name = name,
+                    category = category.ifBlank { "บำรุงรักษา" },
+                    nextDate = nextDate,
+                    nextOdometerKm = nextOdometerKm,
+                    warningDays = warningDays.coerceAtLeast(0),
+                    warningOdometerKm = warningOdometerKm.coerceAtLeast(0.0),
+                    repeatMonths = repeatMonths?.takeIf { it > 0 },
+                    repeatOdometerKm = repeatOdometerKm?.takeIf { it > 0 },
+                )
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }.onFailure { error.value = it.message ?: "แก้ไขรายการเตือนไม่สำเร็จ" }
             saving.value = false
         }
     }
@@ -344,6 +494,39 @@ class NativeAppViewModel(
                 )
             }.onSuccess { onSaved() }
                 .onFailure { error.value = it.message ?: "บันทึกทริปไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
+    fun updateTrip(
+        id: String,
+        name: String,
+        date: String,
+        distanceKm: Double,
+        fuelCost: Double,
+        tollCost: Double,
+        parkingCost: Double,
+        foodCost: Double,
+        otherCost: Double,
+        onSaved: () -> Unit,
+    ) {
+        val vehicleId = state.value.trips.firstOrNull { it.id == id }?.vehicleId
+            ?: state.value.selectedVehicle?.id
+        if (vehicleId == null) {
+            error.value = "ไม่พบรถสำหรับทริปนี้"
+            return
+        }
+        if (name.isBlank() || distanceKm < 0) {
+            error.value = "กรุณาระบุชื่อทริปและระยะทางให้ถูกต้อง"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching {
+                tripRepository.update(id, vehicleId, name, date, distanceKm, fuelCost, tollCost, parkingCost, foodCost, otherCost)
+            }.onSuccess { onSaved() }
+                .onFailure { error.value = it.message ?: "แก้ไขทริปไม่สำเร็จ" }
             saving.value = false
         }
     }

@@ -15,6 +15,9 @@ class LocalMaintenanceRepository(
     fun observe(vehicleId: String): Flow<List<MaintenanceTask>> =
         dao.observeForVehicle(vehicleId).map { tasks -> tasks.map(MaintenanceEntity::toDomain) }
 
+    fun observeCategorySuggestions(vehicleId: String): Flow<List<String>> =
+        dao.observeDistinctCategories(vehicleId)
+
     suspend fun add(
         vehicleId: String,
         name: String,
@@ -42,6 +45,39 @@ class LocalMaintenanceRepository(
                 referenceNumber = "",
                 note = "",
                 createdAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun update(
+        id: String,
+        vehicleId: String,
+        name: String,
+        category: String,
+        nextDate: String?,
+        nextOdometerKm: Double?,
+        warningDays: Int,
+        warningOdometerKm: Double,
+        repeatMonths: Int?,
+        repeatOdometerKm: Double?,
+    ) {
+        val existing = dao.getById(id)
+        dao.upsert(
+            MaintenanceEntity(
+                id = id,
+                vehicleId = vehicleId,
+                name = name.trim(),
+                category = category.trim(),
+                nextDate = nextDate?.takeIf(String::isNotBlank),
+                nextOdometerKm = nextOdometerKm,
+                warningDays = warningDays,
+                warningOdometerKm = warningOdometerKm,
+                repeatMonths = repeatMonths,
+                repeatOdometerKm = repeatOdometerKm,
+                provider = existing?.provider ?: "",
+                referenceNumber = existing?.referenceNumber ?: "",
+                note = existing?.note ?: "",
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             ),
         )
     }

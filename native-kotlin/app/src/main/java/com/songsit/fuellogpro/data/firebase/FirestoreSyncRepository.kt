@@ -40,22 +40,26 @@ class FirestoreSyncRepository(
         var conflicts = 0
 
         for ((id, local) in localVehicles) {
-            val cloud = cloudVehicles[id]
-            val equal = cloud?.let(::parseVehicle)?.let(::vehicleCanonical) == vehicleCanonical(local)
-            when (decideSync(localExists = true, cloudExists = cloud != null, contentEqual = equal)) {
-                SyncDecision.UPLOAD -> {
-                    firestore.collection("vehicles").document(id).set(
-                        vehicleCloudMap(local, uid, email, displayName),
-                        SetOptions.merge(),
-                    ).await()
-                    uploaded++
-                    clearConflict(VEHICLES_COLLECTION, id, id)
+            try {
+                val cloud = cloudVehicles[id]
+                val equal = cloud?.let(::parseVehicle)?.let(::vehicleCanonical) == vehicleCanonical(local)
+                when (decideSync(localExists = true, cloudExists = cloud != null, contentEqual = equal)) {
+                    SyncDecision.UPLOAD -> {
+                        firestore.collection("vehicles").document(id).set(
+                            vehicleCloudMap(local, uid, email, displayName),
+                            SetOptions.merge(),
+                        ).await()
+                        uploaded++
+                        clearConflict(VEHICLES_COLLECTION, id, id)
+                    }
+                    SyncDecision.CONFLICT -> {
+                        conflicts++
+                        recordConflict(id, VEHICLES_COLLECTION, id)
+                    }
+                    else -> clearConflict(VEHICLES_COLLECTION, id, id)
                 }
-                SyncDecision.CONFLICT -> {
-                    conflicts++
-                    recordConflict(id, VEHICLES_COLLECTION, id)
-                }
-                else -> clearConflict(VEHICLES_COLLECTION, id, id)
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle doc '$id' (${local.name}): ${e.message}", e)
             }
         }
         val cloudOnlyVehicles = cloudVehicles
@@ -70,61 +74,81 @@ class FirestoreSyncRepository(
 
         val vehicleIds = localVehicles.keys + cloudVehicles.keys
         for (vehicleId in vehicleIds) {
-            syncDeletionTombstones(vehicleId).also {
-                uploaded += it.uploaded
-                downloaded += it.downloaded
+            try {
+                syncDeletionTombstones(vehicleId).also {
+                    uploaded += it.uploaded
+                    downloaded += it.downloaded
+                }
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' collection '_deletions': ${e.message}", e)
             }
-            syncCollection(
-                vehicleId = vehicleId,
-                collection = "entries",
-                local = database.fuelEntryDao().getAll().filter { it.vehicleId == vehicleId },
-                idOf = FuelEntryEntity::id,
-                encode = ::fuelCloudMap,
-                decode = { parseFuel(vehicleId, it) },
-                upsert = { database.fuelEntryDao().upsertAll(it) },
-            ).also {
-                uploaded += it.uploaded
-                downloaded += it.downloaded
-                conflicts += it.conflicts
+            try {
+                syncCollection(
+                    vehicleId = vehicleId,
+                    collection = "entries",
+                    local = database.fuelEntryDao().getAll().filter { it.vehicleId == vehicleId },
+                    idOf = FuelEntryEntity::id,
+                    encode = ::fuelCloudMap,
+                    decode = { parseFuel(vehicleId, it) },
+                    upsert = { database.fuelEntryDao().upsertAll(it) },
+                ).also {
+                    uploaded += it.uploaded
+                    downloaded += it.downloaded
+                    conflicts += it.conflicts
+                }
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' collection 'entries': ${e.message}", e)
             }
-            syncCollection(
-                vehicleId = vehicleId,
-                collection = "expenses",
-                local = database.expenseDao().getAll().filter { it.vehicleId == vehicleId },
-                idOf = ExpenseEntity::id,
-                encode = ::expenseCloudMap,
-                decode = { parseExpense(vehicleId, it) },
-                upsert = { database.expenseDao().upsertAll(it) },
-            ).also {
-                uploaded += it.uploaded
-                downloaded += it.downloaded
-                conflicts += it.conflicts
+            try {
+                syncCollection(
+                    vehicleId = vehicleId,
+                    collection = "expenses",
+                    local = database.expenseDao().getAll().filter { it.vehicleId == vehicleId },
+                    idOf = ExpenseEntity::id,
+                    encode = ::expenseCloudMap,
+                    decode = { parseExpense(vehicleId, it) },
+                    upsert = { database.expenseDao().upsertAll(it) },
+                ).also {
+                    uploaded += it.uploaded
+                    downloaded += it.downloaded
+                    conflicts += it.conflicts
+                }
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' collection 'expenses': ${e.message}", e)
             }
-            syncCollection(
-                vehicleId = vehicleId,
-                collection = "reminders",
-                local = database.maintenanceDao().getAll().filter { it.vehicleId == vehicleId },
-                idOf = MaintenanceEntity::id,
-                encode = ::maintenanceCloudMap,
-                decode = { parseMaintenance(vehicleId, it) },
-                upsert = { database.maintenanceDao().upsertAll(it) },
-            ).also {
-                uploaded += it.uploaded
-                downloaded += it.downloaded
-                conflicts += it.conflicts
+            try {
+                syncCollection(
+                    vehicleId = vehicleId,
+                    collection = "reminders",
+                    local = database.maintenanceDao().getAll().filter { it.vehicleId == vehicleId },
+                    idOf = MaintenanceEntity::id,
+                    encode = ::maintenanceCloudMap,
+                    decode = { parseMaintenance(vehicleId, it) },
+                    upsert = { database.maintenanceDao().upsertAll(it) },
+                ).also {
+                    uploaded += it.uploaded
+                    downloaded += it.downloaded
+                    conflicts += it.conflicts
+                }
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' collection 'reminders': ${e.message}", e)
             }
-            syncCollection(
-                vehicleId = vehicleId,
-                collection = "trips",
-                local = database.tripDao().getAll().filter { it.vehicleId == vehicleId },
-                idOf = TripEntity::id,
-                encode = ::tripCloudMap,
-                decode = { parseTrip(vehicleId, it) },
-                upsert = { database.tripDao().upsertAll(it) },
-            ).also {
-                uploaded += it.uploaded
-                downloaded += it.downloaded
-                conflicts += it.conflicts
+            try {
+                syncCollection(
+                    vehicleId = vehicleId,
+                    collection = "trips",
+                    local = database.tripDao().getAll().filter { it.vehicleId == vehicleId },
+                    idOf = TripEntity::id,
+                    encode = ::tripCloudMap,
+                    decode = { parseTrip(vehicleId, it) },
+                    upsert = { database.tripDao().upsertAll(it) },
+                ).also {
+                    uploaded += it.uploaded
+                    downloaded += it.downloaded
+                    conflicts += it.conflicts
+                }
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' collection 'trips': ${e.message}", e)
             }
         }
         return CloudSyncResult(uploaded, downloaded, conflicts, vehicleIds.size)

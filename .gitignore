@@ -8,3 +8,9 @@ mobile/release-keystore.jks
 *.aab
 .gradle/
 local.properties
+native-kotlin/.idea/
+native-kotlin/app/build/
+native-kotlin/gradle/
+native-kotlin/gradlew
+native-kotlin/gradlew.bat
+native-kotlin/app/google-services.json

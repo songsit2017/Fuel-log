@@ -121,6 +121,7 @@ private fun AutocompleteTextField(
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onFocus: (() -> Unit)? = null,
+    optionLabels: Map<String, String>? = null,
 ) {
     var fieldWidthPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -145,7 +146,7 @@ private fun AutocompleteTextField(
         ) {
             options.take(20).forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option) },
+                    text = { Text(optionLabels?.get(option) ?: option) },
                     onClick = {
                         onValueChange(option)
                         onExpandedChange(false)
@@ -370,7 +371,6 @@ fun FuelLogApp(
                 saving = state.saving,
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingFuel,
-                stationSuggestions = state.stationSuggestions,
                 onFindNearbyStations = onFindNearbyStations,
                 onPickPhoto = onPickPhoto,
                 onPickCameraPhoto = onPickCameraPhoto,
@@ -1380,7 +1380,6 @@ private fun AddFuelDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: FuelEntry? = null,
-    stationSuggestions: List<String> = emptyList(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
@@ -1432,8 +1431,15 @@ private fun AddFuelDialog(
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
-    val stationOptions = (nearbyStations.map { it.name } + stationSuggestions).distinct()
+    val stationOptions = nearbyStations.map { it.name }.distinct()
         .filter { station.isBlank() || it.contains(station, ignoreCase = true) }
+    // Nearby Search doesn't return distance itself (computed locally in NearbyStationRepository),
+    // so the dropdown shows "name • X.X กม." while the field/onSave still only ever gets the
+    // plain station name via AutocompleteTextField's optionLabels indirection.
+    val stationOptionLabels = nearbyStations
+        .sortedBy { it.distanceMeters }
+        .distinctBy { it.name }
+        .associate { it.name to "${it.name} • ${"%.1f".format(Locale.US, it.distanceMeters / 1000.0)} กม." }
     val runNearbySearch = {
         nearbySearching = true
         nearbyError = null
@@ -1467,6 +1473,7 @@ private fun AddFuelDialog(
                         onValueChange = { station = it },
                         label = "สถานีบริการ",
                         options = stationOptions,
+                        optionLabels = stationOptionLabels,
                         expanded = stationMenuExpanded,
                         onExpandedChange = { stationMenuExpanded = it },
                         modifier = Modifier.fillMaxWidth(),

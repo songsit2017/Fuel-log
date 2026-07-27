@@ -35,7 +35,6 @@ data class NativeAppState(
     val maintenanceTasks: List<MaintenanceTask> = emptyList(),
     val trips: List<Trip> = emptyList(),
     val summary: FuelSummary = calculateFuelSummary(emptyList()),
-    val stationSuggestions: List<String> = emptyList(),
     val expenseCategorySuggestions: List<String> = emptyList(),
     val maintenanceCategorySuggestions: List<String> = emptyList(),
     val saving: Boolean = false,
@@ -61,7 +60,6 @@ private data class VehicleRecords(
 )
 
 private data class Suggestions(
-    val stations: List<String>,
     val expenseCategories: List<String>,
     val maintenanceCategories: List<String>,
 )
@@ -95,9 +93,6 @@ class NativeAppViewModel(
             fuelEntries, vehicleExpenses, tasks, vehicleTrips ->
         VehicleRecords(fuelEntries, vehicleExpenses, tasks, vehicleTrips)
     }
-    private val stationSuggestions = selectedVehicleId.flatMapLatest { vehicleId ->
-        vehicleId?.let(fuelRepository::observeStationSuggestions) ?: flowOf(emptyList())
-    }
     private val expenseCategorySuggestions = selectedVehicleId.flatMapLatest { vehicleId ->
         vehicleId?.let(expenseRepository::observeCategorySuggestions) ?: flowOf(emptyList())
     }
@@ -105,11 +100,10 @@ class NativeAppViewModel(
         vehicleId?.let(maintenanceRepository::observeCategorySuggestions) ?: flowOf(emptyList())
     }
     private val suggestions = combine(
-        stationSuggestions,
         expenseCategorySuggestions,
         maintenanceCategorySuggestions,
-    ) { stations, expenseCategories, maintenanceCategories ->
-        Suggestions(stations, expenseCategories, maintenanceCategories)
+    ) { expenseCategories, maintenanceCategories ->
+        Suggestions(expenseCategories, maintenanceCategories)
     }
 
     val state: StateFlow<NativeAppState> = combine(
@@ -138,7 +132,6 @@ class NativeAppViewModel(
             maintenanceTasks = if (validId == selectedId) tasks else emptyList(),
             trips = if (validId == selectedId) vehicleTrips else emptyList(),
             summary = calculateFuelSummary(if (validId == selectedId) fuelEntries else emptyList()),
-            stationSuggestions = if (validId == selectedId) suggestionsForVehicle.stations else emptyList(),
             expenseCategorySuggestions = if (validId == selectedId) suggestionsForVehicle.expenseCategories else emptyList(),
             maintenanceCategorySuggestions = if (validId == selectedId) suggestionsForVehicle.maintenanceCategories else emptyList(),
             saving = isSaving,

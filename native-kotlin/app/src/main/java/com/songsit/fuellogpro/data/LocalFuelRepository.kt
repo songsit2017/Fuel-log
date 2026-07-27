@@ -15,9 +15,6 @@ class LocalFuelRepository(
     fun observe(vehicleId: String): Flow<List<FuelEntry>> =
         dao.observeForVehicle(vehicleId).map { entries -> entries.map(FuelEntryEntity::toDomain) }
 
-    fun observeStationSuggestions(vehicleId: String): Flow<List<String>> =
-        dao.observeDistinctStations(vehicleId)
-
     suspend fun add(
         vehicleId: String,
         date: String,

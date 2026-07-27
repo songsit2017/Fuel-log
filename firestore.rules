@@ -11,7 +11,7 @@ service cloud.firestore {
       return signedIn() && (
         resource.data.ownerUid == request.auth.uid ||
         resource.data.members[request.auth.uid].role in ['owner','editor','viewer'] ||
-        (resource.data.memberUids is list && request.auth.uid in resource.data.memberUids)
+        request.auth.uid in resource.data.memberUids
       );
     }
 

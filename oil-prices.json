@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-07-27T15:09:43.510300+00:00",
+  "fetchedAt": "2026-07-27T22:15:33.285273+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -8,7 +8,7 @@
       "BannerUrl": "",
       "BannerPoint": "https://webbcpopaprd001.azurewebsites.net/ApiGetImages?FileName=133786018442015734.png",
       "BannerUrlPoint": "https://www.bcpgreenmiles.com/th/promotions/180/SamePrice_Jul2025",
-      "OilDateNow": "27/07/2569",
+      "OilDateNow": "28/07/2569",
       "OilPriceDate": "22/07/2569",
       "OilPriceTime": "19:50",
       "OilMessageDate": "22/07/2569",
@@ -33,7 +33,7 @@
     },
     "shell": {
       "source": "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH",
-      "updatedAt": "2026-07-27T22:09:42",
+      "updatedAt": "2026-07-28T05:15:32",
       "station": "CO WUTTHIPAN B1 SAI MAI 31 BKK",
       "grades": {
         "gasohol_95": null,

@@ -63,6 +63,7 @@ class NativeAppViewModel(
     private val expenseRepository: LocalExpenseRepository,
     private val maintenanceRepository: LocalMaintenanceRepository,
     private val tripRepository: LocalTripRepository,
+    private val onReminderDataChanged: () -> Unit,
 ) : ViewModel() {
     private val saving = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
@@ -177,7 +178,10 @@ class NativeAppViewModel(
                     fullTank = fullTank,
                     station = station,
                 )
-            }.onSuccess { onSaved() }
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }
                 .onFailure { error.value = it.message ?: "บันทึกไม่สำเร็จ" }
             saving.value = false
         }
@@ -186,6 +190,7 @@ class NativeAppViewModel(
     fun deleteFuel(id: String) {
         viewModelScope.launch {
             runCatching { fuelRepository.delete(id) }
+                .onSuccess { onReminderDataChanged() }
                 .onFailure { error.value = it.message ?: "ลบไม่สำเร็จ" }
         }
     }
@@ -225,7 +230,10 @@ class NativeAppViewModel(
                     recurring,
                     reminderDate,
                 )
-            }.onSuccess { onSaved() }
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }
                 .onFailure { error.value = it.message ?: "บันทึกค่าใช้จ่ายไม่สำเร็จ" }
             saving.value = false
         }
@@ -234,6 +242,7 @@ class NativeAppViewModel(
     fun deleteExpense(id: String) {
         viewModelScope.launch {
             runCatching { expenseRepository.delete(id) }
+                .onSuccess { onReminderDataChanged() }
                 .onFailure { error.value = it.message ?: "ลบค่าใช้จ่ายไม่สำเร็จ" }
         }
     }
@@ -273,7 +282,10 @@ class NativeAppViewModel(
                     repeatMonths = repeatMonths?.takeIf { it > 0 },
                     repeatOdometerKm = repeatOdometerKm?.takeIf { it > 0 },
                 )
-            }.onSuccess { onSaved() }
+            }.onSuccess {
+                onReminderDataChanged()
+                onSaved()
+            }
                 .onFailure { error.value = it.message ?: "บันทึกรายการเตือนไม่สำเร็จ" }
             saving.value = false
         }
@@ -284,13 +296,15 @@ class NativeAppViewModel(
         viewModelScope.launch {
             runCatching {
                 maintenanceRepository.markDone(task, state.value.summary.latestOdometerKm)
-            }.onFailure { error.value = it.message ?: "อัปเดตรายการไม่สำเร็จ" }
+            }.onSuccess { onReminderDataChanged() }
+                .onFailure { error.value = it.message ?: "อัปเดตรายการไม่สำเร็จ" }
         }
     }
 
     fun deleteMaintenance(id: String) {
         viewModelScope.launch {
             runCatching { maintenanceRepository.delete(id) }
+                .onSuccess { onReminderDataChanged() }
                 .onFailure { error.value = it.message ?: "ลบรายการเตือนไม่สำเร็จ" }
         }
     }
@@ -352,6 +366,7 @@ class NativeAppViewModelFactory(
     private val expenseRepository: LocalExpenseRepository,
     private val maintenanceRepository: LocalMaintenanceRepository,
     private val tripRepository: LocalTripRepository,
+    private val onReminderDataChanged: () -> Unit,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -361,5 +376,6 @@ class NativeAppViewModelFactory(
             expenseRepository,
             maintenanceRepository,
             tripRepository,
+            onReminderDataChanged,
         ) as T
 }

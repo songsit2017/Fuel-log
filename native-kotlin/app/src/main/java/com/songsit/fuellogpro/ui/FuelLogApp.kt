@@ -48,6 +48,7 @@ import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.domain.model.Trip
 import com.songsit.fuellogpro.domain.model.totalCost
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
+import com.songsit.fuellogpro.notifications.ReminderSettings
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -78,6 +79,8 @@ fun FuelLogApp(
     onDeleteMaintenance: (String) -> Unit,
     onAddTrip: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onDeleteTrip: (String) -> Unit,
+    reminderSettings: ReminderSettings,
+    onReminderSettingsChange: (ReminderSettings) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     cloudState: CloudUiState,
@@ -176,6 +179,8 @@ fun FuelLogApp(
                     onSignOut = onSignOut,
                     syncConflicts = syncConflicts,
                     onResolveConflict = onResolveConflict,
+                    reminderSettings = reminderSettings,
+                    onReminderSettingsChange = onReminderSettingsChange,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -561,6 +566,8 @@ private fun VehicleList(
     onSignOut: () -> Unit,
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
+    reminderSettings: ReminderSettings,
+    onReminderSettingsChange: (ReminderSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -568,6 +575,37 @@ private fun VehicleList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("การแจ้งเตือน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    NotificationSettingRow(
+                        label = "ตามวันที่",
+                        checked = reminderSettings.dateReminders,
+                        onCheckedChange = {
+                            onReminderSettingsChange(reminderSettings.copy(dateReminders = it))
+                        },
+                    )
+                    NotificationSettingRow(
+                        label = "ตามเลขไมล์",
+                        checked = reminderSettings.odometerReminders,
+                        onCheckedChange = {
+                            onReminderSettingsChange(reminderSettings.copy(odometerReminders = it))
+                        },
+                    )
+                    NotificationSettingRow(
+                        label = "กำหนดชำระ",
+                        checked = reminderSettings.paymentReminders,
+                        onCheckedChange = {
+                            onReminderSettingsChange(reminderSettings.copy(paymentReminders = it))
+                        },
+                    )
+                }
+            }
+        }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -665,6 +703,21 @@ private fun VehicleList(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NotificationSettingRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

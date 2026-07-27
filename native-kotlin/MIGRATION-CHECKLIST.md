@@ -14,7 +14,7 @@
 - [x] Expense income, recurrence and payment reminder dates.
 - [x] Offline maintenance records with date/odometer due status and recurrence.
 - [x] Android notification channel and daily WorkManager scheduling for date reminders.
-- [ ] Odometer-triggered notification refresh and notification settings.
+- [x] Odometer-triggered notification refresh and persistent notification settings.
 - [x] Offline trip records with distance and all Stable cost categories.
 - [x] Versioned full JSON backup and non-destructive merge restore through Android file picker.
 - [x] Native Google sign-in UI and manual Firestore sync.

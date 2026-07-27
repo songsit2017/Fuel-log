@@ -25,6 +25,8 @@ import com.songsit.fuellogpro.ui.NativeAppViewModel
 import com.songsit.fuellogpro.ui.NativeAppViewModelFactory
 import com.songsit.fuellogpro.ui.CloudUiState
 import com.songsit.fuellogpro.notifications.MaintenanceReminderWorker
+import com.songsit.fuellogpro.notifications.NotificationPreferences
+import com.songsit.fuellogpro.notifications.ReminderSettings
 import android.widget.Toast
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         val database = FuelLogDatabase.get(this)
+        val notificationPreferences = NotificationPreferences(this)
         backupRepository = LocalBackupRepository(database)
         val authRepository = GoogleAuthRepository()
         val cloudRepository = FirestoreSyncRepository(database)
@@ -103,6 +106,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
             val composeScope = rememberCoroutineScope()
+            var reminderSettings by remember { mutableStateOf(notificationPreferences.load()) }
             val syncConflicts by database.syncConflictDao().observeAll().collectAsState(emptyList())
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
@@ -111,6 +115,9 @@ class MainActivity : ComponentActivity() {
                     expenseRepository,
                     maintenanceRepository,
                     tripRepository,
+                    onReminderDataChanged = {
+                        MaintenanceReminderWorker.refresh(applicationContext)
+                    },
                 ),
             )
             val state by viewModel.state.collectAsState()
@@ -125,6 +132,12 @@ class MainActivity : ComponentActivity() {
                 onDeleteMaintenance = viewModel::deleteMaintenance,
                 onAddTrip = viewModel::addTrip,
                 onDeleteTrip = viewModel::deleteTrip,
+                reminderSettings = reminderSettings,
+                onReminderSettingsChange = { settings: ReminderSettings ->
+                    reminderSettings = settings
+                    notificationPreferences.save(settings)
+                    MaintenanceReminderWorker.refresh(applicationContext)
+                },
                 onExportBackup = {
                     createBackup.launch("FuelLog-Native-${LocalDate.now()}.json")
                 },
@@ -168,6 +181,7 @@ class MainActivity : ComponentActivity() {
                                     authRepository.currentDisplayName,
                                 )
                             }.onSuccess { result ->
+                                MaintenanceReminderWorker.refresh(applicationContext)
                                 cloudState = cloudState.copy(
                                     syncing = false,
                                     message = "อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",

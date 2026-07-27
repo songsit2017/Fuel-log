@@ -27,6 +27,7 @@ const nativeExpenseDao = await readFile(new URL('../native-kotlin/app/src/main/j
 const nativeMaintenanceDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/MaintenanceDao.kt', import.meta.url), 'utf8');
 const nativeMaintenanceStatus = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/MaintenanceStatus.kt', import.meta.url), 'utf8');
 const nativeMaintenanceWorker = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/notifications/MaintenanceReminderWorker.kt', import.meta.url), 'utf8');
+const nativeNotificationPreferences = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/notifications/NotificationPreferences.kt', import.meta.url), 'utf8');
 const nativeTripDao = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/local/TripDao.kt', import.meta.url), 'utf8');
 const nativeTripSummary = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/domain/TripSummary.kt', import.meta.url), 'utf8');
 const nativeBackupRepository = await readFile(new URL('../native-kotlin/app/src/main/java/com/songsit/fuellogpro/data/LocalBackupRepository.kt', import.meta.url), 'utf8');
@@ -292,6 +293,21 @@ test('native maintenance dates schedule Android notifications safely', () => {
   assert.match(nativeMaintenanceWorker, /ExistingPeriodicWorkPolicy\.UPDATE/);
   assert.match(nativeMaintenanceWorker, /Manifest\.permission\.POST_NOTIFICATIONS/);
   assert.match(nativeMaintenanceWorker, /getItemsWithReminderDates/);
+});
+
+test('native notifications refresh for odometer changes and honor settings', () => {
+  assert.match(nativeNotificationPreferences, /data class ReminderSettings/);
+  assert.match(nativeNotificationPreferences, /getSharedPreferences/);
+  assert.match(nativeNotificationPreferences, /dateReminders/);
+  assert.match(nativeNotificationPreferences, /odometerReminders/);
+  assert.match(nativeNotificationPreferences, /paymentReminders/);
+  assert.match(nativeMaintenanceWorker, /latestOdometerByVehicle/);
+  assert.match(nativeMaintenanceWorker, /warningOdometerKm/);
+  assert.match(nativeMaintenanceWorker, /enqueueUniqueWork/);
+  assert.match(nativeMaintenanceWorker, /OneTimeWorkRequestBuilder<MaintenanceReminderWorker>/);
+  assert.match(nativeMain, /MaintenanceReminderWorker\.refresh/);
+  assert.match(nativeFuelApp, /NotificationSettingRow/);
+  assert.match(nativeFuelApp, /ตามเลขไมล์/);
 });
 
 test('native trips remain vehicle-scoped and include every stable cost field', () => {

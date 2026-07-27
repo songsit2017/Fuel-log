@@ -15,6 +15,7 @@ All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 - Vehicle-scoped expenses, income, recurrence, payment reminders and net total.
 - Maintenance reminders by date or odometer with overdue/soon status and recurrence.
 - Daily Android notifications for upcoming date-based maintenance.
+- Immediate odometer reminder refresh with separate date, mileage and payment toggles.
 - Offline trips with distance, fuel, toll, parking, food and other costs.
 - Versioned JSON backup/restore for every Room collection using Android's file picker.
 - Manual Google/Firebase sync that preserves divergent copies as explicit conflicts.

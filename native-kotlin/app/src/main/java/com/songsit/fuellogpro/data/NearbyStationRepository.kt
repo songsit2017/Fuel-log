@@ -15,6 +15,8 @@ import kotlin.math.sqrt
 data class NearbyStation(
     val name: String,
     val distanceMeters: Double,
+    val lat: Double,
+    val lon: Double,
 )
 
 /**
@@ -73,7 +75,12 @@ class NearbyStationRepository {
             val placeLat = location.optDouble("lat", Double.NaN)
             val placeLon = location.optDouble("lng", Double.NaN)
             if (placeLat.isNaN() || placeLon.isNaN()) continue
-            stations += NearbyStation(name = name, distanceMeters = haversineMeters(lat, lon, placeLat, placeLon))
+            stations += NearbyStation(
+                name = name,
+                distanceMeters = haversineMeters(lat, lon, placeLat, placeLon),
+                lat = placeLat,
+                lon = placeLon,
+            )
         }
         return stations.sortedBy { it.distanceMeters }.take(30)
     }

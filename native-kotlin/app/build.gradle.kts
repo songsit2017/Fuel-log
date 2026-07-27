@@ -21,6 +21,14 @@ android {
         targetSdk = 37
         versionCode = providers.environmentVariable("FUELLOG_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("FUELLOG_VERSION_NAME").orNull ?: "9.0.0-native-alpha.1"
+
+        val secretsProps = java.util.Properties().apply {
+            val localFile = rootProject.file("local.properties")
+            val defaultsFile = rootProject.file("local.defaults.properties")
+            if (defaultsFile.exists()) defaultsFile.inputStream().use { load(it) }
+            if (localFile.exists()) localFile.inputStream().use { load(it) }
+        }
+        manifestPlaceholders["MAPS_API_KEY"] = secretsProps.getProperty("MAPS_API_KEY", "MISSING")
     }
     signingConfigs {
         create("release") {
@@ -88,6 +96,8 @@ dependencies {
     implementation("com.google.firebase:firebase-functions")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.android.gms:play-services-maps:19.1.0")
+    implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("androidx.core:core-ktx:1.15.0")
     // Vehicle photo loading (VehicleListScreen/VehicleEditScreen background images from imageUri).
     implementation("io.coil-kt:coil-compose:2.7.0")

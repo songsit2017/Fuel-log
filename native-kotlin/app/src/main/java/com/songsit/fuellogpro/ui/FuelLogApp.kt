@@ -449,7 +449,7 @@ fun FuelLogApp(
                 0 -> when (homeTab) {
                     0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
                     1 -> TimelineScreen(state, Modifier.padding(padding))
-                    2 -> TripCalculatorScreen(Modifier.padding(padding))
+                    2 -> TripCalculatorScreen(state, Modifier.padding(padding))
                     else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
                 }
                 1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
@@ -543,55 +543,145 @@ fun FuelLogApp(
     }
 }
 
+private val calculatorModes = listOf("ค่าใช้จ่ายในการเดินทาง", "ระยะทาง", "อัตราการใช้งาน", "ปริมาณน้ำมันที่ต้องใช้")
+private val distanceQuickPicks = listOf(10, 30, 100, 200, 300, 400, 500, 700, 1000, 1200)
+
 @Composable
-private fun TripCalculatorScreen(modifier: Modifier = Modifier) {
+private fun QuickPickField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    quickChoices: List<Pair<String, String>> = emptyList(),
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            trailingIcon = {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกด่วน")
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+            quickChoices.forEach { (choiceLabel, choiceValue) ->
+                DropdownMenuItem(
+                    text = { Text(choiceLabel) },
+                    onClick = { onValueChange(choiceValue); menuExpanded = false },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Modifier) {
+    var modeExpanded by remember { mutableStateOf(false) }
+    var mode by remember { mutableIntStateOf(0) }
     var distanceKm by remember { mutableStateOf("") }
     var pricePerLiter by remember { mutableStateOf("") }
     var consumptionKmPerLiter by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<Double?>(null) }
+    var costResult by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) }
+
+    val latestPrice = state.entries.maxByOrNull { it.date + it.time }?.pricePerLiter
+    val averagePrice = state.entries.map { it.pricePerLiter }.filter { it > 0 }.let { if (it.isEmpty()) null else it.average() }
+    val latestConsumption = calculatePerEntryKmPerLiter(state.entries).values.lastOrNull()
+    val averageConsumption = state.summary.averageKmPerLiter
+
+    val priceQuickChoices = listOfNotNull(
+        latestPrice?.let { "ราคาน้ำมันล่าสุด (%.2f)".format(it) to "%.2f".format(it) },
+        averagePrice?.let { "ราคาเชื้อเพลิงเฉลี่ย (%.2f)".format(it) to "%.2f".format(it) },
+    )
+    val consumptionQuickChoices = listOfNotNull(
+        latestConsumption?.let { "ปริมาณการใช้น้ำมันล่าสุด (%.2f)".format(it) to "%.2f".format(it) },
+        averageConsumption?.let { "ปริมาณการใช้น้ำมันเฉลี่ย (%.2f)".format(it) to "%.2f".format(it) },
+    )
+    val distanceQuickChoices = distanceQuickPicks.map { "$it km" to it.toString() }
+
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("เครื่องคิดเลขคำนวณค่าเดินทาง", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        OutlinedTextField(
-            value = distanceKm,
-            onValueChange = { distanceKm = it },
-            label = { Text("ระยะทาง (km)") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = pricePerLiter,
-            onValueChange = { pricePerLiter = it },
-            label = { Text("ราคา/L") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = consumptionKmPerLiter,
-            onValueChange = { consumptionKmPerLiter = it },
-            label = { Text("อัตราสิ้นเปลือง (km/L)") },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Text("เครื่องคิดเลข", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedTextField(
+                value = calculatorModes[mode],
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("โหมดการคำนวณ") },
+                trailingIcon = {
+                    IconButton(onClick = { modeExpanded = true }) {
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกโหมด")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }) {
+                calculatorModes.forEachIndexed { index, label ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = { mode = index; modeExpanded = false; result = null })
+                }
+            }
+        }
+        if (mode != 3) {
+            QuickPickField(
+                value = distanceKm,
+                onValueChange = { distanceKm = it },
+                label = "ระยะทาง (km)",
+                quickChoices = distanceQuickChoices,
+            )
+        }
+        if (mode != 1) {
+            QuickPickField(
+                value = pricePerLiter,
+                onValueChange = { pricePerLiter = it },
+                label = "ราคา/L",
+                quickChoices = priceQuickChoices,
+            )
+        }
+        if (mode != 2) {
+            QuickPickField(
+                value = consumptionKmPerLiter,
+                onValueChange = { consumptionKmPerLiter = it },
+                label = "อัตราสิ้นเปลือง (km/L)",
+                quickChoices = consumptionQuickChoices,
+            )
+        }
+        if (mode == 0) {
+            QuickPickField(value = costResult, onValueChange = { costResult = it }, label = "ค่าใช้จ่าย (ไม่บังคับ)")
+        }
         Button(
             onClick = {
                 val distance = distanceKm.toDoubleOrNull()
                 val price = pricePerLiter.toDoubleOrNull()
                 val consumption = consumptionKmPerLiter.toDoubleOrNull()
-                result = if (distance != null && price != null && consumption != null && consumption > 0) {
-                    (distance / consumption) * price
-                } else null
+                val cost = costResult.toDoubleOrNull()
+                result = when (mode) {
+                    0 -> if (distance != null && price != null && consumption != null && consumption > 0) {
+                        thaiCurrency.format((distance / consumption) * price)
+                    } else null
+                    1 -> if (cost != null && price != null && consumption != null && price > 0) {
+                        "%.1f km".format((cost / price) * consumption)
+                    } else null
+                    2 -> if (distance != null && price != null && cost != null && cost > 0) {
+                        "%.2f km/L".format(distance / (cost / price))
+                    } else null
+                    else -> if (distance != null && consumption != null && consumption > 0) {
+                        "%.2f L".format(distance / consumption)
+                    } else null
+                }
             },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("คำนวณ") }
         result?.let {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("ค่าใช้จ่ายโดยประมาณ", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        thaiCurrency.format(it),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Text("ผลลัพธ์", style = MaterialTheme.typography.titleSmall)
+                    Text(it, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -613,11 +703,36 @@ private fun NearbyStationsMapScreen(
             { message -> searching = false; error = message },
         )
     }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    val cameraPositionState = com.google.maps.android.compose.rememberCameraPositionState()
+    LaunchedEffect(stations) {
+        stations.firstOrNull()?.let {
+            cameraPositionState.position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(
+                com.google.android.gms.maps.model.LatLng(it.lat, it.lon),
+                13f,
+            )
+        }
+    }
+    Column(modifier = modifier.fillMaxSize()) {
+        com.google.maps.android.compose.GoogleMap(
+            modifier = Modifier.fillMaxWidth().height(280.dp),
+            cameraPositionState = cameraPositionState,
+            properties = com.google.maps.android.compose.MapProperties(isMyLocationEnabled = true),
+            uiSettings = com.google.maps.android.compose.MapUiSettings(myLocationButtonEnabled = true),
+        ) {
+            stations.forEach { station ->
+                com.google.maps.android.compose.Marker(
+                    state = com.google.maps.android.compose.rememberMarkerState(
+                        position = com.google.android.gms.maps.model.LatLng(station.lat, station.lon),
+                    ),
+                    title = station.name,
+                )
+            }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
         item {
             SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
         }
@@ -640,6 +755,7 @@ private fun NearbyStationsMapScreen(
                     }
                 }
             }
+        }
         }
     }
 }

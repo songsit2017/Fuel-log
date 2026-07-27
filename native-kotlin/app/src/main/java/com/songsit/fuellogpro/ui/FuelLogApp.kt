@@ -19,11 +19,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -42,8 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.songsit.fuellogpro.data.NearbyStation
 import com.songsit.fuellogpro.data.firebase.VehicleMember
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
@@ -64,6 +65,49 @@ import java.util.Locale
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
     maximumFractionDigits = 2
+}
+
+@Composable
+private fun AutocompleteTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    options: List<String>,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var fieldWidthPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+                onExpandedChange(true)
+            },
+            label = { Text(label) },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { fieldWidthPx = it.size.width },
+        )
+        DropdownMenu(
+            expanded = expanded && options.isNotEmpty(),
+            onDismissRequest = { onExpandedChange(false) },
+            modifier = Modifier.width(with(density) { fieldWidthPx.toDp() }),
+        ) {
+            options.take(20).forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onValueChange(option)
+                        onExpandedChange(false)
+                    },
+                )
+            }
+        }
+    }
 }
 
 data class CloudUiState(
@@ -1062,29 +1106,15 @@ private fun AddFuelDialog(
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    ExposedDropdownMenuBox(
-                        expanded = stationMenuExpanded && stationOptions.isNotEmpty(),
+                    AutocompleteTextField(
+                        value = station,
+                        onValueChange = { station = it },
+                        label = "สถานีบริการ",
+                        options = stationOptions,
+                        expanded = stationMenuExpanded,
                         onExpandedChange = { stationMenuExpanded = it },
-                    ) {
-                        OutlinedTextField(
-                            value = station,
-                            onValueChange = { station = it; stationMenuExpanded = true },
-                            label = { Text("สถานีบริการ") },
-                            singleLine = true,
-                            modifier = Modifier.menuAnchor(ExposedDropdownMenuDefaults.TrailingIcon, true).fillMaxWidth(),
-                        )
-                        ExposedDropdownMenu(
-                            expanded = stationMenuExpanded && stationOptions.isNotEmpty(),
-                            onDismissRequest = { stationMenuExpanded = false },
-                        ) {
-                            stationOptions.take(20).forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = { station = option; stationMenuExpanded = false },
-                                )
-                            }
-                        }
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 if (onFindNearbyStations != null) {
                     item {
@@ -1173,29 +1203,15 @@ private fun AddExpenseDialog(
         title = { Text(if (editing != null) "แก้ไขค่าใช้จ่าย" else "เพิ่มค่าใช้จ่าย") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ExposedDropdownMenuBox(
-                    expanded = categoryMenuExpanded && categoryOptions.isNotEmpty(),
+                AutocompleteTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    label = "หมวดหมู่",
+                    options = categoryOptions,
+                    expanded = categoryMenuExpanded,
                     onExpandedChange = { categoryMenuExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = category,
-                        onValueChange = { category = it; categoryMenuExpanded = true },
-                        label = { Text("หมวดหมู่") },
-                        singleLine = true,
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuDefaults.TrailingIcon, true).fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = categoryMenuExpanded && categoryOptions.isNotEmpty(),
-                        onDismissRequest = { categoryMenuExpanded = false },
-                    ) {
-                        categoryOptions.take(20).forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = { category = option; categoryMenuExpanded = false },
-                            )
-                        }
-                    }
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 OutlinedTextField(description, { description = it }, label = { Text("รายละเอียด") }, singleLine = true)
                 OutlinedTextField(amount, { amount = it }, label = { Text("จำนวนเงิน") }, singleLine = true)
                 OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true)
@@ -1267,29 +1283,15 @@ private fun AddMaintenanceDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { OutlinedTextField(name, { name = it }, label = { Text("รายการ") }, singleLine = true) }
                 item {
-                    ExposedDropdownMenuBox(
-                        expanded = categoryMenuExpanded && categoryOptions.isNotEmpty(),
+                    AutocompleteTextField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = "ประเภท",
+                        options = categoryOptions,
+                        expanded = categoryMenuExpanded,
                         onExpandedChange = { categoryMenuExpanded = it },
-                    ) {
-                        OutlinedTextField(
-                            value = category,
-                            onValueChange = { category = it; categoryMenuExpanded = true },
-                            label = { Text("ประเภท") },
-                            singleLine = true,
-                            modifier = Modifier.menuAnchor(ExposedDropdownMenuDefaults.TrailingIcon, true).fillMaxWidth(),
-                        )
-                        ExposedDropdownMenu(
-                            expanded = categoryMenuExpanded && categoryOptions.isNotEmpty(),
-                            onDismissRequest = { categoryMenuExpanded = false },
-                        ) {
-                            categoryOptions.take(20).forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = { category = option; categoryMenuExpanded = false },
-                                )
-                            }
-                        }
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 item { OutlinedTextField(nextDate, { nextDate = it }, label = { Text("กำหนดวันที่ (ไม่บังคับ)") }, singleLine = true) }
                 item { OutlinedTextField(nextOdometer, { nextOdometer = it }, label = { Text("กำหนดเลขไมล์ (ไม่บังคับ)") }, singleLine = true) }

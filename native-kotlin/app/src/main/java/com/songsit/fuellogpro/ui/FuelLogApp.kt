@@ -62,8 +62,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -592,30 +593,36 @@ private fun Dashboard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OilPriceCard(info: OilPriceInfo) {
+    // Brand tab state lives only here — it's local to this card and never touches Dashboard's
+    // own state, so switching brands can't affect any other section of the screen.
     var tab by remember { mutableIntStateOf(0) }
     val selectedTab = tab.coerceIn(0, info.brands.lastIndex)
     val selected = info.brands[selectedTab]
     Card(shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth()) {
-            TabRow(selectedTabIndex = selectedTab) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("ราคาน้ำมันวันนี้", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 info.brands.forEachIndexed { index, brand ->
-                    Tab(selected = index == selectedTab, onClick = { tab = index }, text = { Text(brand.brand) })
-                }
-            }
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("ราคาน้ำมันวันนี้", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
-                OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
-                OilPriceRow("ดีเซล B7", selected.dieselB7)
-                if (info.dateLabel.isNotBlank()) {
-                    Text(
-                        info.dateLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    SegmentedButton(
+                        selected = index == selectedTab,
+                        onClick = { tab = index },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = info.brands.size),
+                        label = { Text(brand.brand) },
                     )
                 }
+            }
+            OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
+            OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
+            OilPriceRow("ดีเซล B7", selected.dieselB7)
+            if (info.dateLabel.isNotBlank()) {
+                Text(
+                    info.dateLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

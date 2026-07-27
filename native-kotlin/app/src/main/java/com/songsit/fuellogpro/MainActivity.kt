@@ -102,6 +102,35 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // Camera counterpart to pickPhoto above: the user chooses "ถ่ายรูป" instead of "เลือกจาก
+    // แกลอรี่" in PhotoAttachmentRow's source menu. TakePicture writes straight into a
+    // filesDir/photos file we hand it via FileProvider, so the result path already matches the
+    // gallery flow's storage convention with no extra copy step.
+    private var pendingCameraFile: java.io.File? = null
+    private var pendingCameraResult: ((uris: List<String>, extractedAmount: Double?) -> Unit)? = null
+    private val takePicture = registerForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val onCaptured = pendingCameraResult
+        val destFile = pendingCameraFile
+        pendingCameraResult = null
+        pendingCameraFile = null
+        if (!success || onCaptured == null || destFile == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val amount = runCatching { ocrRepository.extractAmount(destFile.absolutePath) }.getOrNull()
+            onCaptured(listOf(destFile.absolutePath), amount)
+        }
+    }
+
+    private fun launchCameraCapture(onCaptured: (uris: List<String>, extractedAmount: Double?) -> Unit) {
+        val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+        val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
+        pendingCameraFile = destFile
+        pendingCameraResult = onCaptured
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", destFile)
+        takePicture.launch(uri)
+    }
     private val locationPermission = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
@@ -198,7 +227,7 @@ class MainActivity : ComponentActivity() {
         val displayPreferences = DisplayPreferences(this)
         backupRepository = LocalBackupRepository(database)
         csvExportRepository = LocalCsvExportRepository(database)
-        fuelioImportRepository = FuelioImportRepository(database)
+        fuelioImportRepository = FuelioImportRepository(applicationContext, database)
         val authRepository = GoogleAuthRepository()
         val cloudRepository = FirestoreSyncRepository(database)
         val deletionRecorder = LocalDeletionRecorder(database)
@@ -315,6 +344,7 @@ class MainActivity : ComponentActivity() {
                         ),
                     )
                 },
+                onPickCameraPhoto = { onPicked -> launchCameraCapture(onPicked) },
                 oilPriceSummary = oilPriceSummary,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->

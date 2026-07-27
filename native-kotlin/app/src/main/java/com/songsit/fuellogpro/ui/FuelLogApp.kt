@@ -162,6 +162,7 @@ fun FuelLogApp(
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     oilPriceSummary: String? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -313,6 +314,7 @@ fun FuelLogApp(
                 stationSuggestions = state.stationSuggestions,
                 onFindNearbyStations = onFindNearbyStations,
                 onPickPhoto = onPickPhoto,
+                onPickCameraPhoto = onPickCameraPhoto,
                 onDismiss = { showAddFuel = false; editingFuel = null },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
@@ -332,6 +334,7 @@ fun FuelLogApp(
                 editing = editingExpense,
                 categorySuggestions = state.expenseCategorySuggestions,
                 onPickPhoto = onPickPhoto,
+                onPickCameraPhoto = onPickCameraPhoto,
                 onDismiss = { showAddExpense = false; editingExpense = null },
                 onSave = onAddExpense,
                 onUpdate = onUpdateExpense,
@@ -1229,6 +1232,7 @@ private fun AddFuelDialog(
     stationSuggestions: List<String> = emptyList(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit)? = null,
@@ -1308,9 +1312,16 @@ private fun AddFuelDialog(
                     item {
                         PhotoAttachmentRow(
                             photoUris = photoUris,
-                            onPick = {
+                            onPickGallery = {
                                 onPickPhoto { picked, _ ->
                                     photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                                }
+                            },
+                            onPickCamera = onPickCameraPhoto?.let { pick ->
+                                {
+                                    pick { picked, _ ->
+                                        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                                    }
                                 }
                             },
                             onRemove = { uri -> photoUris = photoUris - uri },
@@ -1348,8 +1359,9 @@ private const val MAX_PHOTOS = 3
 @Composable
 private fun PhotoAttachmentRow(
     photoUris: List<String>,
-    onPick: () -> Unit,
+    onPickGallery: () -> Unit,
     onRemove: (String) -> Unit,
+    onPickCamera: (() -> Unit)? = null,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         photoUris.forEach { uri ->
@@ -1370,8 +1382,26 @@ private fun PhotoAttachmentRow(
             }
         }
         if (photoUris.size < MAX_PHOTOS) {
-            TextButton(onClick = onPick) {
-                Text(if (photoUris.isEmpty()) "📷 แนบรูป/ใบเสร็จ" else "📷 เพิ่มรูป")
+            var showSourceMenu by remember { mutableStateOf(false) }
+            Box {
+                TextButton(onClick = { if (onPickCamera != null) showSourceMenu = true else onPickGallery() }) {
+                    Text(if (photoUris.isEmpty()) "📷 แนบรูป/ใบเสร็จ" else "📷 เพิ่มรูป")
+                }
+                if (onPickCamera != null) {
+                    DropdownMenu(
+                        expanded = showSourceMenu,
+                        onDismissRequest = { showSourceMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("ถ่ายรูป") },
+                            onClick = { showSourceMenu = false; onPickCamera() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("เลือกจากแกลอรี่") },
+                            onClick = { showSourceMenu = false; onPickGallery() },
+                        )
+                    }
+                }
             }
         }
     }
@@ -1384,6 +1414,7 @@ private fun AddExpenseDialog(
     editing: Expense? = null,
     categorySuggestions: List<String> = emptyList(),
     onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
+    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
@@ -1434,18 +1465,18 @@ private fun AddExpenseDialog(
                     singleLine = true,
                 )
                 if (onPickPhoto != null) {
+                    val handlePicked = { picked: List<String>, extractedAmount: Double? ->
+                        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+                        // Item 3: mirrors V8's OCR auto-fill (autoOcrEnabled) — only
+                        // pre-fills the amount field if the user hasn't typed one yet.
+                        if (amount.isBlank() && extractedAmount != null) {
+                            amount = "%.2f".format(Locale.US, extractedAmount)
+                        }
+                    }
                     PhotoAttachmentRow(
                         photoUris = photoUris,
-                        onPick = {
-                            onPickPhoto { picked, extractedAmount ->
-                                photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                                // Item 3: mirrors V8's OCR auto-fill (autoOcrEnabled) — only
-                                // pre-fills the amount field if the user hasn't typed one yet.
-                                if (amount.isBlank() && extractedAmount != null) {
-                                    amount = "%.2f".format(Locale.US, extractedAmount)
-                                }
-                            }
-                        },
+                        onPickGallery = { onPickPhoto(handlePicked) },
+                        onPickCamera = onPickCameraPhoto?.let { pick -> { pick(handlePicked) } },
                         onRemove = { uri -> photoUris = photoUris - uri },
                     )
                 }

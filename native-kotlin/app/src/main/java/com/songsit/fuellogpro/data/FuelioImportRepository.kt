@@ -1,102 +1,88 @@
 package com.songsit.fuellogpro.data
 
+import android.content.Context
 import androidx.room.withTransaction
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
+import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.data.local.VehicleEntity
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.UUID
 import java.util.zip.ZipInputStream
+import kotlin.math.abs
 
 /**
  * Ports V8's Fuelio importer (app.js:1612-1945, "Fuelio import (CSV / .fuelio / .zip —
  * multi-vehicle ... )"). A .fuelio backup is a zip archive containing one quoted
  * pseudo-CSV per vehicle. Sections inside each CSV are marked by lines starting with
- * (quote-stripped) "##", e.g. "##Log" for the fuel-log rows and "##Costs" for
- * maintenance/expense rows. This does NOT rename any existing Room entity fields —
- * it is purely a translation layer from Fuelio's column names into the existing
- * VehicleEntity/FuelEntryEntity/ExpenseEntity shapes, so FirestoreSyncRepository.kt and
- * every other consumer of those entities needs no changes.
+ * (quote-stripped) "##", e.g. "##Log" for the fuel-log rows, "##Costs" for
+ * maintenance/expense rows, and "##Pictures" linking a row's unique id to photo
+ * filenames stored in a nested `pictures.data` zip. This does NOT rename any existing
+ * Room entity fields — it is purely a translation layer from Fuelio's column names into
+ * the existing VehicleEntity/FuelEntryEntity/ExpenseEntity shapes.
  *
- * NOT PORTED: Fuelio's `pictures.data` (a second, nested zip holding the actual photo
- * files referenced by the `##Pictures` section) is intentionally skipped. FuelEntryEntity
- * has no photo/attachment column in the current Room schema (see FuelEntryEntity.kt) and
- * ExpenseEntity likewise has none, so persisting imported photos would require a schema
- * migration touching entities that other in-flight work (Firestore sync) also depends on.
- * That risk was judged not worth taking for this change; photo import can be added later
- * once a photo storage column/table exists.
+ * Re-importing the same (or an updated) Fuelio backup must not create duplicate rows:
+ * a vehicle is matched by name, and within that vehicle a fuel/cost row is matched by
+ * date + odometer (+ title, for costs) against what's already stored — see
+ * [findMatchingFuelEntry]/[findMatchingExpense]. A match updates the existing row in
+ * place (keeping its id and, unless it has none yet, its photo) instead of inserting a
+ * new one.
  */
 class FuelioImportRepository(
+    private val context: Context,
     private val database: FuelLogDatabase,
 ) {
     suspend fun importFuelioZip(bytes: ByteArray): BackupImportResult {
-        val vehicles = mutableListOf<VehicleEntity>()
+        val zipEntries = readZipEntries(bytes)
+        val picturesDataBytes = zipEntries.entries
+            .firstOrNull { (name, _) -> name.substringAfterLast('/').equals("pictures.data", ignoreCase = true) }
+            ?.value
+        val imageMap: Map<String, ByteArray> = picturesDataBytes
+            ?.let(::readZipEntries)
+            ?.mapKeys { (name, _) -> name.substringAfterLast('/').substringAfterLast('\\').lowercase() }
+            ?: emptyMap()
+
+        val existingVehicles = database.vehicleDao().getAll().toMutableList()
+        val vehiclesToUpsert = mutableListOf<VehicleEntity>()
         val fuelEntries = mutableListOf<FuelEntryEntity>()
         val expenses = mutableListOf<ExpenseEntity>()
+        var vehicleCount = 0
 
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val name = entry.name
-                if (!entry.isDirectory && name.lowercase().endsWith(".csv")) {
-                    val text = zip.readBytes().toString(Charsets.UTF_8)
-                    val vehicleId = UUID.randomUUID().toString()
-                    val parsed = parseFuelioCsv(text)
-                    if (parsed.fuelRows.isNotEmpty() || parsed.costRows.isNotEmpty()) {
-                        val vehicleName = parsed.vehicleName
-                            ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
-                        vehicles += VehicleEntity(
-                            id = vehicleId,
-                            name = vehicleName,
-                            registration = parsed.vehicleRegistration ?: "",
-                            fuelType = parsed.vehicleFuelType ?: "",
-                            createdAt = System.currentTimeMillis(),
-                        )
-                        parsed.fuelRows.forEach { row ->
-                            fuelEntries += FuelEntryEntity(
-                                id = UUID.randomUUID().toString(),
-                                vehicleId = vehicleId,
-                                date = row.date,
-                                time = row.time,
-                                odometerKm = row.odometerKm,
-                                liters = row.liters,
-                                pricePerLiter = row.pricePerLiter,
-                                amount = row.amount,
-                                fullTank = row.fullTank,
-                                station = row.station,
-                                createdAt = System.currentTimeMillis(),
-                            )
-                        }
-                        parsed.costRows.forEach { row ->
-                            expenses += ExpenseEntity(
-                                id = UUID.randomUUID().toString(),
-                                vehicleId = vehicleId,
-                                date = row.date,
-                                category = row.category,
-                                description = row.title,
-                                amount = row.amount,
-                                odometerKm = row.odometerKm,
-                                income = row.income,
-                                recurring = false,
-                                reminderDate = null,
-                                createdAt = System.currentTimeMillis(),
-                            )
-                        }
-                    }
-                }
-                zip.closeEntry()
-                entry = zip.nextEntry
+        for ((name, csvBytes) in zipEntries) {
+            if (!name.lowercase().endsWith(".csv")) continue
+            val parsed = parseFuelioCsv(csvBytes.toString(Charsets.UTF_8))
+            if (parsed.fuelRows.isEmpty() && parsed.costRows.isEmpty()) continue
+
+            val vehicleName = parsed.vehicleName
+                ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
+            val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
+            val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
+            if (matchedVehicle == null) {
+                val newVehicle = VehicleEntity(
+                    id = vehicleId,
+                    name = vehicleName,
+                    registration = parsed.vehicleRegistration ?: "",
+                    fuelType = parsed.vehicleFuelType ?: "",
+                    createdAt = System.currentTimeMillis(),
+                )
+                vehiclesToUpsert += newVehicle
+                existingVehicles += newVehicle
             }
+            vehicleCount++
+
+            fuelEntries += mergeFuelRows(vehicleId, parsed, imageMap)
+            expenses += mergeCostRows(vehicleId, parsed, imageMap)
         }
 
         database.withTransaction {
-            database.vehicleDao().upsertAll(vehicles)
+            database.vehicleDao().upsertAll(vehiclesToUpsert)
             database.fuelEntryDao().upsertAll(fuelEntries)
             database.expenseDao().upsertAll(expenses)
         }
         return BackupImportResult(
-            vehicles = vehicles.size,
+            vehicles = vehicleCount,
             fuelEntries = fuelEntries.size,
             expenses = expenses.size,
             maintenanceTasks = 0,
@@ -105,19 +91,42 @@ class FuelioImportRepository(
     }
 
     // Single, un-zipped .csv (one vehicle) — Fuelio also supports exporting just this.
+    // There is no nested pictures.data to draw photos from here.
     suspend fun importFuelioCsv(text: String): BackupImportResult {
-        val vehicleId = UUID.randomUUID().toString()
         val parsed = parseFuelioCsv(text)
-        val vehicle = VehicleEntity(
+        val vehicleName = parsed.vehicleName ?: "รถนำเข้า"
+        val existingVehicles = database.vehicleDao().getAll()
+        val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
+        val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
+        val vehicle = matchedVehicle ?: VehicleEntity(
             id = vehicleId,
-            name = parsed.vehicleName ?: "รถนำเข้า",
+            name = vehicleName,
             registration = parsed.vehicleRegistration ?: "",
             fuelType = parsed.vehicleFuelType ?: "",
             createdAt = System.currentTimeMillis(),
         )
-        val fuelEntries = parsed.fuelRows.map { row ->
+
+        val fuelEntries = mergeFuelRows(vehicleId, parsed, emptyMap())
+        val expenses = mergeCostRows(vehicleId, parsed, emptyMap())
+
+        database.withTransaction {
+            database.vehicleDao().upsert(vehicle)
+            database.fuelEntryDao().upsertAll(fuelEntries)
+            database.expenseDao().upsertAll(expenses)
+        }
+        return BackupImportResult(if (matchedVehicle == null) 1 else 0, fuelEntries.size, expenses.size, 0, 0)
+    }
+
+    private suspend fun mergeFuelRows(
+        vehicleId: String,
+        parsed: FuelioParseResult,
+        imageMap: Map<String, ByteArray>,
+    ): List<FuelEntryEntity> {
+        val existingEntries = database.fuelEntryDao().getForVehicle(vehicleId)
+        return parsed.fuelRows.map { row ->
+            val existing = findMatchingFuelEntry(existingEntries, row)
             FuelEntryEntity(
-                id = UUID.randomUUID().toString(),
+                id = existing?.id ?: UUID.randomUUID().toString(),
                 vehicleId = vehicleId,
                 date = row.date,
                 time = row.time,
@@ -127,12 +136,22 @@ class FuelioImportRepository(
                 amount = row.amount,
                 fullTank = row.fullTank,
                 station = row.station,
-                createdAt = System.currentTimeMillis(),
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, parsed.pictureMap, imageMap),
             )
         }
-        val expenses = parsed.costRows.map { row ->
+    }
+
+    private suspend fun mergeCostRows(
+        vehicleId: String,
+        parsed: FuelioParseResult,
+        imageMap: Map<String, ByteArray>,
+    ): List<ExpenseEntity> {
+        val existingExpenses = database.expenseDao().getForVehicle(vehicleId)
+        return parsed.costRows.map { row ->
+            val existing = findMatchingExpense(existingExpenses, row)
             ExpenseEntity(
-                id = UUID.randomUUID().toString(),
+                id = existing?.id ?: UUID.randomUUID().toString(),
                 vehicleId = vehicleId,
                 date = row.date,
                 category = row.category,
@@ -140,17 +159,66 @@ class FuelioImportRepository(
                 amount = row.amount,
                 odometerKm = row.odometerKm,
                 income = row.income,
-                recurring = false,
-                reminderDate = null,
-                createdAt = System.currentTimeMillis(),
+                recurring = existing?.recurring ?: false,
+                reminderDate = existing?.reminderDate,
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, parsed.pictureMap, imageMap),
             )
         }
-        database.withTransaction {
-            database.vehicleDao().upsert(vehicle)
-            database.fuelEntryDao().upsertAll(fuelEntries)
-            database.expenseDao().upsertAll(expenses)
+    }
+
+    private fun findMatchingFuelEntry(existing: List<FuelEntryEntity>, row: FuelioFuelRow): FuelEntryEntity? =
+        existing.find { it.date == row.date && abs(it.odometerKm - row.odometerKm) < 0.01 }
+
+    private fun findMatchingExpense(existing: List<ExpenseEntity>, row: FuelioCostRow): ExpenseEntity? =
+        existing.find {
+            it.date == row.date &&
+                it.description.trim().equals(row.title.trim(), ignoreCase = true) &&
+                odometerMatches(it.odometerKm, row.odometerKm)
         }
-        return BackupImportResult(1, fuelEntries.size, expenses.size, 0, 0)
+
+    private fun odometerMatches(a: Double?, b: Double?): Boolean = when {
+        a == null && b == null -> true
+        a == null || b == null -> false
+        else -> abs(a - b) < 0.01
+    }
+
+    // Only fills in a photo when the matched record doesn't already have one, so a
+    // re-import never overwrites a photo the user already attached or imported.
+    private fun resolvePhotoUri(
+        existingPhotoUri: String?,
+        uniqueId: String,
+        pictureMap: Map<String, List<String>>,
+        imageMap: Map<String, ByteArray>,
+    ): String? {
+        if (!existingPhotoUri.isNullOrBlank()) return existingPhotoUri
+        if (uniqueId.isBlank()) return existingPhotoUri
+        val filenames = pictureMap[uniqueId].orEmpty()
+        if (filenames.isEmpty()) return existingPhotoUri
+        val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
+        val savedPaths = filenames.mapNotNull { filename ->
+            val base = filename.substringAfterLast('/').substringAfterLast('\\').lowercase()
+            val imageBytes = imageMap[base] ?: return@mapNotNull null
+            val destFile = File(photosDir, "${UUID.randomUUID()}.jpg")
+            destFile.writeBytes(imageBytes)
+            destFile.absolutePath
+        }
+        return PhotoUris.join(savedPaths) ?: existingPhotoUri
+    }
+
+    private fun readZipEntries(bytes: ByteArray): Map<String, ByteArray> {
+        val result = LinkedHashMap<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory) {
+                    result[entry.name] = zip.readBytes()
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        return result
     }
 }
 
@@ -163,6 +231,7 @@ private data class FuelioFuelRow(
     val amount: Double,
     val fullTank: Boolean,
     val station: String,
+    val uniqueId: String,
 )
 
 private data class FuelioCostRow(
@@ -172,6 +241,7 @@ private data class FuelioCostRow(
     val odometerKm: Double?,
     val amount: Double,
     val income: Boolean,
+    val uniqueId: String,
 )
 
 private data class FuelioParseResult(
@@ -180,6 +250,7 @@ private data class FuelioParseResult(
     val vehicleFuelType: String?,
     val fuelRows: List<FuelioFuelRow>,
     val costRows: List<FuelioCostRow>,
+    val pictureMap: Map<String, List<String>>,
 )
 
 private fun stripQuotes(field: String) = field.trim().removeSurrounding("\"").trim()
@@ -213,6 +284,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     val fuelRows = mutableListOf<FuelioFuelRow>()
     val costRows = mutableListOf<FuelioCostRow>()
     val costCategories = mutableMapOf<String, String>()
+    val pictureMap = mutableMapOf<String, MutableList<String>>()
 
     var section = ""
     var headerColumns: List<String> = emptyList()
@@ -223,6 +295,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     var idxPrice = -1
     var idxStation = -1
     var idxMissed = -1
+    var idxUniqueId = -1
     // ##Costs columns
     var idxCostDate = -1
     var idxCostOdo = -1
@@ -230,6 +303,10 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     var idxCostTitle = -1
     var idxCostPrice = -1
     var idxCostIncome = -1
+    var idxCostUniqueId = -1
+    // ##Pictures columns
+    var idxPicFilename = -1
+    var idxPicTargetId = -1
 
     for (line in rawLines) {
         if (line.isBlank()) continue
@@ -271,6 +348,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                     idxPrice = headerColumns.indexOfFirst { it.contains("price") }
                     idxStation = headerColumns.indexOfFirst { it.contains("station") || it.contains("place") }
                     idxMissed = headerColumns.indexOfFirst { it.contains("missed") }
+                    idxUniqueId = headerColumns.indexOfFirst { it.replace(" ", "").contains("uniqueid") }
                 } else if (headerColumns.isNotEmpty()) {
                     if (idxMissed >= 0 && fields.getOrNull(idxMissed)?.let { it == "1" || it.equals("true", true) } == true) continue
                     val date = if (idxDate in fields.indices) parseFuelioDate(fields[idxDate]) else ""
@@ -290,6 +368,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                         amount = liters * price,
                         fullTank = fullTank,
                         station = station,
+                        uniqueId = fields.getOrNull(idxUniqueId)?.trim() ?: "",
                     )
                 }
             }
@@ -308,6 +387,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                     idxCostTitle = lowerFields.indexOfFirst { it.contains("title") }
                     idxCostPrice = lowerFields.indexOfFirst { it.contains("price") || it.contains("amount") }
                     idxCostIncome = lowerFields.indexOfFirst { it.contains("income") }
+                    idxCostUniqueId = lowerFields.indexOfFirst { it.replace(" ", "").let { c -> c == "uniqueid" || c == "costid" } }
                 } else if (idxCostDate >= 0) {
                     val date = fields.getOrNull(idxCostDate)?.let(::parseFuelioDate) ?: ""
                     val amount = fields.getOrNull(idxCostPrice)?.toDoubleOrNull() ?: 0.0
@@ -317,10 +397,32 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                     val title = fields.getOrNull(idxCostTitle) ?: ""
                     val odo = fields.getOrNull(idxCostOdo)?.toDoubleOrNull()
                     val income = fields.getOrNull(idxCostIncome)?.let { it == "1" || it.equals("true", true) } ?: false
-                    costRows += FuelioCostRow(date, title, category, odo, amount, income)
+                    costRows += FuelioCostRow(
+                        date = date,
+                        title = title,
+                        category = category,
+                        odometerKm = odo,
+                        amount = amount,
+                        income = income,
+                        uniqueId = fields.getOrNull(idxCostUniqueId)?.trim() ?: "",
+                    )
+                }
+            }
+            "pictures" -> {
+                val lowerFields = fields.map { it.lowercase() }
+                val looksLikeHeader = lowerFields.any { it == "filename" } && lowerFields.any { it.replace("_", "") == "targetid" }
+                if (idxPicFilename < 0 && looksLikeHeader) {
+                    idxPicFilename = lowerFields.indexOfFirst { it == "filename" }
+                    idxPicTargetId = lowerFields.indexOfFirst { it.replace("_", "") == "targetid" }
+                } else if (idxPicFilename >= 0) {
+                    val targetId = fields.getOrNull(idxPicTargetId)?.trim() ?: ""
+                    val filename = fields.getOrNull(idxPicFilename)?.trim() ?: ""
+                    if (targetId.isNotBlank() && filename.isNotBlank()) {
+                        pictureMap.getOrPut(targetId) { mutableListOf() } += filename
+                    }
                 }
             }
         }
     }
-    return FuelioParseResult(vehicleName, vehicleRegistration, vehicleFuelType, fuelRows, costRows)
+    return FuelioParseResult(vehicleName, vehicleRegistration, vehicleFuelType, fuelRows, costRows, pictureMap)
 }

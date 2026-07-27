@@ -16,6 +16,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses")
     suspend fun getAll(): List<ExpenseEntity>
 
+    @Query("SELECT * FROM expenses WHERE vehicleId = :vehicleId")
+    suspend fun getForVehicle(vehicleId: String): List<ExpenseEntity>
+
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getById(id: String): ExpenseEntity?
 

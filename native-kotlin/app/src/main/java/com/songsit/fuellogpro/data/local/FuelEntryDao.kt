@@ -13,6 +13,9 @@ interface FuelEntryDao {
     @Query("SELECT * FROM fuel_entries")
     suspend fun getAll(): List<FuelEntryEntity>
 
+    @Query("SELECT * FROM fuel_entries WHERE vehicleId = :vehicleId")
+    suspend fun getForVehicle(vehicleId: String): List<FuelEntryEntity>
+
     @Query("SELECT * FROM fuel_entries WHERE id = :id")
     suspend fun getById(id: String): FuelEntryEntity?
 

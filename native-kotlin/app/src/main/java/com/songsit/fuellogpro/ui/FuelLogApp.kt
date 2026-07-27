@@ -377,6 +377,7 @@ private fun Dashboard(
     modifier: Modifier = Modifier,
 ) {
     val displaySettings = LocalDisplaySettings.current
+    val kmPerLiterByEntry = remember(state.entries) { calculatePerEntryKmPerLiter(state.entries) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -487,7 +488,6 @@ private fun Dashboard(
         if (state.entries.isEmpty()) {
             item { EmptyFuelState() }
         } else {
-            val kmPerLiterByEntry = remember(state.entries) { calculatePerEntryKmPerLiter(state.entries) }
             items(state.entries.take(3), key = { it.id }) { FuelRow(it, kmPerLiter = kmPerLiterByEntry[it.id]) }
         }
     }

@@ -26,6 +26,15 @@ android {
                 keyPassword = providers.environmentVariable("FUELLOG_KEY_PASSWORD").orNull
             }
         }
+        getByName("debug") {
+            val debugKeystore = file("debug.keystore")
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
     buildTypes {
         getByName("release") {

@@ -49,20 +49,29 @@ jobs:
           echo "$FIREBASE_ANDROID_CONFIG_BASE64" | base64 --decode > app/google-services.json
 
       - name: Cache debug keystore
+        id: cache-debug-keystore
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
+          path: native-kotlin/app/debug.keystore
           key: android-debug-keystore-v1
+
+      - name: Generate debug keystore
+        if: steps.cache-debug-keystore.outputs.cache-hit != 'true'
+        working-directory: native-kotlin/app
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Test and build native preview
         working-directory: native-kotlin
         run: gradle testDebugUnitTest assembleDebug --no-daemon
 
       - name: Print debug keystore SHA-1 / SHA-256
-        continue-on-error: true
+        working-directory: native-kotlin/app
         run: |
           echo "Register these fingerprints for com.songsit.fuellogpro in the Firebase console (Project settings > Your apps) so Google Sign-In works on preview builds:"
-          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android || true
+          keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android
 
       - name: Prepare preview APK
         working-directory: native-kotlin

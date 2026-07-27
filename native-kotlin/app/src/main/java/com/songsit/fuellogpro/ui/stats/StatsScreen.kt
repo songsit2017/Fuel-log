@@ -1,45 +1,45 @@
 package com.songsit.fuellogpro.ui.stats
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.songsit.fuellogpro.domain.DueLevel
+import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
+import com.songsit.fuellogpro.domain.model.Expense
+import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.IconBadge
-import com.songsit.fuellogpro.domain.distanceByMonth
-import com.songsit.fuellogpro.domain.distanceByYear
-import com.songsit.fuellogpro.domain.expenseTotalByMonth
-import com.songsit.fuellogpro.domain.expenseTotalByYear
-import com.songsit.fuellogpro.domain.fuelCountByMonth
-import com.songsit.fuellogpro.domain.fuelCountByYear
-import com.songsit.fuellogpro.domain.fuelLitersByMonth
-import com.songsit.fuellogpro.domain.fuelLitersByYear
 import com.songsit.fuellogpro.ui.NativeAppState
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -47,137 +47,229 @@ import java.util.Locale
 
 private val statsCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val statsNumber = NumberFormat.getNumberInstance(Locale("th", "TH")).apply { maximumFractionDigits = 2 }
+private val statsMonthShort = listOf(
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+    "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+)
 
-// Item D: "สถิติ" screen, three sub-tabs via the stable (non-experimental) material3 TabRow/Tab.
+// Drivvo-style stats screen: (1) a Fuelio-like icon hero + monthly-spend card, (2) a
+// maintenance due/overdue alert banner, (3) the 3 most recent fuel/expense transactions.
 @Composable
 fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
-    var tab by remember { mutableIntStateOf(0) }
-    val titles = listOf("เติม-เพิ่ม", "ค่าใช้จ่าย", "ระยะทาง")
-    Column(modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = tab) {
-            titles.forEachIndexed { index, title ->
-                Tab(selected = tab == index, onClick = { tab = index }, text = { Text(title) })
-            }
-        }
-        when (tab) {
-            0 -> FillUpStatsTab(state, Modifier.fillMaxSize())
-            1 -> ExpenseStatsTab(state, Modifier.fillMaxSize())
-            else -> DistanceStatsTab(state, Modifier.fillMaxSize())
-        }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item { StatsHeroIllustration() }
+        item { MonthlySpendCard(state) }
+        item { MaintenanceAlertBanner(state) }
+        item { RecentActivityCard(state) }
     }
 }
 
 @Composable
-private fun StatCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+private fun StatsHeroIllustration() {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(120.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy((-18).dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(88.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.LocalGasStation,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(44.dp),
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.WaterDrop, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                Box(
+                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.secondary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.CreditCard, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
+        }
+    }
+}
+
+private fun monthTotal(entries: List<FuelEntry>, expenses: List<Expense>, year: Int, month: Int): Double {
+    fun matches(date: String) = runCatching { LocalDate.parse(date) }.getOrNull()?.let { it.year == year && it.monthValue == month } ?: false
+    val fuelTotal = entries.filter { matches(it.date) }.sumOf { it.amount }
+    val expenseTotal = expenses.filterNot(Expense::income).filter { matches(it.date) }.sumOf { it.amount }
+    return fuelTotal + expenseTotal
+}
+
+@Composable
+private fun MonthlySpendCard(state: NativeAppState) {
+    val today = remember { LocalDate.now() }
+    val months = remember(state.entries, state.expenses) {
+        (5 downTo 0).map { offset ->
+            val date = today.minusMonths(offset.toLong())
+            Triple(date.year, date.monthValue, monthTotal(state.entries, state.expenses, date.year, date.monthValue))
+        }
+    }
+    val maxValue = months.maxOf { it.third }.takeIf { it > 0 } ?: 1.0
     Card(shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBadge(Icons.Filled.Payments, size = 30.dp)
+                Column {
+                    Text("ค่าใช้จ่ายรายเดือน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${statsCurrency.format(months.last().third)} เดือนนี้",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().height(96.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                months.forEach { (year, month, total) ->
+                    val isCurrent = year == today.year && month == today.monthValue
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height((72 * (total / maxValue).coerceIn(0.04, 1.0)).dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer),
+                        )
+                        Text(
+                            statsMonthShort[month - 1],
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaintenanceAlertBanner(state: NativeAppState) {
+    val currentOdometer = state.summary.latestOdometerKm
+    val dueTasks = remember(state.maintenanceTasks, currentOdometer) {
+        state.maintenanceTasks
+            .map { it to calculateMaintenanceStatus(it, currentOdometer) }
+            .filter { (_, status) -> status.level != DueLevel.OK }
+            .sortedBy { (_, status) -> status.level.ordinal }
+    }
+    if (dueTasks.isEmpty()) return
+    val overdue = dueTasks.first().second.level == DueLevel.OVERDUE
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (overdue) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconBadge(icon, size = 26.dp)
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            content()
-        }
-    }
-}
-
-private fun compareLine(current: Number, previous: Number, currentLabel: String, previousLabel: String): String =
-    "${statsNumber.format(current)} $currentLabel / ${statsNumber.format(previous)} $previousLabel"
-
-private fun previousMonth(year: Int, month: Int): Pair<Int, Int> =
-    if (month == 1) (year - 1) to 12 else year to (month - 1)
-
-@Composable
-private fun FillUpStatsTab(state: NativeAppState, modifier: Modifier = Modifier) {
-    val today = remember { LocalDate.now() }
-    val thisYear = today.year
-    val lastYear = thisYear - 1
-    val thisMonth = today.monthValue
-    val (prevYear, prevMonth) = previousMonth(thisYear, thisMonth)
-    val entries = state.entries
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            StatCard("จำนวนครั้งเติมน้ำมัน", Icons.Filled.LocalGasStation) {
-                Text(compareLine(fuelCountByYear(entries, thisYear), fuelCountByYear(entries, lastYear), "ปีนี้", "ปีก่อนหน้านี้"))
-                Text(compareLine(fuelCountByMonth(entries, thisYear, thisMonth), fuelCountByMonth(entries, prevYear, prevMonth), "เดือนนี้", "เดือนก่อนหน้านี้"))
-            }
-        }
-        item {
-            StatCard("ปริมาณน้ำมันรวม", Icons.Filled.WaterDrop) {
-                Text(compareLine(fuelLitersByYear(entries, thisYear), fuelLitersByYear(entries, lastYear), "ลิตร ปีนี้", "ลิตร ปีก่อนหน้านี้"))
-                Text(compareLine(fuelLitersByMonth(entries, thisYear, thisMonth), fuelLitersByMonth(entries, prevYear, prevMonth), "ลิตร เดือนนี้", "ลิตร เดือนก่อนหน้านี้"))
-            }
-        }
-        item {
-            StatCard("ปริมาณต่อครั้ง", Icons.Filled.LocalGasStation) {
-                val minLiters = entries.minOfOrNull { it.liters }
-                val maxLiters = entries.maxOfOrNull { it.liters }
-                Text("เติมต่ำสุด: ${minLiters?.let { "${statsNumber.format(it)} ลิตร" } ?: "—"}")
-                Text("เติมสูงสุด: ${maxLiters?.let { "${statsNumber.format(it)} ลิตร" } ?: "—"}")
-            }
-        }
-        item {
-            StatCard("อัตราสิ้นเปลืองเฉลี่ย", Icons.Filled.Speed) {
-                // Reuses NativeAppState.summary (calculateFuelSummary() in NativeAppViewModel) —
-                // not recomputed here.
+                Icon(
+                    Icons.Filled.Build,
+                    contentDescription = null,
+                    tint = if (overdue) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.tertiary,
+                )
                 Text(
-                    state.summary.averageKmPerLiter?.let { "${statsNumber.format(it)} กม./ลิตร" } ?: "—",
-                    style = MaterialTheme.typography.headlineSmall,
+                    if (overdue) "ถึงกำหนดบำรุงรักษาแล้ว" else "ใกล้ถึงกำหนดบำรุงรักษา",
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
+                    color = if (overdue) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            dueTasks.take(3).forEach { (task, status) ->
+                Text(
+                    "${task.name} • ${status.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (overdue) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
 }
 
-@Composable
-private fun ExpenseStatsTab(state: NativeAppState, modifier: Modifier = Modifier) {
-    val today = remember { LocalDate.now() }
-    val thisYear = today.year
-    val lastYear = thisYear - 1
-    val thisMonth = today.monthValue
-    val (prevYear, prevMonth) = previousMonth(thisYear, thisMonth)
-    val expenses = state.expenses
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            StatCard("ค่าใช้จ่ายรวม", Icons.Filled.Payments) {
-                Text(
-                    "${statsCurrency.format(expenseTotalByYear(expenses, thisYear))} ปีนี้ / " +
-                        "${statsCurrency.format(expenseTotalByYear(expenses, lastYear))} ปีก่อนหน้านี้",
-                )
-                Text(
-                    "${statsCurrency.format(expenseTotalByMonth(expenses, thisYear, thisMonth))} เดือนนี้ / " +
-                        "${statsCurrency.format(expenseTotalByMonth(expenses, prevYear, prevMonth))} เดือนก่อนหน้านี้",
-                )
-            }
-        }
-    }
-}
+private data class ActivityRow(
+    val date: String,
+    val sortKey: String,
+    val title: String,
+    val subtitle: String,
+    val amount: Double,
+    val income: Boolean,
+    val icon: ImageVector,
+)
 
 @Composable
-private fun DistanceStatsTab(state: NativeAppState, modifier: Modifier = Modifier) {
-    val today = remember { LocalDate.now() }
-    val thisYear = today.year
-    val lastYear = thisYear - 1
-    val thisMonth = today.monthValue
-    val (prevYear, prevMonth) = previousMonth(thisYear, thisMonth)
-    val entries = state.entries
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            StatCard("ระยะทางที่ขับ", Icons.Filled.Route) {
-                Text(compareLine(distanceByYear(entries, thisYear), distanceByYear(entries, lastYear), "กม. ปีนี้", "กม. ปีก่อนหน้านี้"))
-                Text(compareLine(distanceByMonth(entries, thisYear, thisMonth), distanceByMonth(entries, prevYear, prevMonth), "กม. เดือนนี้", "กม. เดือนก่อนหน้านี้"))
+private fun RecentActivityCard(state: NativeAppState) {
+    val rows = remember(state.entries, state.expenses) {
+        val fuelRows = state.entries.map { entry ->
+            ActivityRow(
+                date = entry.date,
+                sortKey = "${entry.date} ${entry.time}",
+                title = entry.station.ifBlank { "เติมน้ำมัน" },
+                subtitle = "${statsNumber.format(entry.odometerKm)} กม.",
+                amount = entry.amount,
+                income = false,
+                icon = Icons.Filled.LocalGasStation,
+            )
+        }
+        val expenseRows = state.expenses.map { expense ->
+            ActivityRow(
+                date = expense.date,
+                sortKey = "${expense.date} 00:00",
+                title = expense.category.ifBlank { "ค่าใช้จ่าย" },
+                subtitle = expense.description,
+                amount = expense.amount,
+                income = expense.income,
+                icon = Icons.Filled.Build,
+            )
+        }
+        (fuelRows + expenseRows).sortedByDescending { it.sortKey }.take(3)
+    }
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconBadge(Icons.Filled.Payments, size = 26.dp)
+                Text("รายการล่าสุด", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            if (rows.isEmpty()) {
+                Text("ยังไม่มีรายการ", style = MaterialTheme.typography.bodySmall)
+            } else {
+                rows.forEachIndexed { index, row ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(row.icon, size = 32.dp)
+                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                            Text(row.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                            val detail = listOf(row.date, row.subtitle).filter(String::isNotBlank).joinToString(" • ")
+                            Text(detail, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Text(
+                            "${if (row.income) "+" else "-"}${statsCurrency.format(row.amount)}",
+                            fontWeight = FontWeight.Bold,
+                            color = if (row.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (index != rows.lastIndex) HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                }
             }
         }
     }

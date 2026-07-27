@@ -54,6 +54,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1344,6 +1345,28 @@ private fun AddFuelDialog(
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
     val stationOptions = (nearbyStations.map { it.name } + stationSuggestions).distinct()
         .filter { station.isBlank() || it.contains(station, ignoreCase = true) }
+    val runNearbySearch = {
+        nearbySearching = true
+        nearbyError = null
+        onFindNearbyStations?.invoke(
+            { results ->
+                nearbySearching = false
+                nearbyStations = results
+                stationMenuExpanded = true
+                if (results.isEmpty()) nearbyError = "ไม่พบปั๊มใกล้ฉัน"
+            },
+            { message ->
+                nearbySearching = false
+                nearbyError = message
+            },
+        )
+    }
+    // Auto-run the nearby-station lookup as soon as the "add new fill-up" dialog opens, so the
+    // user doesn't have to tap "หาปั๊มใกล้ฉัน" first — only for new entries, not edits, since an
+    // existing entry already has its station filled in.
+    LaunchedEffect(Unit) {
+        if (editing == null && onFindNearbyStations != null) runNearbySearch()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editing != null) "แก้ไขการเติมน้ำมัน" else "เพิ่มการเติมน้ำมัน") },
@@ -1365,22 +1388,7 @@ private fun AddFuelDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(
                                 enabled = !nearbySearching,
-                                onClick = {
-                                    nearbySearching = true
-                                    nearbyError = null
-                                    onFindNearbyStations(
-                                        { results ->
-                                            nearbySearching = false
-                                            nearbyStations = results
-                                            stationMenuExpanded = true
-                                            if (results.isEmpty()) nearbyError = "ไม่พบปั๊มใกล้ฉัน"
-                                        },
-                                        { message ->
-                                            nearbySearching = false
-                                            nearbyError = message
-                                        },
-                                    )
-                                },
+                                onClick = { runNearbySearch() },
                             ) { Text(if (nearbySearching) "กำลังค้นหา…" else "หาปั๊มใกล้ฉัน") }
                             nearbyError?.let {
                                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)

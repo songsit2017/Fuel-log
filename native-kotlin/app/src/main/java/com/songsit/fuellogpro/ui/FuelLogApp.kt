@@ -58,6 +58,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -253,8 +255,10 @@ fun FuelLogApp(
     var showSettings by remember { mutableStateOf(false) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var dashboardFabExpanded by remember { mutableStateOf(false) }
+    var homeTab by remember { mutableIntStateOf(0) }
     var recordsMode by remember { mutableIntStateOf(0) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ")
+    val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -298,9 +302,8 @@ fun FuelLogApp(
             "บันทึกค่าใช้จ่าย" to Icons.Filled.ReceiptLong,
             "บำรุงรักษา" to Icons.Filled.Build,
             "รถของฉัน" to Icons.Filled.DirectionsCar,
-            "ไทม์ไลน์" to Icons.Filled.History,
         )
-        val drawerTabTargets = listOf(0, 1, 5, 2, 3, 4, 6)
+        val drawerTabTargets = listOf(0, 1, 5, 2, 3, 4)
         androidx.compose.material3.ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -318,6 +321,7 @@ fun FuelLogApp(
                             selected = tab == drawerTabTargets[index],
                             onClick = {
                                 tab = drawerTabTargets[index]
+                                if (tab == 0) homeTab = 0
                                 drawerScope.launch { drawerState.close() }
                             },
                             modifier = Modifier.padding(horizontal = 12.dp),
@@ -346,7 +350,7 @@ fun FuelLogApp(
                     },
                     title = {
                         Column {
-                            Text(titles[tab], fontWeight = FontWeight.SemiBold)
+                            Text(if (tab == 0) homeTitles[homeTab] else titles[tab], fontWeight = FontWeight.SemiBold)
                             if (state.vehicles.size > 1) {
                                 Box {
                                     Row(
@@ -383,9 +387,29 @@ fun FuelLogApp(
                     },
                 )
             },
+            bottomBar = {
+                if (tab == 0) {
+                    NavigationBar {
+                        val homeTabIcons = listOf(
+                            Icons.Filled.Home,
+                            Icons.Filled.History,
+                            Icons.Filled.BarChart,
+                            Icons.Filled.Route,
+                        )
+                        homeTitles.forEachIndexed { index, label ->
+                            NavigationBarItem(
+                                selected = homeTab == index,
+                                onClick = { homeTab = index },
+                                icon = { Icon(homeTabIcons[index], contentDescription = label) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+            },
             floatingActionButton = {
                 when (tab) {
-                    0 -> Box {
+                    0 -> if (homeTab == 0) Box {
                         FloatingActionButton(
                             onClick = {
                                 if (state.vehicles.isEmpty()) showAddVehicle = true else dashboardFabExpanded = true
@@ -422,7 +446,12 @@ fun FuelLogApp(
             },
         ) { padding ->
             when (tab) {
-                0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
+                0 -> when (homeTab) {
+                    0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
+                    1 -> TimelineScreen(state, Modifier.padding(padding))
+                    2 -> TripCalculatorScreen(Modifier.padding(padding))
+                    else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
+                }
                 1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
                 2 -> RecordsPage(
                     mode = recordsMode,
@@ -450,8 +479,7 @@ fun FuelLogApp(
                     onDelete = onDeleteVehicle,
                     modifier = Modifier.padding(padding),
                 )
-                5 -> StatsScreen(state, Modifier.padding(padding))
-                else -> TimelineScreen(state, Modifier.padding(padding))
+                else -> StatsScreen(state, Modifier.padding(padding))
             }
         }
         if (showAddFuel || editingFuel != null) {
@@ -512,6 +540,107 @@ fun FuelLogApp(
         }
     }
     }
+    }
+}
+
+@Composable
+private fun TripCalculatorScreen(modifier: Modifier = Modifier) {
+    var distanceKm by remember { mutableStateOf("") }
+    var pricePerLiter by remember { mutableStateOf("") }
+    var consumptionKmPerLiter by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<Double?>(null) }
+    Column(
+        modifier = modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("เครื่องคิดเลขคำนวณค่าเดินทาง", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = distanceKm,
+            onValueChange = { distanceKm = it },
+            label = { Text("ระยะทาง (km)") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = pricePerLiter,
+            onValueChange = { pricePerLiter = it },
+            label = { Text("ราคา/L") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = consumptionKmPerLiter,
+            onValueChange = { consumptionKmPerLiter = it },
+            label = { Text("อัตราสิ้นเปลือง (km/L)") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = {
+                val distance = distanceKm.toDoubleOrNull()
+                val price = pricePerLiter.toDoubleOrNull()
+                val consumption = consumptionKmPerLiter.toDoubleOrNull()
+                result = if (distance != null && price != null && consumption != null && consumption > 0) {
+                    (distance / consumption) * price
+                } else null
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("คำนวณ") }
+        result?.let {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("ค่าใช้จ่ายโดยประมาณ", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        thaiCurrency.format(it),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearbyStationsMapScreen(
+    onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        searching = true
+        onFindNearbyStations?.invoke(
+            { results -> searching = false; stations = results },
+            { message -> searching = false; error = message },
+        )
+    }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
+        }
+        if (searching) {
+            item { Text("กำลังค้นหา...") }
+        } else if (error != null) {
+            item { Text(error ?: "") }
+        } else if (stations.isEmpty()) {
+            item { Text("ไม่พบปั๊มใกล้ฉัน") }
+        } else {
+            items(stations) { station ->
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(station.name, fontWeight = FontWeight.SemiBold)
+                        Text("${(station.distanceMeters / 1000).let { "%.1f".format(it) }} km")
+                    }
+                }
+            }
+        }
     }
 }
 

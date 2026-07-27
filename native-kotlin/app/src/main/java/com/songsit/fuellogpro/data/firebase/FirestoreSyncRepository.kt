@@ -232,7 +232,13 @@ class FirestoreSyncRepository(
         }
     }
 
-    private suspend fun discoverVehicles(uid: String): Map<String, DocumentSnapshot> {
+    private suspend fun discoverVehicles(uid: String): Map<String, DocumentSnapshot> = try {
+        discoverVehiclesUnsafe(uid)
+    } catch (e: Exception) {
+        throw Exception("Sync failed discovering vehicles for uid '$uid': ${e.message}", e)
+    }
+
+    private suspend fun discoverVehiclesUnsafe(uid: String): Map<String, DocumentSnapshot> {
         val found = linkedMapOf<String, DocumentSnapshot>()
         firestore.collection("vehicles").whereEqualTo("ownerUid", uid).get().await()
             .documents.forEach { found[it.id] = it }

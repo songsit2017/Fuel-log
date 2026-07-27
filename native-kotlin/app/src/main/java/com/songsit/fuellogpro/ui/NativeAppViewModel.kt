@@ -14,6 +14,7 @@ import com.songsit.fuellogpro.domain.calculateExpenseSummary
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
+import com.songsit.fuellogpro.domain.model.VehicleFormValues
 import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.domain.TripSummary
 import com.songsit.fuellogpro.domain.calculateTripSummary
@@ -143,19 +144,34 @@ class NativeAppViewModel(
         selectedVehicleId.value = id
     }
 
-    fun addVehicle(name: String, registration: String, fuelType: String, onSaved: () -> Unit) {
-        if (name.isBlank()) {
+    fun addVehicle(values: VehicleFormValues, onSaved: () -> Unit) {
+        if (values.name.isBlank()) {
             error.value = "กรุณาระบุชื่อรถ"
             return
         }
         viewModelScope.launch {
             saving.value = true
             error.value = null
-            runCatching { vehicleRepository.add(name, registration, fuelType) }
+            runCatching { vehicleRepository.add(values) }
                 .onSuccess {
                     selectedVehicleId.value = it
                     onSaved()
                 }
+                .onFailure { error.value = it.message ?: "บันทึกรถไม่สำเร็จ" }
+            saving.value = false
+        }
+    }
+
+    fun updateVehicle(id: String, values: VehicleFormValues, onSaved: () -> Unit) {
+        if (values.name.isBlank()) {
+            error.value = "กรุณาระบุชื่อรถ"
+            return
+        }
+        viewModelScope.launch {
+            saving.value = true
+            error.value = null
+            runCatching { vehicleRepository.update(id, values) }
+                .onSuccess { onSaved() }
                 .onFailure { error.value = it.message ?: "บันทึกรถไม่สำเร็จ" }
             saving.value = false
         }

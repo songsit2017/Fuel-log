@@ -86,6 +86,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.core:core-ktx:1.15.0")
+    // Vehicle photo loading (VehicleListScreen/VehicleEditScreen background images from imageUri).
+    implementation("io.coil-kt:coil-compose:2.7.0")
     // Item 3 (receipt OCR): on-device text recognition to pre-fill the expense amount field,
     // mirroring V8's OCR auto-fill (Tesseract/Claude OCR, app.js recognizeReceipt()).
     implementation("com.google.mlkit:text-recognition:16.0.1")

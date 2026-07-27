@@ -19,16 +19,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -36,8 +40,6 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,9 +47,11 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -83,6 +87,7 @@ import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
+import com.songsit.fuellogpro.domain.model.VehicleFormValues
 import com.songsit.fuellogpro.domain.DueLevel
 import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
 import com.songsit.fuellogpro.domain.model.MaintenanceTask
@@ -102,7 +107,11 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 
 private val fuelTypeOptions = listOf(
     "แก๊สโซฮอล์ 91", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ E20", "แก๊สโซฮอล์ E85", "ดีเซล B7", "ดีเซล B20", "เบนซิน",
@@ -210,7 +219,8 @@ fun FuelLogApp(
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
     onSelectVehicle: (String) -> Unit,
-    onAddVehicle: (String, String, String, () -> Unit) -> Unit,
+    onAddVehicle: (VehicleFormValues, () -> Unit) -> Unit,
+    onUpdateVehicle: (String, VehicleFormValues, () -> Unit) -> Unit,
     onDeleteVehicle: (String) -> Unit,
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -233,12 +243,24 @@ fun FuelLogApp(
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var editingMaintenance by remember { mutableStateOf<MaintenanceTask?>(null) }
     var editingTrip by remember { mutableStateOf<Trip?>(null) }
+    var editingVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึก", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {
+    if (showAddVehicle || editingVehicle != null) {
+        VehicleEditScreen(
+            saving = state.saving,
+            editing = editingVehicle,
+            onPickPhoto = onPickPhoto,
+            onPickCameraPhoto = onPickCameraPhoto,
+            onDismiss = { showAddVehicle = false; editingVehicle = null },
+            onSave = onAddVehicle,
+            onUpdate = onUpdateVehicle,
+        )
+    } else {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -346,6 +368,7 @@ fun FuelLogApp(
                     vehicles = state.vehicles,
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
+                    onEdit = { editingVehicle = it },
                     onDelete = onDeleteVehicle,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
@@ -379,13 +402,6 @@ fun FuelLogApp(
                 onDismiss = { showAddFuel = false; editingFuel = null },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
-            )
-        }
-        if (showAddVehicle) {
-            AddVehicleDialog(
-                saving = state.saving,
-                onDismiss = { showAddVehicle = false },
-                onSave = onAddVehicle,
             )
         }
         if (showAddExpense || editingExpense != null) {
@@ -429,6 +445,7 @@ fun FuelLogApp(
                 text = { Text(message) },
             )
         }
+    }
     }
     }
 }
@@ -1058,6 +1075,7 @@ private fun VehicleList(
     vehicles: List<Vehicle>,
     selectedVehicleId: String?,
     onSelect: (String) -> Unit,
+    onEdit: (Vehicle) -> Unit,
     onDelete: (String) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
@@ -1202,39 +1220,71 @@ private fun VehicleList(
             }
         }
         items(vehicles, key = { it.id }) { vehicle ->
+            var menuExpanded by remember { mutableStateOf(false) }
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { onSelect(vehicle.id) },
+                modifier = Modifier.fillMaxWidth().height(180.dp).clickable { onSelect(vehicle.id) },
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (vehicle.id == selectedVehicleId) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                ),
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(vehicle.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        val detail = listOf(vehicle.registration, vehicle.fuelType).filter(String::isNotBlank).joinToString(" • ")
-                        if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (vehicle.id == selectedVehicleId) {
-                        AssistChip(
-                            onClick = {},
-                            enabled = false,
-                            label = { Text("กำลังใช้") },
-                            colors = AssistChipDefaults.assistChipColors(
-                                disabledContainerColor = MaterialTheme.colorScheme.primary,
-                                disabledLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
+                Box(Modifier.fillMaxSize()) {
+                    if (!vehicle.imageUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = vehicle.imageUri,
+                            contentDescription = vehicle.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
                         )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.DirectionsCar,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    TextButton(onClick = { onDelete(vehicle.id) }) { Text("ลบ") }
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                                startY = 60f,
+                            ),
+                        ),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().align(Alignment.BottomStart).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                vehicle.name,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (vehicle.id == selectedVehicleId) {
+                                Text("กำลังใช้", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "เมนู", tint = Color.White)
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("แก้ไข") },
+                                    onClick = { menuExpanded = false; onEdit(vehicle) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("ลบ") },
+                                    onClick = { menuExpanded = false; onDelete(vehicle.id) },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1370,32 +1420,186 @@ private fun SimplePage(title: String, body: String, modifier: Modifier = Modifie
     }
 }
 
+// Read-only OutlinedTextField + manual DropdownMenu (not ExposedDropdownMenuBox — that combo
+// broke the build once before in this project) for the unit pickers below.
 @Composable
-private fun AddVehicleDialog(
+private fun UnitDropdownField(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(
+            Modifier.matchParentSize().clickable { expanded = true },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(text = { Text(option) }, onClick = { onSelect(option); expanded = false })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VehicleEditScreen(
     saving: Boolean,
+    editing: Vehicle?,
+    onPickPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)?,
+    onPickCameraPhoto: ((onPicked: (uris: List<String>, extractedAmount: Double?) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, () -> Unit) -> Unit,
+    onSave: (VehicleFormValues, () -> Unit) -> Unit,
+    onUpdate: (String, VehicleFormValues, () -> Unit) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var registration by remember { mutableStateOf("") }
-    var fuelType by remember { mutableStateOf("เบนซิน") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("เพิ่มรถ") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("ชื่อรถ") }, singleLine = true)
-                OutlinedTextField(registration, { registration = it }, label = { Text("ทะเบียน (ไม่บังคับ)") }, singleLine = true)
-                OutlinedTextField(fuelType, { fuelType = it }, label = { Text("ชนิดเชื้อเพลิง") }, singleLine = true)
-            }
+    var name by remember { mutableStateOf(editing?.name ?: "") }
+    var registration by remember { mutableStateOf(editing?.registration ?: "") }
+    var fuelType by remember { mutableStateOf(editing?.fuelType?.ifBlank { "เบนซิน" } ?: "เบนซิน") }
+    var imageUri by remember { mutableStateOf(editing?.imageUri) }
+    var distanceUnit by remember { mutableStateOf(editing?.distanceUnit ?: "km") }
+    var volumeUnit by remember { mutableStateOf(editing?.volumeUnit ?: "L") }
+    var consumptionUnit by remember { mutableStateOf(editing?.consumptionUnit ?: "km/l") }
+    var hasDualTank by remember { mutableStateOf(editing?.hasDualTank ?: false) }
+    var tankCapacity by remember { mutableStateOf(editing?.tankCapacity?.let { "%.0f".format(Locale.US, it) } ?: "") }
+    var vin by remember { mutableStateOf(editing?.vin ?: "") }
+    var insurance by remember { mutableStateOf(editing?.insurance ?: "") }
+    var isActive by remember { mutableStateOf(editing?.isActive ?: true) }
+    var photoSourceMenuExpanded by remember { mutableStateOf(false) }
+
+    fun handleSave() {
+        val values = VehicleFormValues(
+            name = name,
+            registration = registration,
+            fuelType = fuelType,
+            imageUri = imageUri,
+            distanceUnit = distanceUnit,
+            volumeUnit = volumeUnit,
+            consumptionUnit = consumptionUnit,
+            hasDualTank = hasDualTank,
+            tankCapacity = tankCapacity.toDoubleOrNull(),
+            vin = vin,
+            insurance = insurance,
+            isActive = isActive,
+        )
+        if (editing != null) onUpdate(editing.id, values, onDismiss) else onSave(values, onDismiss)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (editing != null) "แก้ไขรถ" else "เพิ่มรถ") },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "ปิด") }
+                },
+                actions = {
+                    IconButton(enabled = !saving, onClick = ::handleSave) {
+                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                    }
+                },
+            )
         },
-        confirmButton = {
-            Button(enabled = !saving, onClick = { onSave(name, registration, fuelType, onDismiss) }) {
-                Text(if (saving) "กำลังบันทึก…" else "บันทึก")
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(20.dp))) {
+                    if (!imageUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.DirectionsCar,
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (onPickPhoto != null) {
+                        val handlePicked = { picked: List<String>, _: Double? -> imageUri = picked.firstOrNull() ?: imageUri }
+                        Box(Modifier.align(Alignment.BottomEnd).padding(12.dp)) {
+                            FilledIconButton(
+                                onClick = {
+                                    if (onPickCameraPhoto != null) photoSourceMenuExpanded = true else onPickPhoto(handlePicked)
+                                },
+                            ) {
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = "เปลี่ยนรูปรถ")
+                            }
+                            DropdownMenu(
+                                expanded = photoSourceMenuExpanded,
+                                onDismissRequest = { photoSourceMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("ถ่ายรูป") },
+                                    onClick = { photoSourceMenuExpanded = false; onPickCameraPhoto?.invoke(handlePicked) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("เลือกจากแกลอรี่") },
+                                    onClick = { photoSourceMenuExpanded = false; onPickPhoto(handlePicked) },
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
-    )
+            item { OutlinedTextField(name, { name = it }, label = { Text("ชื่อรถ") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { Text("หน่วย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { UnitDropdownField("หน่วยระยะทาง", distanceUnit, listOf("km", "mi")) { distanceUnit = it } }
+            item { UnitDropdownField("หน่วยปริมาตร", volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
+            item { UnitDropdownField("หน่วยอัตราการใช้งาน", consumptionUnit, listOf("km/l", "l/100km", "mpg")) { consumptionUnit = it } }
+            item { Text("ชนิดเชื้อเพลิง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { OutlinedTextField(fuelType, { fuelType = it }, label = { Text("ชนิดเชื้อเพลิง") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("ยานพาหนะมีเชื้อเพลิง 2 ถัง")
+                    Switch(checked = hasDualTank, onCheckedChange = { hasDualTank = it })
+                }
+            }
+            item { Text("ความจุถัง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                OutlinedTextField(
+                    tankCapacity,
+                    { tankCapacity = it },
+                    label = { Text("ความจุถัง (${volumeUnit})") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { OutlinedTextField(registration, { registration = it }, label = { Text("ทะเบียนรถ") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(vin, { vin = it }, label = { Text("VIN") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(insurance, { insurance = it }, label = { Text("กรมธรรม์ประกันภัย") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("ใช้งานอยู่")
+                    Switch(checked = isActive, onCheckedChange = { isActive = it })
+                }
+            }
+        }
+    }
 }
 
 @Composable

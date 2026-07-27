@@ -441,6 +441,7 @@ class MainActivity : ComponentActivity() {
                 },
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,
+                onUpdateVehicle = viewModel::updateVehicle,
                 onDeleteVehicle = viewModel::deleteVehicle,
                 onClearError = viewModel::clearError,
             )

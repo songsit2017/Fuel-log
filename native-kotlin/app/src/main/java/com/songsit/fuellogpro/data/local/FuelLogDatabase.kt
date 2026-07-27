@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncConflictEntity::class,
         DeletionTombstoneEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -162,6 +162,22 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
+        // Fuelio-style vehicle profile: photo, unit preferences, dual-tank/tank capacity, and
+        // optional registration/VIN/insurance fields, plus an isActive flag for retired vehicles.
+        private val migration9To10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN imageUri TEXT")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN distanceUnit TEXT NOT NULL DEFAULT 'km'")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN volumeUnit TEXT NOT NULL DEFAULT 'L'")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN consumptionUnit TEXT NOT NULL DEFAULT 'km/l'")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN hasDualTank INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN tankCapacity REAL")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN vin TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN insurance TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -177,6 +193,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration6To7,
                     migration7To8,
                     migration8To9,
+                    migration9To10,
                 )
                     .build()
                     .also { instance = it }

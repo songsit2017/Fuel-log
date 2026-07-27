@@ -25,6 +25,15 @@ class FirestoreVehicleRepository(
                 name = document.getString("name") ?: "รถจาก Cloud",
                 registration = document.getString("registration").orEmpty(),
                 fuelType = document.getString("fuelType").orEmpty(),
+                imageUri = document.getString("imageUri"),
+                distanceUnit = document.getString("distanceUnit") ?: "km",
+                volumeUnit = document.getString("volumeUnit") ?: "L",
+                consumptionUnit = document.getString("consumptionUnit") ?: "km/l",
+                hasDualTank = document.getBoolean("hasDualTank") ?: false,
+                tankCapacity = document.getDouble("tankCapacity"),
+                vin = document.getString("vin").orEmpty(),
+                insurance = document.getString("insurance").orEmpty(),
+                isActive = document.getBoolean("isActive") ?: true,
             )
         }
         return vehicles.value.size

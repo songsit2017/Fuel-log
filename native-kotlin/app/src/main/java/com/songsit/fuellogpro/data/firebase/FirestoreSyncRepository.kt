@@ -407,10 +407,7 @@ private fun vehicleCloudMap(
     uid: String,
     email: String?,
     displayName: String?,
-): Map<String, Any?> = mapOf(
-    "name" to item.name,
-    "registration" to item.registration,
-    "fuelType" to item.fuelType,
+): Map<String, Any?> = vehicleEditableCloudMap(item) + mapOf(
     "ownerUid" to uid,
     "memberUids" to listOf(uid),
     "members" to mapOf(
@@ -419,13 +416,25 @@ private fun vehicleCloudMap(
     "createdAt" to FieldValue.serverTimestamp(),
 )
 
-private fun vehicleCanonical(item: VehicleEntity) =
-    listOf(item.name, item.registration, item.fuelType)
+private fun vehicleCanonical(item: VehicleEntity) = listOf(
+    item.name, item.registration, item.fuelType, item.imageUri.orEmpty(),
+    item.distanceUnit, item.volumeUnit, item.consumptionUnit, item.hasDualTank,
+    item.tankCapacity, item.vin, item.insurance, item.isActive,
+)
 
 private fun vehicleEditableCloudMap(item: VehicleEntity): Map<String, Any?> = mapOf(
     "name" to item.name,
     "registration" to item.registration,
     "fuelType" to item.fuelType,
+    "imageUri" to item.imageUri,
+    "distanceUnit" to item.distanceUnit,
+    "volumeUnit" to item.volumeUnit,
+    "consumptionUnit" to item.consumptionUnit,
+    "hasDualTank" to item.hasDualTank,
+    "tankCapacity" to item.tankCapacity,
+    "vin" to item.vin,
+    "insurance" to item.insurance,
+    "isActive" to item.isActive,
 )
 
 private fun conflictKey(collection: String, vehicleId: String, recordId: String) =
@@ -492,6 +501,15 @@ private fun parseVehicle(document: DocumentSnapshot) = VehicleEntity(
     registration = document.getString("registration").orEmpty(),
     fuelType = document.getString("fuelType").orEmpty(),
     createdAt = document.timestampMillis("createdAt"),
+    imageUri = document.getString("imageUri"),
+    distanceUnit = document.getString("distanceUnit") ?: "km",
+    volumeUnit = document.getString("volumeUnit") ?: "L",
+    consumptionUnit = document.getString("consumptionUnit") ?: "km/l",
+    hasDualTank = document.getBoolean("hasDualTank") ?: false,
+    tankCapacity = document.getDouble("tankCapacity"),
+    vin = document.getString("vin").orEmpty(),
+    insurance = document.getString("insurance").orEmpty(),
+    isActive = document.getBoolean("isActive") ?: true,
 )
 
 private fun parseFuel(vehicleId: String, document: DocumentSnapshot) = FuelEntryEntity(

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
@@ -248,13 +249,34 @@ fun FuelLogApp(
     var editingMaintenance by remember { mutableStateOf<MaintenanceTask?>(null) }
     var editingTrip by remember { mutableStateOf<Trip?>(null) }
     var editingVehicle by remember { mutableStateOf<Vehicle?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var recordsMode by remember { mutableIntStateOf(0) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ไทม์ไลน์")
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {
-    if (showAddVehicle || editingVehicle != null) {
+    if (showSettings) {
+        SettingsScreen(
+            onDismiss = { showSettings = false },
+            onExportBackup = onExportBackup,
+            onImportBackup = onImportBackup,
+            cloudState = cloudState,
+            onGoogleSignIn = onGoogleSignIn,
+            onCloudSync = onCloudSync,
+            onSignOut = onSignOut,
+            syncConflicts = syncConflicts,
+            onResolveConflict = onResolveConflict,
+            reminderSettings = reminderSettings,
+            onReminderSettingsChange = onReminderSettingsChange,
+            hasSelectedVehicle = state.selectedVehicle != null,
+            vehicleMembers = vehicleMembers,
+            onCreateInvite = onCreateInvite,
+            onJoinByCode = onJoinByCode,
+            displaySettings = displaySettings,
+            onDisplaySettingsChange = onDisplaySettingsChange,
+        )
+    } else if (showAddVehicle || editingVehicle != null) {
         VehicleEditScreen(
             saving = state.saving,
             editing = editingVehicle,
@@ -303,6 +325,11 @@ fun FuelLogApp(
                                     Text(it.name, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "ตั้งค่า")
                         }
                     },
                 )
@@ -368,27 +395,12 @@ fun FuelLogApp(
                     onEdit = { editingMaintenance = it },
                     modifier = Modifier.padding(padding),
                 )
-                4 -> VehicleList(
+                4 -> VehiclesListScreen(
                     vehicles = state.vehicles,
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
                     onEdit = { editingVehicle = it },
                     onDelete = onDeleteVehicle,
-                    onExportBackup = onExportBackup,
-                    onImportBackup = onImportBackup,
-                    cloudState = cloudState,
-                    onGoogleSignIn = onGoogleSignIn,
-                    onCloudSync = onCloudSync,
-                    onSignOut = onSignOut,
-                    syncConflicts = syncConflicts,
-                    onResolveConflict = onResolveConflict,
-                    reminderSettings = reminderSettings,
-                    onReminderSettingsChange = onReminderSettingsChange,
-                    vehicleMembers = vehicleMembers,
-                    onCreateInvite = onCreateInvite,
-                    onJoinByCode = onJoinByCode,
-                    displaySettings = displaySettings,
-                    onDisplaySettingsChange = onDisplaySettingsChange,
                     modifier = Modifier.padding(padding),
                 )
                 5 -> StatsScreen(state, Modifier.padding(padding))
@@ -1145,12 +1157,105 @@ private fun DisplaySettingsCard(
 }
 
 @Composable
-private fun VehicleList(
+private fun VehiclesListScreen(
     vehicles: List<Vehicle>,
     selectedVehicleId: String?,
     onSelect: (String) -> Unit,
     onEdit: (Vehicle) -> Unit,
     onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (vehicles.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ยังไม่มีรถ", fontWeight = FontWeight.Bold)
+                        Text("แตะ + เพื่อเพิ่มรถคันแรก")
+                    }
+                }
+            }
+        }
+        items(vehicles, key = { it.id }) { vehicle ->
+            var menuExpanded by remember { mutableStateOf(false) }
+            Card(
+                modifier = Modifier.fillMaxWidth().height(180.dp).clickable { onSelect(vehicle.id) },
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    if (!vehicle.imageUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = vehicle.imageUri,
+                            contentDescription = vehicle.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.DirectionsCar,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                                startY = 60f,
+                            ),
+                        ),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().align(Alignment.BottomStart).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                vehicle.name,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (vehicle.id == selectedVehicleId) {
+                                Text("กำลังใช้", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "เมนู", tint = Color.White)
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("แก้ไข") },
+                                    onClick = { menuExpanded = false; onEdit(vehicle) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("ลบ") },
+                                    onClick = { menuExpanded = false; onDelete(vehicle.id) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsScreen(
+    onDismiss: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     cloudState: CloudUiState,
@@ -1161,15 +1266,25 @@ private fun VehicleList(
     onResolveConflict: (String, Boolean) -> Unit,
     reminderSettings: ReminderSettings,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
+    hasSelectedVehicle: Boolean,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     displaySettings: DisplaySettings = DisplaySettings(),
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("ตั้งค่า") },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "ปิด") }
+                },
+            )
+        },
+    ) { padding ->
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1179,7 +1294,7 @@ private fun VehicleList(
                 onChange = onDisplaySettingsChange,
             )
         }
-        if (cloudState.uid != null && selectedVehicleId != null && (onCreateInvite != null || onJoinByCode != null)) {
+        if (cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)) {
             item {
                 VehicleSharingCard(
                     members = vehicleMembers,
@@ -1283,85 +1398,7 @@ private fun VehicleList(
                 }
             }
         }
-        if (vehicles.isEmpty()) {
-            item {
-                Card(shape = RoundedCornerShape(20.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีรถ", fontWeight = FontWeight.Bold)
-                        Text("แตะ + เพื่อเพิ่มรถคันแรก")
-                    }
-                }
-            }
-        }
-        items(vehicles, key = { it.id }) { vehicle ->
-            var menuExpanded by remember { mutableStateOf(false) }
-            Card(
-                modifier = Modifier.fillMaxWidth().height(180.dp).clickable { onSelect(vehicle.id) },
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Box(Modifier.fillMaxSize()) {
-                    if (!vehicle.imageUri.isNullOrBlank()) {
-                        AsyncImage(
-                            model = vehicle.imageUri,
-                            contentDescription = vehicle.name,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                        )
-                    } else {
-                        Box(
-                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Filled.DirectionsCar,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Box(
-                        Modifier.fillMaxSize().background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                                startY = 60f,
-                            ),
-                        ),
-                    )
-                    Row(
-                        Modifier.fillMaxWidth().align(Alignment.BottomStart).padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                vehicle.name,
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            if (vehicle.id == selectedVehicleId) {
-                                Text("กำลังใช้", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                        Box {
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = "เมนู", tint = Color.White)
-                            }
-                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("แก้ไข") },
-                                    onClick = { menuExpanded = false; onEdit(vehicle) },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("ลบ") },
-                                    onClick = { menuExpanded = false; onDelete(vehicle.id) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    }
     }
 }
 

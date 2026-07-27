@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui.stats
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,10 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -32,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,46 +63,73 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { StatsHeroIllustration() }
+        item { ExpenseBreakdownCard(state) }
         item { MonthlySpendCard(state) }
         item { MaintenanceAlertBanner(state) }
         item { RecentActivityCard(state) }
     }
 }
 
+private val donutPalette = listOf(
+    Color(0xFF8E4585), Color(0xFFFFA726), Color(0xFF5C6BC0), Color(0xFF26A69A),
+    Color(0xFFEF5350), Color(0xFF66BB6A), Color(0xFFAB47BC), Color(0xFF8D6E63),
+)
+
+private data class ExpenseSlice(val label: String, val amount: Double, val color: Color)
+
+// Replaces the old decorative pump/droplet/card icon cluster (which just overlapped three
+// icons with no real data) with an actual donut chart of where money goes: fuel spend plus
+// each expense category, proportioned by amount.
 @Composable
-private fun StatsHeroIllustration() {
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy((-18).dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(88.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.LocalGasStation,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(44.dp),
-                    )
-                }
-                Box(
-                    modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.WaterDrop, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                }
-                Box(
-                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.CreditCard, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+private fun ExpenseBreakdownCard(state: NativeAppState) {
+    val slices = remember(state.entries, state.expenses) {
+        val byCategory = linkedMapOf<String, Double>()
+        if (state.summary.totalSpent > 0) byCategory["ค่าน้ำมัน"] = state.summary.totalSpent
+        state.expenses.filterNot(Expense::income).forEach { expense ->
+            val key = expense.category.ifBlank { "อื่นๆ" }
+            byCategory[key] = (byCategory[key] ?: 0.0) + expense.amount
+        }
+        byCategory.entries
+            .sortedByDescending { it.value }
+            .mapIndexed { index, entry -> ExpenseSlice(entry.key, entry.value, donutPalette[index % donutPalette.size]) }
+    }
+    val total = slices.sumOf { it.amount }
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconBadge(Icons.Filled.PieChart, size = 26.dp)
+                Text("สัดส่วนค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            if (total <= 0) {
+                Text("ยังไม่มีข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Canvas(modifier = Modifier.size(110.dp)) {
+                        val strokeWidth = size.minDimension * 0.28f
+                        var startAngle = -90f
+                        slices.forEach { slice ->
+                            val sweep = (slice.amount / total * 360.0).toFloat()
+                            drawArc(
+                                color = slice.color,
+                                startAngle = startAngle,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
+                            )
+                            startAngle += sweep
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        slices.take(6).forEach { slice ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.size(10.dp).clip(CircleShape).background(slice.color))
+                                Text(
+                                    "${slice.label} • ${"%.0f".format(Locale.US, slice.amount / total * 100)}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

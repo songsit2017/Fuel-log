@@ -510,7 +510,7 @@ private fun Dashboard(
                             Icons.Filled.Payments,
                         )
                         MetricCard(
-                            "สุทธิหลังรายรับ",
+                            "ค่าใช้จ่ายสุทธิ",
                             formatCurrencyAmount(operatingCost - state.totalIncome, displaySettings),
                             Modifier.weight(1f),
                             Icons.Filled.AccountBalanceWallet,
@@ -518,8 +518,15 @@ private fun Dashboard(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
-                            "ระยะทางทริป",
-                            formatDistanceKm(state.tripSummary.totalDistanceKm, displaySettings),
+                            "ระยะทางสะสม",
+                            // Cumulative distance from the fuel log's own odometer readings
+                            // (latest - earliest), not the separate business-trip tracker —
+                            // most vehicles never log a "Trip" record, so that number stayed 0.
+                            formatDistanceKm(
+                                (state.entries.maxOfOrNull { it.odometerKm } ?: 0.0) -
+                                    (state.entries.minOfOrNull { it.odometerKm } ?: 0.0),
+                                displaySettings,
+                            ),
                             Modifier.weight(1f),
                             Icons.Filled.Route,
                         )

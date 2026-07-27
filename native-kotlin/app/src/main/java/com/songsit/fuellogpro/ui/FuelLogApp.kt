@@ -2279,6 +2279,17 @@ private fun AddExpenseDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { Text("ข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("ค่าทางด่วน", "ค่าที่จอด", "ค่าประกัน", "ค่าซ่อม").forEach { quickCategory ->
+                            androidx.compose.material3.FilterChip(
+                                selected = category == quickCategory,
+                                onClick = { category = quickCategory },
+                                label = { Text(quickCategory) },
+                            )
+                        }
+                    }
+                }
+                item {
                     AutocompleteTextField(
                         value = category,
                         onValueChange = { category = it },

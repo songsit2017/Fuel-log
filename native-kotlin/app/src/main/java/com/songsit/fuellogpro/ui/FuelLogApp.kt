@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -1204,13 +1206,27 @@ private fun VehicleList(
                     },
                 ),
             ) {
-                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(vehicle.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         val detail = listOf(vehicle.registration, vehicle.fuelType).filter(String::isNotBlank).joinToString(" • ")
                         if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall)
                     }
-                    if (vehicle.id == selectedVehicleId) Text("กำลังใช้", color = MaterialTheme.colorScheme.primary)
+                    if (vehicle.id == selectedVehicleId) {
+                        AssistChip(
+                            onClick = {},
+                            enabled = false,
+                            label = { Text("กำลังใช้") },
+                            colors = AssistChipDefaults.assistChipColors(
+                                disabledContainerColor = MaterialTheme.colorScheme.primary,
+                                disabledLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        )
+                    }
                     TextButton(onClick = { onDelete(vehicle.id) }) { Text("ลบ") }
                 }
             }

@@ -1947,6 +1947,7 @@ private fun SettingsScreen(
             item { PreferenceListItem(title = "ราคาน้ำมันวันนี้", subtitle = "บางจาก, ปตท., เชลล์ (Bangchak Open API)") }
             item { PreferenceListItem(title = "ค้นหาปั๊มใกล้ฉัน", subtitle = "Google Places API") }
             item { PreferenceListItem(title = "สภาพอากาศขณะเติมน้ำมัน", subtitle = "Open-Meteo") }
+            item { PreferenceListItem(title = "สแกนใบเสร็จอัตโนมัติ", subtitle = "Claude (Anthropic) AI") }
             item {
                 PreferenceListItem(
                     title = "ซอร์สโค้ดโปรเจกต์",

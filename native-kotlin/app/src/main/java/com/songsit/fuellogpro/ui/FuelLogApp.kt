@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
@@ -28,15 +29,21 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Percent
@@ -47,9 +54,11 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,6 +67,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -1750,6 +1760,7 @@ private fun PreferenceCategoryHeader(title: String) {
 private fun PreferenceListItem(
     title: String,
     subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -1760,6 +1771,9 @@ private fun PreferenceListItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (leading != null) {
+            Box(modifier = Modifier.padding(end = 16.dp), contentAlignment = Alignment.Center) { leading() }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (!subtitle.isNullOrBlank()) {
@@ -1801,7 +1815,34 @@ private fun SettingsScreen(
     var showCurrencyDialog by remember { mutableStateOf(false) }
     var showDecimalsDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showImportExport by remember { mutableStateOf(false) }
+    var showFamilySharing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
+
+    if (showImportExport) {
+        ImportExportScreen(
+            onDismiss = { showImportExport = false },
+            onExportBackup = onExportBackup,
+            onImportBackup = onImportBackup,
+            cloudState = cloudState,
+            onGoogleSignIn = onGoogleSignIn,
+            onCloudSync = onCloudSync,
+            onSignOut = onSignOut,
+            syncConflicts = syncConflicts,
+            onResolveConflict = onResolveConflict,
+        )
+        return
+    }
+    if (showFamilySharing) {
+        FamilySharingScreen(
+            onDismiss = { showFamilySharing = false },
+            members = vehicleMembers,
+            onCreateInvite = onCreateInvite,
+            onJoinByCode = onJoinByCode,
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -1860,68 +1901,26 @@ private fun SettingsScreen(
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { PreferenceCategoryHeader("แบ็คอัพข้อมูล (Import/Export options)") }
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text("สร้าง/กู้คืน", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    Text("เมฆและสำรองข้อมูลท้องถิ่น", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onExportBackup) { Text("สำรองข้อมูล (JSON)") }
-                        TextButton(onClick = onImportBackup) { Text("นำเข้าข้อมูล (.fuelio/JSON)") }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    if (cloudState.uid == null) {
-                        Button(onClick = onGoogleSignIn, enabled = !cloudState.syncing) {
-                            Text(if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบ Google Sync")
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(cloudState.email ?: "Google Connected", style = MaterialTheme.typography.bodySmall)
-                            Button(onClick = onCloudSync, enabled = !cloudState.syncing) {
-                                Text(if (cloudState.syncing) "กำลังซิงก์…" else "ซิงก์ตอนนี้")
-                            }
-                            TextButton(onClick = onSignOut) { Text("ออกจากระบบ") }
-                        }
-                    }
-                    if (syncConflicts.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        syncConflicts.take(5).forEach { conflict ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                                modifier = Modifier.padding(top = 4.dp),
-                            ) {
-                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                    Text(
-                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        TextButton(
-                                            onClick = { onResolveConflict(conflict.key, true) },
-                                            enabled = !cloudState.syncing,
-                                        ) { Text("ใช้ข้อมูลในเครื่อง") }
-                                        TextButton(
-                                            onClick = { onResolveConflict(conflict.key, false) },
-                                            enabled = !cloudState.syncing,
-                                        ) { Text("ใช้ข้อมูล Cloud") }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                val syncSubtitle = when {
+                    syncConflicts.isNotEmpty() -> "พบ ${syncConflicts.size} รายการที่ต่างกันรอแก้ไข"
+                    cloudState.uid != null -> "เมฆและสำรองข้อมูลท้องถิ่น • ${cloudState.email ?: "เชื่อมต่อ Google แล้ว"}"
+                    else -> "เมฆและสำรองข้อมูลท้องถิ่น"
                 }
+                PreferenceListItem(
+                    title = "สร้าง/กู้คืน",
+                    subtitle = syncSubtitle,
+                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = { showImportExport = true },
+                )
             }
 
-            if (cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)) {
+            if (canShareVehicle) {
                 item {
-                    VehicleSharingCard(
-                        members = vehicleMembers,
-                        onCreateInvite = onCreateInvite,
-                        onJoinByCode = onJoinByCode,
+                    PreferenceListItem(
+                        title = "แชร์รถกับสมาชิกครอบครัว",
+                        subtitle = if (vehicleMembers.isEmpty()) "ยังไม่มีสมาชิกร่วมดูแลรถคันนี้" else "${vehicleMembers.size} สมาชิก",
+                        leading = { Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = { showFamilySharing = true },
                     )
                 }
             }
@@ -2059,8 +2058,139 @@ private fun SettingsScreen(
     }
 }
 
+// Dedicated backup/restore + cloud sync screen, styled like Fuelio's own "Import/Export
+// options" list — each action is its own icon+title+subtitle row instead of buttons crammed
+// into one card.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleSharingCard(
+private fun ImportExportScreen(
+    onDismiss: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
+    cloudState: CloudUiState,
+    onGoogleSignIn: () -> Unit,
+    onCloudSync: () -> Unit,
+    onSignOut: () -> Unit,
+    syncConflicts: List<SyncConflictEntity>,
+    onResolveConflict: (String, Boolean) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("แบ็คอัพข้อมูล (Import/Export options)") },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            item { PreferenceCategoryHeader("สร้าง/กู้คืน") }
+            item {
+                PreferenceListItem(
+                    title = "สำรองข้อมูล (JSON)",
+                    subtitle = "ส่งออกข้อมูลรถทั้งหมดเก็บไว้ในเครื่องหรือแชร์ต่อ",
+                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = onExportBackup,
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "นำเข้าข้อมูล (.fuelio/JSON)",
+                    subtitle = "รองรับไฟล์สำรองจาก Fuelio (.fuelio) หรือไฟล์ JSON ของแอปนี้",
+                    leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = onImportBackup,
+                )
+            }
+
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item { PreferenceCategoryHeader("ซิงก์กับ Google") }
+            if (cloudState.uid == null) {
+                item {
+                    PreferenceListItem(
+                        title = if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบ Google Sync",
+                        subtitle = "ซิงก์ข้อมูลรถกับบัญชี Google ของคุณ",
+                        leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                    )
+                }
+            } else {
+                item {
+                    PreferenceListItem(
+                        title = cloudState.email ?: "เชื่อมต่อ Google แล้ว",
+                        subtitle = if (cloudState.syncing) "กำลังซิงก์…" else "แตะเพื่อซิงก์ตอนนี้",
+                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = if (!cloudState.syncing) onCloudSync else null,
+                    )
+                }
+                item {
+                    PreferenceListItem(
+                        title = "ออกจากระบบ",
+                        leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = onSignOut,
+                    )
+                }
+            }
+            cloudState.message?.let { message ->
+                item {
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            if (syncConflicts.isNotEmpty()) {
+                item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+                item { PreferenceCategoryHeader("รายการที่ขัดแย้งกัน") }
+                item {
+                    Text(
+                        "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+                }
+                items(syncConflicts.take(5)) { conflict ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                            Text(
+                                "${conflict.collectionName} • ${conflict.recordId.take(8)}",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = { onResolveConflict(conflict.key, true) },
+                                    enabled = !cloudState.syncing,
+                                ) { Text("ใช้ข้อมูลในเครื่อง") }
+                                TextButton(
+                                    onClick = { onResolveConflict(conflict.key, false) },
+                                    enabled = !cloudState.syncing,
+                                ) { Text("ใช้ข้อมูล Cloud") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dedicated family-sharing screen — pulled out of Settings' main list into its own screen (was
+// previously one cramped card mixed in with backup/sync controls) and restyled with real M3
+// list rows/cards to match the rest of the app.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FamilySharingScreen(
+    onDismiss: () -> Unit,
     members: List<VehicleMember>,
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
@@ -2075,81 +2205,139 @@ private fun VehicleSharingCard(
     var joinError by remember { mutableStateOf<String?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
 
-    Card(shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("แชร์รถกับสมาชิกครอบครัว", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (members.isNotEmpty()) {
-                Text("สมาชิกปัจจุบัน", style = MaterialTheme.typography.labelLarge)
-                members.forEach { member ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(member.displayName.ifBlank { member.email }, fontWeight = FontWeight.SemiBold)
-                            if (member.email.isNotBlank()) Text(member.email, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Text(member.role, style = MaterialTheme.typography.labelMedium)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("แชร์รถกับสมาชิกครอบครัว") },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item { PreferenceCategoryHeader("สมาชิกปัจจุบัน") }
+            if (members.isEmpty()) {
+                item {
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Text(
+                            "ยังไม่มีสมาชิกร่วมดูแลรถคันนี้",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        )
                     }
                 }
             } else {
-                Text("ยังไม่มีสมาชิกร่วมดูแลรถคันนี้", style = MaterialTheme.typography.bodySmall)
-            }
-            if (onCreateInvite != null) {
-                HorizontalDivider()
-                Text("สร้างคำเชิญ", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = inviteEmail,
-                    onValueChange = { inviteEmail = it },
-                    label = { Text("อีเมล Google ของสมาชิก") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("editor" to "แก้ไขได้", "viewer" to "ดูอย่างเดียว").forEach { (value, label) ->
-                        if (inviteRole == value) Button(onClick = { inviteRole = value }) { Text(label) }
-                        else TextButton(onClick = { inviteRole = value }) { Text(label) }
+                item {
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.fillMaxWidth()) {
+                            members.forEachIndexed { index, member ->
+                                if (index > 0) HorizontalDivider()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(member.displayName.ifBlank { member.email }, fontWeight = FontWeight.SemiBold)
+                                        if (member.email.isNotBlank()) {
+                                            Text(member.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    AssistChip(onClick = {}, enabled = false, label = { Text(member.role) })
+                                }
+                            }
+                        }
                     }
                 }
-                Button(
-                    enabled = !inviteBusy && inviteEmail.isNotBlank(),
-                    onClick = {
-                        inviteBusy = true
-                        inviteError = null
-                        inviteResult = null
-                        onCreateInvite(
-                            inviteEmail,
-                            inviteRole,
-                            { code -> inviteBusy = false; inviteResult = code },
-                            { message -> inviteBusy = false; inviteError = message },
-                        )
-                    },
-                ) { Text(if (inviteBusy) "กำลังสร้าง…" else "สร้างรหัสเชิญ") }
-                inviteResult?.let { Text("รหัสเชิญ: $it (7 วัน)", fontWeight = FontWeight.Bold) }
-                inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
+
+            if (onCreateInvite != null) {
+                item { PreferenceCategoryHeader("สร้างคำเชิญ") }
+                item {
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = inviteEmail,
+                                onValueChange = { inviteEmail = it },
+                                label = { Text("อีเมล Google ของสมาชิก") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("editor" to "แก้ไขได้", "viewer" to "ดูอย่างเดียว").forEach { (value, label) ->
+                                    FilterChip(
+                                        selected = inviteRole == value,
+                                        onClick = { inviteRole = value },
+                                        label = { Text(label) },
+                                    )
+                                }
+                            }
+                            Button(
+                                enabled = !inviteBusy && inviteEmail.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    inviteBusy = true
+                                    inviteError = null
+                                    inviteResult = null
+                                    onCreateInvite(
+                                        inviteEmail,
+                                        inviteRole,
+                                        { code -> inviteBusy = false; inviteResult = code },
+                                        { message -> inviteBusy = false; inviteError = message },
+                                    )
+                                },
+                            ) { Text(if (inviteBusy) "กำลังสร้าง…" else "สร้างรหัสเชิญ") }
+                            inviteResult?.let { Text("รหัสเชิญ: $it (7 วัน)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
+                            inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
+            }
+
             if (onJoinByCode != null) {
-                HorizontalDivider()
-                Text("เข้าร่วมด้วยรหัสเชิญ", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = joinCode,
-                    onValueChange = { joinCode = it },
-                    label = { Text("รหัสเชิญ 8 ตัว") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(
-                    enabled = !joinBusy && joinCode.isNotBlank(),
-                    onClick = {
-                        joinBusy = true
-                        joinError = null
-                        joinResult = null
-                        onJoinByCode(
-                            joinCode,
-                            { vehicleName -> joinBusy = false; joinResult = "เข้าร่วม $vehicleName สำเร็จ"; joinCode = "" },
-                            { message -> joinBusy = false; joinError = message },
-                        )
-                    },
-                ) { Text(if (joinBusy) "กำลังตรวจสอบ…" else "เข้าร่วม") }
-                joinResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-                joinError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                item { PreferenceCategoryHeader("เข้าร่วมด้วยรหัสเชิญ") }
+                item {
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = joinCode,
+                                onValueChange = { joinCode = it },
+                                label = { Text("รหัสเชิญ 8 ตัว") },
+                                leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Button(
+                                enabled = !joinBusy && joinCode.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    joinBusy = true
+                                    joinError = null
+                                    joinResult = null
+                                    onJoinByCode(
+                                        joinCode,
+                                        { vehicleName -> joinBusy = false; joinResult = "เข้าร่วม $vehicleName สำเร็จ"; joinCode = "" },
+                                        { message -> joinBusy = false; joinError = message },
+                                    )
+                                },
+                            ) { Text(if (joinBusy) "กำลังตรวจสอบ…" else "เข้าร่วม") }
+                            joinResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                            joinError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
             }
         }
     }

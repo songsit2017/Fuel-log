@@ -33,6 +33,11 @@ private val LightColors = lightColorScheme(
     onSurface = DeepPlum,
     onSurfaceVariant = Color(0xFF4A3B57),
 )
+// True AMOLED black — background/surface pinned to #000000 rather than the previous
+// dark-plum-tinted gray, matching the Netflix/YouTube-style deep-black dark theme (saves power
+// on OLED panels since black pixels are fully off). surfaceContainer* stay a hair off black
+// (#0A0A0A / #121212 / #1C1C1C) so Cards, the bottom nav, and dialogs stay visually distinct
+// from the background instead of blending into it.
 private val DarkColors = darkColorScheme(
     primary = Color(0xFFD8BEE0),
     onPrimary = DeepPlum,
@@ -41,11 +46,12 @@ private val DarkColors = darkColorScheme(
     secondary = Color(0xFFCB8FC0),
     onSecondary = DeepPlum,
     tertiary = FuelOrange,
-    background = Color(0xFF1B1620),
-    surface = Color(0xFF1B1620),
-    surfaceContainer = Color(0xFF2A2233),
-    surfaceContainerHigh = Color(0xFF352B40),
-    surfaceContainerLow = Color(0xFF221C29),
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    onBackground = Color(0xFFEDE3F2),
+    surfaceContainer = Color(0xFF121212),
+    surfaceContainerHigh = Color(0xFF1C1C1C),
+    surfaceContainerLow = Color(0xFF0A0A0A),
     onSurface = Color(0xFFEDE3F2),
     onSurfaceVariant = Color(0xFFC9BBD1),
 )

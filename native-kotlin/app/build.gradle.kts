@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -11,6 +13,13 @@ secrets {
     defaultPropertiesFileName = "local.defaults.properties"
 }
 
+val secretsProps = Properties().apply {
+    val defaultsFile = rootProject.file("local.defaults.properties")
+    val localFile = rootProject.file("local.properties")
+    if (defaultsFile.exists()) defaultsFile.inputStream().use { load(it) }
+    if (localFile.exists()) localFile.inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.songsit.fuellogpro"
     compileSdk = 37
@@ -21,13 +30,6 @@ android {
         targetSdk = 37
         versionCode = providers.environmentVariable("FUELLOG_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("FUELLOG_VERSION_NAME").orNull ?: "9.0.0-native-alpha.1"
-
-        val secretsProps = java.util.Properties().apply {
-            val localFile = rootProject.file("local.properties")
-            val defaultsFile = rootProject.file("local.defaults.properties")
-            if (defaultsFile.exists()) defaultsFile.inputStream().use { load(it) }
-            if (localFile.exists()) localFile.inputStream().use { load(it) }
-        }
         manifestPlaceholders["MAPS_API_KEY"] = secretsProps.getProperty("MAPS_API_KEY", "MISSING")
     }
     signingConfigs {

@@ -3,6 +3,8 @@ package com.songsit.fuellogpro.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,6 +146,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.launch
 
 private val fuelTypeOptions = listOf(
@@ -322,7 +325,11 @@ fun FuelLogApp(
     }
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
-    FuelLogTheme(themeMode = displaySettings.themeMode) {
+    FuelLogTheme(
+        themeMode = displaySettings.themeMode,
+        themePalette = displaySettings.themePalette,
+        fontFamily = displaySettings.fontFamily,
+    ) {
     importProgressPercent?.let { percent ->
         AlertDialog(
             onDismissRequest = {},
@@ -1882,6 +1889,8 @@ private fun SettingsScreen(
     var showCurrencyDialog by remember { mutableStateOf(false) }
     var showDecimalsDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+    var showThemePaletteDialog by remember { mutableStateOf(false) }
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -1967,6 +1976,22 @@ private fun SettingsScreen(
                     onClick = { showThemeDialog = true },
                 )
                 // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "แบบอักษร",
+                    subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
+                    onClick = { showFontDialog = true },
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "ชุดรูปแบบ",
+                    subtitle = themePaletteLabel(displaySettings.themePalette),
+                    onClick = { showThemePaletteDialog = true },
+                )
             }
 
             // ── หมวด 2: แบ็คอัพข้อมูล (Import/Export options) ───────────────────────
@@ -2126,6 +2151,72 @@ private fun SettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("ปิด") } },
+        )
+    }
+
+    if (showFontDialog) {
+        AlertDialog(
+            onDismissRequest = { showFontDialog = false },
+            title = { Text("แบบอักษร") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    fontOptions.forEach { option ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable {
+                                    onDisplaySettingsChange(displaySettings.copy(fontFamily = option.key))
+                                    showFontDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = displaySettings.fontFamily == option.key,
+                                onClick = {
+                                    onDisplaySettingsChange(displaySettings.copy(fontFamily = option.key))
+                                    showFontDialog = false
+                                },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showFontDialog = false }) { Text("ยกเลิก") } },
+        )
+    }
+
+    if (showThemePaletteDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemePaletteDialog = false },
+            title = { Text("ชุดรูปแบบ") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    themePaletteKeys.forEach { key ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable {
+                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
+                                    showThemePaletteDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = displaySettings.themePalette == key,
+                                onClick = {
+                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
+                                    showThemePaletteDialog = false
+                                },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(themePaletteLabel(key))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text("ยกเลิก") } },
         )
     }
 }
@@ -2386,7 +2477,18 @@ private fun FamilySharingScreen(
                                         modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        if (member.photoUrl != null) {
+                                            SubcomposeAsyncImage(
+                                                model = member.photoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop,
+                                                loading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) },
+                                                error = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) },
+                                            )
+                                        } else {
+                                            Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        }
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {

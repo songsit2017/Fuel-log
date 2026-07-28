@@ -13,6 +13,8 @@ data class DisplaySettings(
     val distanceUnit: String = "km",
     val volumeUnit: String = "liters",
     val themeMode: String = "system",
+    val fontFamily: String = "ubuntu",
+    val themePalette: String = "default",
 ) {
     val isMiles: Boolean get() = distanceUnit == "mi"
     val isGallons: Boolean get() = volumeUnit == "gal"
@@ -30,6 +32,8 @@ class DisplayPreferences(context: Context) {
         distanceUnit = preferences.getString(DISTANCE_UNIT, null) ?: "km",
         volumeUnit = preferences.getString(VOLUME_UNIT, null) ?: "liters",
         themeMode = preferences.getString(THEME_MODE, null) ?: "system",
+        fontFamily = preferences.getString(FONT_FAMILY, null) ?: "ubuntu",
+        themePalette = preferences.getString(THEME_PALETTE, null) ?: "default",
     )
 
     fun save(settings: DisplaySettings) {
@@ -39,6 +43,8 @@ class DisplayPreferences(context: Context) {
             .putString(DISTANCE_UNIT, settings.distanceUnit)
             .putString(VOLUME_UNIT, settings.volumeUnit)
             .putString(THEME_MODE, settings.themeMode)
+            .putString(FONT_FAMILY, settings.fontFamily)
+            .putString(THEME_PALETTE, settings.themePalette)
             .apply()
     }
 
@@ -48,5 +54,7 @@ class DisplayPreferences(context: Context) {
         const val DISTANCE_UNIT = "distance-unit"
         const val VOLUME_UNIT = "volume-unit"
         const val THEME_MODE = "theme-mode"
+        const val FONT_FAMILY = "font-family"
+        const val THEME_PALETTE = "theme-palette"
     }
 }

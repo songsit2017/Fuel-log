@@ -10,6 +10,7 @@ data class VehicleMember(
     val email: String,
     val displayName: String,
     val role: String,
+    val photoUrl: String? = null,
 )
 
 data class InviteResult(
@@ -43,6 +44,7 @@ class VehicleSharingRepository(
                 email = fields["email"] as? String ?: "",
                 displayName = fields["displayName"] as? String ?: "",
                 role = fields["role"] as? String ?: "viewer",
+                photoUrl = fields["photoUrl"] as? String,
             )
         }
     }
@@ -86,6 +88,7 @@ class VehicleSharingRepository(
         currentUid: String,
         currentEmail: String,
         currentDisplayName: String,
+        currentPhotoUrl: String? = null,
     ): String {
         val normalizedCode = code.trim().uppercase()
         require(normalizedCode.length == 8) { "กรอกรหัสเชิญให้ครบ 8 ตัว" }
@@ -109,6 +112,7 @@ class VehicleSharingRepository(
                     "email" to currentEmail,
                     "emailLower" to emailLower,
                     "displayName" to currentDisplayName,
+                    "photoUrl" to currentPhotoUrl,
                 ),
                 "memberUids" to FieldValue.arrayUnion(currentUid),
                 "lastJoinCode" to normalizedCode,

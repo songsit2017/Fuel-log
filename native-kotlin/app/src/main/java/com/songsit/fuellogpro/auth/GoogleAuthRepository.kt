@@ -15,6 +15,7 @@ class GoogleAuthRepository(
     val currentUid: String? get() = auth.currentUser?.uid
     val currentEmail: String? get() = auth.currentUser?.email
     val currentDisplayName: String? get() = auth.currentUser?.displayName
+    val currentPhotoUrl: String? get() = auth.currentUser?.photoUrl?.toString()
 
     suspend fun signIn(context: Context, webClientId: String): String {
         val googleOption = GetGoogleIdOption.Builder()

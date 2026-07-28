@@ -443,7 +443,7 @@ class MainActivity : ComponentActivity() {
                 if (uid != null) {
                     cloudState = cloudState.copy(syncing = true, message = null)
                     runCatching {
-                        cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName)
+                        cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName, authRepository.currentPhotoUrl)
                     }.onSuccess { result ->
                         cloudState = cloudState.copy(
                             syncing = false,
@@ -472,7 +472,7 @@ class MainActivity : ComponentActivity() {
                         if (uid != null) {
                             composeScope.launch {
                                 runCatching {
-                                    cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName)
+                                    cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName, authRepository.currentPhotoUrl)
                                 }
                             }
                         }
@@ -599,10 +599,10 @@ class MainActivity : ComponentActivity() {
                     } else {
                         composeScope.launch {
                             runCatching {
-                                vehicleSharingRepository.joinByCode(code, uid, email, authRepository.currentDisplayName ?: "")
+                                vehicleSharingRepository.joinByCode(code, uid, email, authRepository.currentDisplayName ?: "", authRepository.currentPhotoUrl)
                             }.onSuccess { vehicleName ->
                                 onResult(vehicleName)
-                                runCatching { cloudRepository.sync(uid, email, authRepository.currentDisplayName) }
+                                runCatching { cloudRepository.sync(uid, email, authRepository.currentDisplayName, authRepository.currentPhotoUrl) }
                             }.onFailure { onError(it.message ?: "เข้าร่วมไม่สำเร็จ") }
                         }
                     }
@@ -644,6 +644,7 @@ class MainActivity : ComponentActivity() {
                                     uid,
                                     authRepository.currentEmail,
                                     authRepository.currentDisplayName,
+                                    authRepository.currentPhotoUrl,
                                 )
                             }.onSuccess { result ->
                                 MaintenanceReminderWorker.refresh(applicationContext)

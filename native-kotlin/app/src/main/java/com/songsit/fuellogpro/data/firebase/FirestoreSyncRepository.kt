@@ -40,7 +40,7 @@ class FirestoreSyncRepository(
     // Serializing them here removes that race for every call site at once.
     private val syncMutex = Mutex()
 
-    suspend fun sync(uid: String, email: String?, displayName: String?): CloudSyncResult = syncMutex.withLock {
+    suspend fun sync(uid: String, email: String?, displayName: String?, photoUrl: String? = null): CloudSyncResult = syncMutex.withLock {
         normalizeLegacyVehicleId()
         val cloudVehicles = discoverVehicles(uid)
         val localVehicles = database.vehicleDao().getAll().associateBy(VehicleEntity::id)
@@ -55,7 +55,7 @@ class FirestoreSyncRepository(
                 when (decideSync(localExists = true, cloudExists = cloud != null, contentEqual = equal)) {
                     SyncDecision.UPLOAD -> {
                         firestore.collection("vehicles").document(id).set(
-                            vehicleCloudMap(local, uid, email, displayName),
+                            vehicleCloudMap(local, uid, email, displayName, photoUrl),
                             SetOptions.merge(),
                         ).await()
                         uploaded++
@@ -425,11 +425,17 @@ private fun vehicleCloudMap(
     uid: String,
     email: String?,
     displayName: String?,
+    photoUrl: String? = null,
 ): Map<String, Any?> = vehicleEditableCloudMap(item) + mapOf(
     "ownerUid" to uid,
     "memberUids" to listOf(uid),
     "members" to mapOf(
-        uid to mapOf("role" to "owner", "email" to email.orEmpty(), "displayName" to displayName.orEmpty()),
+        uid to mapOf(
+            "role" to "owner",
+            "email" to email.orEmpty(),
+            "displayName" to displayName.orEmpty(),
+            "photoUrl" to photoUrl,
+        ),
     ),
     "createdAt" to FieldValue.serverTimestamp(),
 )

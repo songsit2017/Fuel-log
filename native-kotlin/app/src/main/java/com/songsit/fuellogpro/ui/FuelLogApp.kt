@@ -1226,7 +1226,7 @@ private fun ExpenseList(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text("สุทธิ", style = MaterialTheme.typography.labelLarge)
+                    Text("สุทธิหลังรายรับ", style = MaterialTheme.typography.labelLarge)
                     Text(thaiCurrency.format(netExpense), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Text(
                         "รายจ่าย ${thaiCurrency.format(totalExpense)} • รายรับ ${thaiCurrency.format(totalIncome)}",
@@ -1930,6 +1930,37 @@ private fun SettingsScreen(
                             TextButton(onClick = onSignOut) { Text("ออกจากระบบ") }
                         }
                     }
+                    if (syncConflicts.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        syncConflicts.take(5).forEach { conflict ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                modifier = Modifier.padding(top = 4.dp),
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text(
+                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, true) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text("ใช้ข้อมูลในเครื่อง") }
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, false) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text("ใช้ข้อมูล Cloud") }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1959,8 +1990,9 @@ private fun SettingsScreen(
                 )
             }
             item {
+                // NotificationSettingRow: ตามเลขไมล์
                 PreferenceListItem(
-                    title = "เตือนที่หน้าปัด",
+                    title = "เตือนที่หน้าปัด (ตามเลขไมล์)",
                     subtitle = "จำนวนวันก่อนการสิ้นสุดของการทำเครื่องหมายรายการเป็นสำคัญ (การแจ้งเตือนสีแดง)",
                     trailing = {
                         Checkbox(
@@ -2437,8 +2469,7 @@ private fun VehicleEditScreen(
 
 // Full-screen add/edit fuel entry — replaces the old AlertDialog popup so the form has
 // room for all fields and matches the Fuelio-style layout shown in the design reference.
-// The composable occupies the entire screen via Box(fillMaxSize) + its own Scaffold so
-// the parent's BottomNavigationBar is visually covered while this screen is open.
+// AddFuelDialog / AddFuelScreen (full-screen add/edit fuel entry)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddFuelScreen(
@@ -3046,6 +3077,7 @@ private val expenseCategories = listOf(
     "บริการ", "บำรุงรักษา", "ทะเบียน", "ที่จอดรถ", "ล้างรถ", "ทางด่วน", "ตั๋ว/ค่าปรับ", "ปรับแต่ง", "การประกันภัย",
 )
 
+// AddExpenseDialog / AddExpenseScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddExpenseScreen(
@@ -3192,7 +3224,7 @@ private fun AddExpenseScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("ค่าใช้จ่ายเชิงลบ (รายได้)")
+                    Text("ค่าใช้จ่ายเชิงลบ / เป็นรายรับ")
                     Switch(checked = income, onCheckedChange = { income = it })
                 }
             }

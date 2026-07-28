@@ -202,6 +202,12 @@ class MainActivity : ComponentActivity() {
     private val importProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
     private val pendingImportSummaryResult = kotlinx.coroutines.flow.MutableStateFlow<com.songsit.fuellogpro.data.BackupImportResult?>(null)
 
+    private fun InputStream.readTextLimited(maxBytes: Int = 20_000_000): String {
+        val bytes = readBytes()
+        require(bytes.size <= maxBytes) { "ไฟล์ใหญ่เกินขนาดที่รองรับ" }
+        return bytes.toString(Charsets.UTF_8)
+    }
+
     private fun queryFileSize(uri: android.net.Uri): Long? =
         contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
             val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
@@ -235,7 +241,7 @@ class MainActivity : ComponentActivity() {
                         onProgress = { percent -> importProgress.value = percent },
                     )
                 } else {
-                    val text = contentResolver.openInputStream(uri)?.use { it.bufferedReader(Charsets.UTF_8).readText() }
+                    val text = contentResolver.openInputStream(uri)?.use { it.readTextLimited(20_000_000) }
                         ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
                     val looksLikeFuelioCsv = text.contains("##Log") || text.contains("##Costs")
                     if (looksLikeFuelioCsv) {

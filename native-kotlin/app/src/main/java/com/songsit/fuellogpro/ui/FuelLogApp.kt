@@ -295,6 +295,12 @@ fun FuelLogApp(
             },
         )
     }
+    importSummaryResult?.let { result ->
+        ImportSummaryDialog(
+            result = result,
+            onDismiss = onDismissImportSummary,
+        )
+    }
     if (showSettings) {
         SettingsScreen(
             onDismiss = { showSettings = false },
@@ -560,12 +566,6 @@ fun FuelLogApp(
                 onDismiss = { showAddTrip = false; editingTrip = null },
                 onSave = onAddTrip,
                 onUpdate = onUpdateTrip,
-            )
-        }
-        importSummaryResult?.let { result ->
-            ImportSummaryDialog(
-                result = result,
-                onDismiss = onDismissImportSummary,
             )
         }
         state.errorMessage?.let { message ->

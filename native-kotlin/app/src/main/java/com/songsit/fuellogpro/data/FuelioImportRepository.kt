@@ -68,13 +68,14 @@ class FuelioImportRepository(
         val imageMap = extractPictures(openStream(), reportProgress)
 
         // Pass 2: re-open the same source and stream each vehicle's (small, text-only) .csv
-        // entry, merging its rows against what's already in the local DB.
-        val existingVehicles = database.vehicleDao().getAll().toMutableList()
-        val vehiclesToUpsert = mutableListOf<VehicleEntity>()
-        val fuelEntries = mutableListOf<FuelEntryEntity>()
-        val expenses = mutableListOf<ExpenseEntity>()
-        var vehicleCount = 0
-
+        // entry, merging its rows against what's already in the local DB. Fuelio sometimes
+        // splits a vehicle's log and its costs across separate .csv entries in the same zip
+        // (see the isCostFile detection below), and each entry's own ##Pictures table may only
+        // cover photos for *that* file — so every entry is parsed first, then every entry's
+        // ##Pictures table is combined into one map before any row is linked to a photo, so a
+        // picture table sitting in one file can still resolve a row parsed from another.
+        data class ParsedCsvEntry(val entryName: String, val isCostFile: Boolean, val parsed: FuelioParseResult)
+        val parsedEntries = mutableListOf<ParsedCsvEntry>()
         CountingInputStream(openStream(), reportProgress).use { counting ->
             ZipInputStream(counting).use { zip ->
                 var entry = zip.nextEntry
@@ -84,34 +85,54 @@ class FuelioImportRepository(
                         val isCostFile = name.lowercase().contains("cost") || name.lowercase().contains("expense")
                         val defaultSection = if (isCostFile) "costs" else ""
                         val parsed = parseFuelioCsv(zip.readBytes().toString(Charsets.UTF_8), defaultSection)
-                        if (parsed.fuelRows.isNotEmpty() || parsed.costRows.isNotEmpty()) {
-                            var parsedVehicleName = parsed.vehicleName
-                                ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
-                            if (isCostFile && (parsedVehicleName.lowercase().contains("cost") || parsedVehicleName.lowercase().contains("expense"))) {
-                                parsedVehicleName = existingVehicles.firstOrNull()?.name ?: "รถนำเข้า"
-                            }
-                            val matchedVehicle = existingVehicles.find { it.name.trim().equals(parsedVehicleName.trim(), ignoreCase = true) }
-                            val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
-                            if (matchedVehicle == null) {
-                                val newVehicle = VehicleEntity(
-                                    id = vehicleId,
-                                    name = parsedVehicleName,
-                                    registration = parsed.vehicleRegistration ?: "",
-                                    fuelType = parsed.vehicleFuelType ?: "",
-                                    createdAt = System.currentTimeMillis(),
-                                )
-                                vehiclesToUpsert += newVehicle
-                                existingVehicles += newVehicle
-                            }
-                            vehicleCount++
-                            fuelEntries += mergeFuelRows(vehicleId, parsed, imageMap)
-                            expenses += mergeCostRows(vehicleId, parsed, imageMap)
+                        if (parsed.fuelRows.isNotEmpty() || parsed.costRows.isNotEmpty() || parsed.pictureMap.isNotEmpty()) {
+                            parsedEntries += ParsedCsvEntry(name, isCostFile, parsed)
                         }
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
                 }
             }
+        }
+
+        val combinedPictureMap = mutableMapOf<String, MutableList<String>>()
+        for (csvEntry in parsedEntries) {
+            for ((targetId, filenames) in csvEntry.parsed.pictureMap) {
+                combinedPictureMap.getOrPut(targetId) { mutableListOf() } += filenames
+            }
+        }
+
+        val existingVehicles = database.vehicleDao().getAll().toMutableList()
+        val vehiclesToUpsert = mutableListOf<VehicleEntity>()
+        val fuelEntries = mutableListOf<FuelEntryEntity>()
+        val expenses = mutableListOf<ExpenseEntity>()
+        var vehicleCount = 0
+
+        for (csvEntry in parsedEntries) {
+            val parsed = csvEntry.parsed
+            if (parsed.fuelRows.isEmpty() && parsed.costRows.isEmpty()) continue
+            var parsedVehicleName = parsed.vehicleName
+                ?: csvEntry.entryName.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
+            if (csvEntry.isCostFile && (parsedVehicleName.lowercase().contains("cost") || parsedVehicleName.lowercase().contains("expense"))) {
+                parsedVehicleName = existingVehicles.firstOrNull()?.name ?: "รถนำเข้า"
+            }
+            val matchedVehicle = existingVehicles.find { it.name.trim().equals(parsedVehicleName.trim(), ignoreCase = true) }
+            val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
+            if (matchedVehicle == null) {
+                val newVehicle = VehicleEntity(
+                    id = vehicleId,
+                    name = parsedVehicleName,
+                    registration = parsed.vehicleRegistration ?: "",
+                    fuelType = parsed.vehicleFuelType ?: "",
+                    createdAt = System.currentTimeMillis(),
+                )
+                vehiclesToUpsert += newVehicle
+                existingVehicles += newVehicle
+            }
+            vehicleCount++
+            val parsedWithCombinedPictures = parsed.copy(pictureMap = combinedPictureMap)
+            fuelEntries += mergeFuelRows(vehicleId, parsedWithCombinedPictures, imageMap)
+            expenses += mergeCostRows(vehicleId, parsedWithCombinedPictures, imageMap)
         }
 
         database.withTransaction {
@@ -346,6 +367,11 @@ private data class FuelioParseResult(
 
 private fun stripQuotes(field: String) = field.trim().removeSurrounding("\"").trim()
 
+// Fuelio header names vary in separator style across export versions/locales (e.g.
+// "Cost Title", "Cost_Title", "CostTitle"), so column matching strips underscores, spaces
+// and dashes before comparing — mirrors the legacy web importer's costIndex() helper.
+private fun normalizeHeader(field: String): String = field.lowercase().replace(Regex("[_\\s-]"), "")
+
 private fun detectDelimiter(line: String): Char {
     val semicolons = line.count { it == ';' }
     val commas = line.count { it == ',' }
@@ -439,10 +465,10 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                     idxOdo = headerColumns.indexOfFirst { it.contains("odo") }
                     idxFuel = headerColumns.indexOfFirst { it.contains("fuel") || it.contains("liter") || it.contains("volume") }
                     idxFull = headerColumns.indexOfFirst { it.contains("full") }
-                    idxPrice = headerColumns.indexOfFirst { it.contains("price") }
+                    idxPrice = headerColumns.indexOfFirst { it.contains("price") || it.contains("cost") }
                     idxStation = headerColumns.indexOfFirst { it.contains("station") || it.contains("place") }
                     idxMissed = headerColumns.indexOfFirst { it.contains("missed") }
-                    idxUniqueId = headerColumns.indexOfFirst { it.replace(" ", "").contains("uniqueid") }
+                    idxUniqueId = headerColumns.indexOfFirst { normalizeHeader(it).contains("uniqueid") }
                 } else if (headerColumns.isNotEmpty()) {
                     if (idxMissed >= 0 && fields.getOrNull(idxMissed)?.let { it == "1" || it.equals("true", true) } == true) continue
                     val date = if (idxDate in fields.indices) parseFuelioDate(fields[idxDate]) else ""
@@ -473,17 +499,24 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                 }
             }
             "costs" -> {
-                val lowerFields = fields.map { it.lowercase() }
-                val looksLikeHeader = lowerFields.any { it.contains("title") } && lowerFields.any { it.contains("price") || it.contains("amount") }
+                // Matched against Fuelio's real ##Costs column names (per the legacy web
+                // importer's costIndex() ported from app.js:1716-1717): the money column is
+                // literally named "Cost", not "Price"/"Amount" — normalizeHeader() strips
+                // separators so "Cost_Title"/"Cost Title"/"CostTitle" all resolve the same way,
+                // and the amount column is matched *exactly* against "cost"/"amount"/"price" so
+                // it never collides with the "Cost Title" column (which also contains "cost").
+                val normalizedFields = fields.map { normalizeHeader(it) }
+                val looksLikeHeader = normalizedFields.any { it == "costtitle" || it == "title" } &&
+                    normalizedFields.any { it == "cost" || it == "amount" || it == "price" }
                 if (idxCostDate < 0 && looksLikeHeader) {
-                    idxCostDate = lowerFields.indexOfFirst { it.contains("date") }
-                    idxCostTime = lowerFields.indexOfFirst { it.contains("time") }
-                    idxCostOdo = lowerFields.indexOfFirst { it.contains("odo") }
-                    idxCostCategory = lowerFields.indexOfFirst { it.contains("categ") }
-                    idxCostTitle = lowerFields.indexOfFirst { it.contains("title") }
-                    idxCostPrice = lowerFields.indexOfFirst { it.contains("price") || it.contains("amount") }
-                    idxCostIncome = lowerFields.indexOfFirst { it.contains("income") }
-                    idxCostUniqueId = lowerFields.indexOfFirst { it.replace(" ", "").let { c -> c == "uniqueid" || c == "costid" } }
+                    idxCostTitle = normalizedFields.indexOfFirst { it == "costtitle" || it == "title" }
+                    idxCostDate = normalizedFields.indexOfFirst { it == "date" || it == "datetime" }
+                    idxCostTime = normalizedFields.indexOfFirst { it == "time" }
+                    idxCostOdo = normalizedFields.indexOfFirst { it == "odo" || it == "odometer" }
+                    idxCostCategory = normalizedFields.indexOfFirst { it == "costtypeid" || it == "categoryid" || it.contains("categ") }
+                    idxCostPrice = normalizedFields.indexOfFirst { it == "cost" || it == "amount" || it == "price" }
+                    idxCostIncome = normalizedFields.indexOfFirst { it == "isincome" || it == "income" }
+                    idxCostUniqueId = normalizedFields.indexOfFirst { it == "uniqueid" || it == "costid" || it == "id" }
                 } else if (idxCostDate >= 0) {
                     val date = fields.getOrNull(idxCostDate)?.let(::parseFuelioDate) ?: ""
                     val amount = fields.getOrNull(idxCostPrice)?.toDoubleOrNull() ?: 0.0

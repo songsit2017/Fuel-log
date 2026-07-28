@@ -268,6 +268,9 @@ fun FuelLogApp(
     onDismissImportSummary: () -> Unit = {},
     driveBackupProgress: Int? = null,
     onDriveBackup: (() -> Unit)? = null,
+    onDriveRestore: (() -> Unit)? = null,
+    driveAutoSyncEnabled: Boolean = false,
+    onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
@@ -350,6 +353,9 @@ fun FuelLogApp(
             displaySettings = displaySettings,
             onDisplaySettingsChange = onDisplaySettingsChange,
             onDriveBackup = onDriveBackup,
+            onDriveRestore = onDriveRestore,
+            driveAutoSyncEnabled = driveAutoSyncEnabled,
+            onDriveAutoSyncChange = onDriveAutoSyncChange,
         )
     } else if (showAddVehicle || editingVehicle != null) {
         VehicleEditScreen(
@@ -1830,6 +1836,9 @@ private fun SettingsScreen(
     displaySettings: DisplaySettings = DisplaySettings(),
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
     onDriveBackup: (() -> Unit)? = null,
+    onDriveRestore: (() -> Unit)? = null,
+    driveAutoSyncEnabled: Boolean = false,
+    onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
 ) {
     var showUnitDialog by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
@@ -1852,6 +1861,9 @@ private fun SettingsScreen(
             syncConflicts = syncConflicts,
             onResolveConflict = onResolveConflict,
             onDriveBackup = onDriveBackup,
+            onDriveRestore = onDriveRestore,
+            driveAutoSyncEnabled = driveAutoSyncEnabled,
+            onDriveAutoSyncChange = onDriveAutoSyncChange,
         )
         return
     }
@@ -2095,6 +2107,9 @@ private fun ImportExportScreen(
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
     onDriveBackup: (() -> Unit)? = null,
+    onDriveRestore: (() -> Unit)? = null,
+    driveAutoSyncEnabled: Boolean = false,
+    onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -2134,6 +2149,32 @@ private fun ImportExportScreen(
                         subtitle = "อัปโหลด JSON และรูปต้นฉบับไปที่ Drive/Android/FuelLog Pro (แบบเดียวกับ Fuelio)",
                         leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = onDriveBackup,
+                    )
+                }
+            }
+            if (onDriveRestore != null) {
+                item {
+                    PreferenceListItem(
+                        title = "ดาวน์โหลดจาก Google ไดรฟ์",
+                        subtitle = "ดึงไฟล์สำรองล่าสุด อัปเดตทับเฉพาะรายการเดียวกัน ไม่ลบข้อมูลเดิม",
+                        leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onDriveRestore,
+                    )
+                }
+            }
+            if (onDriveAutoSyncChange != null) {
+                item {
+                    PreferenceListItem(
+                        title = "ซิงค์อัตโนมัติ Google ไดรฟ์",
+                        subtitle = "สำรองไปไดรฟ์ทุกครั้งที่เพิ่ม/แก้ไขข้อมูล",
+                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailing = {
+                            Switch(
+                                checked = driveAutoSyncEnabled,
+                                onCheckedChange = onDriveAutoSyncChange,
+                            )
+                        },
+                        onClick = { onDriveAutoSyncChange(!driveAutoSyncEnabled) },
                     )
                 }
             }

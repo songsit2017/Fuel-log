@@ -109,31 +109,69 @@ class MainActivity : ComponentActivity() {
 
     // Uploads a fresh JSON export plus every photo under filesDir/photos and
     // filesDir/fuelio_images to Drive (see GoogleDriveBackupRepository for the folder layout).
-    private fun performDriveBackup() {
+    // `silent` is used by the auto-sync hook in onReminderDataChanged below — it skips the
+    // blocking progress dialog and success toast (only a failure is surfaced) so saving a
+    // fill-up/expense doesn't interrupt the user with a sync popup every time; the very first
+    // authorization still needs a one-time consent screen regardless of this flag, since that
+    // part is Google's UI, not ours.
+    private fun performDriveBackup(silent: Boolean = false) {
         requestDriveAccessToken { token ->
             if (token == null) {
-                Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
+                if (!silent) Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
                 return@requestDriveAccessToken
             }
             lifecycleScope.launch {
-                driveBackupProgress.value = 0
+                if (!silent) driveBackupProgress.value = 0
                 runCatching {
                     val json = backupRepository.exportJson()
                     val photosDir = java.io.File(filesDir, "photos")
                     val fuelioImagesDir = java.io.File(filesDir, "fuelio_images")
                     val photos = (photosDir.listFiles()?.toList().orEmpty() + fuelioImagesDir.listFiles()?.toList().orEmpty())
                         .filter { it.isFile }
-                    driveBackupRepository.backup(token, json, photos) { percent -> driveBackupProgress.value = percent }
+                    driveBackupRepository.backup(token, json, photos) { percent ->
+                        if (!silent) driveBackupProgress.value = percent
+                    }
                 }.onSuccess { result ->
                     driveBackupProgress.value = null
-                    Toast.makeText(
-                        this@MainActivity,
-                        "สำรองไป Google ไดรฟ์สำเร็จ • อัปโหลดรูปใหม่ ${result.photosUploaded} รูป (ข้าม ${result.photosSkipped} รูปที่มีอยู่แล้ว)",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    if (!silent) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "สำรองไป Google ไดรฟ์สำเร็จ • อัปโหลดรูปใหม่ ${result.photosUploaded} รูป (ข้าม ${result.photosSkipped} รูปที่มีอยู่แล้ว)",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 }.onFailure {
                     driveBackupProgress.value = null
                     Toast.makeText(this@MainActivity, it.message ?: "สำรองไป Google ไดรฟ์ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // Downloads the latest JSON backup from Drive and merges it in via the same
+    // LocalBackupRepository.importJson() used for local-file JSON import — an id-keyed upsert,
+    // so this updates matching records in place and adds new ones without deleting or
+    // duplicating anything already on the device. Reuses the same progress/summary UI as the
+    // local import flow (importProgress/pendingImportSummaryResult).
+    private fun performDriveRestore() {
+        requestDriveAccessToken { token ->
+            if (token == null) {
+                Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
+                return@requestDriveAccessToken
+            }
+            lifecycleScope.launch {
+                importProgress.value = 0
+                runCatching {
+                    val json = driveBackupRepository.downloadLatestBackup(token)
+                        ?: error("ไม่พบไฟล์สำรองใน Google ไดรฟ์")
+                    importProgress.value = 50
+                    backupRepository.importJson(json)
+                }.onSuccess {
+                    importProgress.value = null
+                    pendingImportSummaryResult.value = it
+                }.onFailure {
+                    importProgress.value = null
+                    Toast.makeText(this@MainActivity, it.message ?: "ดาวน์โหลดจาก Google ไดรฟ์ไม่สำเร็จ", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -365,6 +403,7 @@ class MainActivity : ComponentActivity() {
         val database = FuelLogDatabase.get(this)
         val notificationPreferences = NotificationPreferences(this)
         val displayPreferences = DisplayPreferences(this)
+        val backupPreferences = com.songsit.fuellogpro.settings.BackupPreferences(this)
         backupRepository = LocalBackupRepository(database)
         csvExportRepository = LocalCsvExportRepository(database)
         fuelioImportRepository = FuelioImportRepository(applicationContext, database)
@@ -390,6 +429,7 @@ class MainActivity : ComponentActivity() {
             val composeScope = rememberCoroutineScope()
             var reminderSettings by remember { mutableStateOf(notificationPreferences.load()) }
             var displaySettings by remember { mutableStateOf(displayPreferences.load()) }
+            var backupSettings by remember { mutableStateOf(backupPreferences.load()) }
             val syncConflicts by database.syncConflictDao().observeAll().collectAsState(emptyList())
             var oilPriceInfo by remember { mutableStateOf<OilPriceInfo?>(null) }
             LaunchedEffect(Unit) {
@@ -404,6 +444,9 @@ class MainActivity : ComponentActivity() {
                     tripRepository,
                     onReminderDataChanged = {
                         MaintenanceReminderWorker.refresh(applicationContext)
+                        // Fuelio-style auto-sync: mirror every add/edit to Drive in the
+                        // background, matching the ("ซิงค์อัตโนมัติ ในขณะเพิ่ม/แก้ไขใหม่") checkbox.
+                        if (backupSettings.driveAutoSyncEnabled) performDriveBackup(silent = true)
                     },
                 ),
             )
@@ -427,6 +470,12 @@ class MainActivity : ComponentActivity() {
                 onDismissImportSummary = { pendingImportSummaryResult.value = null },
                 driveBackupProgress = driveBackupPercent,
                 onDriveBackup = { performDriveBackup() },
+                onDriveRestore = { performDriveRestore() },
+                driveAutoSyncEnabled = backupSettings.driveAutoSyncEnabled,
+                onDriveAutoSyncChange = { enabled ->
+                    backupSettings = backupSettings.copy(driveAutoSyncEnabled = enabled)
+                    backupPreferences.save(backupSettings)
+                },
                 onAddFuel = viewModel::addFuel,
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,

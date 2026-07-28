@@ -1,6 +1,11 @@
 package com.songsit.fuellogpro.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -11,11 +16,19 @@ import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 data class DriveBackupResult(
     val photosUploaded: Int,
     val photosSkipped: Int,
 )
+
+// How many photo uploads run concurrently. Uploads are dominated by per-request round-trip
+// latency (TLS + Drive API processing), not just raw bytes, so overlapping several requests
+// meaningfully speeds up wall-clock backup time on connections with real bandwidth to spare —
+// this was tuned down from a fully-sequential one-file-at-a-time loop after a user reported a
+// 100+ photo backup crawling at a few percent per minute despite a fast connection.
+private const val UPLOAD_CONCURRENCY = 4
 
 /**
  * Backs up a JSON export and every original-resolution photo to the signed-in user's own
@@ -58,23 +71,32 @@ class GoogleDriveBackupRepository {
         )
 
         val existingNames = listFilenames(accessToken, picturesFolderId)
-        var uploaded = 0
-        photoFiles.forEachIndexed { index, file ->
-            if (file.name !in existingNames) {
-                uploadFile(
-                    accessToken = accessToken,
-                    parentId = picturesFolderId,
-                    filename = file.name,
-                    mimeType = "image/jpeg",
-                    bytes = file.readBytes(),
-                )
-                uploaded++
-            }
-            val percent = (((index + 1) * 100) / photoFiles.size.coerceAtLeast(1)).coerceIn(0, 99)
-            onProgress(percent)
+        val toUpload = photoFiles.filter { it.name !in existingNames }
+        val skipped = photoFiles.size - toUpload.size
+        val totalWork = photoFiles.size.coerceAtLeast(1)
+        val doneCount = AtomicInteger(skipped)
+        onProgress(((doneCount.get() * 100) / totalWork).coerceIn(0, 99))
+
+        val semaphore = Semaphore(UPLOAD_CONCURRENCY)
+        coroutineScope {
+            toUpload.map { file ->
+                async {
+                    semaphore.withPermit {
+                        uploadFile(
+                            accessToken = accessToken,
+                            parentId = picturesFolderId,
+                            filename = file.name,
+                            mimeType = "image/jpeg",
+                            bytes = file.readBytes(),
+                        )
+                        val done = doneCount.incrementAndGet()
+                        onProgress(((done * 100) / totalWork).coerceIn(0, 99))
+                    }
+                }
+            }.awaitAll()
         }
         onProgress(100)
-        DriveBackupResult(photosUploaded = uploaded, photosSkipped = photoFiles.size - uploaded)
+        DriveBackupResult(photosUploaded = toUpload.size, photosSkipped = skipped)
     }
 
     // Downloads the most recently created JSON backup from the "backup" subfolder, or null if

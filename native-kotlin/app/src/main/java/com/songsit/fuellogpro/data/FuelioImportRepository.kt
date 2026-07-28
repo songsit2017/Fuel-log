@@ -234,7 +234,8 @@ class FuelioImportRepository(
                 fullTank = row.fullTank,
                 station = row.station,
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, parsed.pictureMap, imageMap),
+                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, "1", parsed.pictureMap, imageMap),
+                missedPreviousFillUp = row.missedPreviousFillUp,
             )
         }
     }
@@ -260,7 +261,7 @@ class FuelioImportRepository(
                 recurring = existing?.recurring ?: false,
                 reminderDate = existing?.reminderDate,
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, parsed.pictureMap, imageMap),
+                photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, "2", parsed.pictureMap, imageMap),
             )
         }
     }
@@ -285,15 +286,23 @@ class FuelioImportRepository(
     // Only fills in a photo when the matched record doesn't already have one, so a
     // re-import never overwrites a photo the user already attached or imported. The photo
     // itself was already streamed to disk in pass 1 — this just looks up its saved path.
+    //
+    // Real Fuelio exports assign UniqueId from two *separate* auto-increment sequences (one
+    // for ##Log rows, one for ##Costs rows) that are shared across every vehicle in the same
+    // backup — so a Log row and a Costs row can legitimately have the same UniqueId. The
+    // ##Pictures table's "Type" column (rowType here: "1" = log, "2" = costs) disambiguates
+    // them; [pictureMap] is keyed "type:targetId" first, falling back to the bare targetId
+    // for exports that omit a Type column.
     private fun resolvePhotoUri(
         existingPhotoUri: String?,
         uniqueId: String,
+        rowType: String,
         pictureMap: Map<String, List<String>>,
         imageMap: Map<String, String>,
     ): String? {
         if (!existingPhotoUri.isNullOrBlank()) return existingPhotoUri
         if (uniqueId.isBlank()) return existingPhotoUri
-        val filenames = pictureMap[uniqueId].orEmpty()
+        val filenames = pictureMap["$rowType:$uniqueId"] ?: pictureMap[uniqueId].orEmpty()
         if (filenames.isEmpty()) return existingPhotoUri
         val savedPaths = filenames.mapNotNull { filename ->
             val base = filename.substringAfterLast('/').substringAfterLast('\\').lowercase()
@@ -333,7 +342,7 @@ private class NonClosingInputStream(private val delegate: InputStream) : InputSt
     override fun close() {}
 }
 
-private data class FuelioFuelRow(
+internal data class FuelioFuelRow(
     val date: String,
     val time: String,
     val odometerKm: Double,
@@ -343,9 +352,10 @@ private data class FuelioFuelRow(
     val fullTank: Boolean,
     val station: String,
     val uniqueId: String,
+    val missedPreviousFillUp: Boolean,
 )
 
-private data class FuelioCostRow(
+internal data class FuelioCostRow(
     val date: String,
     val time: String,
     val title: String,
@@ -356,7 +366,7 @@ private data class FuelioCostRow(
     val uniqueId: String,
 )
 
-private data class FuelioParseResult(
+internal data class FuelioParseResult(
     val vehicleName: String?,
     val vehicleRegistration: String?,
     val vehicleFuelType: String?,
@@ -393,7 +403,7 @@ private fun parseFuelioDate(raw: String): String {
     return value
 }
 
-private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioParseResult {
+internal fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioParseResult {
     val rawLines = text.split('\n').map { it.trimEnd('\r') }
     var vehicleName: String? = null
     var vehicleRegistration: String? = null
@@ -410,7 +420,8 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
     var idxOdo = -1
     var idxFuel = -1
     var idxFull = -1
-    var idxPrice = -1
+    var idxAmount = -1
+    var idxVolumePrice = -1
     var idxStation = -1
     var idxMissed = -1
     var idxUniqueId = -1
@@ -423,9 +434,14 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
     var idxCostPrice = -1
     var idxCostIncome = -1
     var idxCostUniqueId = -1
+    // ##Vehicle columns
+    var idxVehicleHeaderSeen = false
+    var idxVehicleName = -1
+    var idxVehiclePlate = -1
     // ##Pictures columns
     var idxPicFilename = -1
     var idxPicTargetId = -1
+    var idxPicType = -1
 
     for (line in rawLines) {
         if (line.isBlank()) continue
@@ -460,37 +476,68 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                 val looksLikeHeader = lowerFields.any { it.contains("odo") } && lowerFields.any { it.contains("fuel") || it.contains("liter") || it.contains("volume") }
                 if (headerColumns.isEmpty() && looksLikeHeader) {
                     headerColumns = lowerFields
-                    idxDate = headerColumns.indexOfFirst { it.contains("date") }
+                    // Real Fuelio exports spell the date+time column "Data" (not "Date" — a
+                    // known quirk of the app) and pack both into one "yyyy-MM-dd HH:mm" value;
+                    // "date"/"data" both matched here, and the two are split apart below. The
+                    // gross total is a column literally named "Price (optional)" while the
+                    // *actual* per-liter price is a separate "VolumePrice" column — both
+                    // contain "price", so idxVolumePrice must be resolved first and idxAmount
+                    // must explicitly exclude it to avoid picking the wrong column.
+                    idxDate = headerColumns.indexOfFirst { it.contains("date") || it == "data" }
                     idxTime = headerColumns.indexOfFirst { it.contains("time") }
                     idxOdo = headerColumns.indexOfFirst { it.contains("odo") }
-                    idxFuel = headerColumns.indexOfFirst { it.contains("fuel") || it.contains("liter") || it.contains("volume") }
+                    idxFuel = headerColumns.indexOfFirst { it.contains("fuel") || it.contains("liter") || it.contains("volume") && !it.contains("price") }
                     idxFull = headerColumns.indexOfFirst { it.contains("full") }
-                    idxPrice = headerColumns.indexOfFirst { it.contains("price") || it.contains("cost") }
-                    idxStation = headerColumns.indexOfFirst { it.contains("station") || it.contains("place") }
+                    idxVolumePrice = headerColumns.indexOfFirst { it.contains("volume") && it.contains("price") }
+                    idxAmount = headerColumns.indexOfFirst { it.contains("price") && !it.contains("volume") || it.contains("cost") }
+                    idxStation = headerColumns.indexOfFirst { it.contains("station") || it.contains("place") || it.contains("city") }
                     idxMissed = headerColumns.indexOfFirst { it.contains("missed") }
                     idxUniqueId = headerColumns.indexOfFirst { normalizeHeader(it).contains("uniqueid") }
                 } else if (headerColumns.isNotEmpty()) {
-                    if (idxMissed >= 0 && fields.getOrNull(idxMissed)?.let { it == "1" || it.equals("true", true) } == true) continue
-                    val date = if (idxDate in fields.indices) parseFuelioDate(fields[idxDate]) else ""
+                    val rawDateTime = (if (idxDate in fields.indices) fields[idxDate] else "").trim()
+                    val spaceIdx = rawDateTime.indexOf(' ')
+                    val rawDate = if (spaceIdx > 0) rawDateTime.substring(0, spaceIdx) else rawDateTime
+                    val timeFromDateTime = if (spaceIdx > 0) rawDateTime.substring(spaceIdx + 1).trim() else ""
+                    val date = parseFuelioDate(rawDate)
                     val odo = fields.getOrNull(idxOdo)?.toDoubleOrNull()
                     val liters = fields.getOrNull(idxFuel)?.toDoubleOrNull()
                     if (date.isBlank() || odo == null || liters == null || liters <= 0) continue
-                    val price = fields.getOrNull(idxPrice)?.toDoubleOrNull() ?: 0.0
+                    val amount = fields.getOrNull(idxAmount)?.toDoubleOrNull() ?: 0.0
+                    val volumePrice = fields.getOrNull(idxVolumePrice)?.toDoubleOrNull()?.takeIf { it > 0 }
+                    val pricePerLiter = volumePrice ?: (if (amount > 0) amount / liters else 0.0)
                     val station = fields.getOrNull(idxStation)?.takeIf { it.isNotBlank() } ?: ""
-                    val fullField = fields.getOrNull(idxFull)?.lowercase()
-                    val fullTank = fullField == null || fullField == "1" || fullField == "true" || fullField == "full"
-                    val time = fields.getOrNull(idxTime)?.trim()?.takeIf { it.isNotBlank() } ?: "00:00"
+                    val fullField = fields.getOrNull(idxFull)?.trim()?.lowercase()
+                    val fullTank = fullField == null || fullField != "0"
+                    val time = timeFromDateTime.takeIf { it.isNotBlank() }
+                        ?: fields.getOrNull(idxTime)?.trim()?.takeIf { it.isNotBlank() }
+                        ?: "00:00"
+                    val missed = idxMissed >= 0 && fields.getOrNull(idxMissed)?.let { it == "1" || it.equals("true", true) } == true
                     fuelRows += FuelioFuelRow(
                         date = date,
                         time = time,
                         odometerKm = odo,
                         liters = liters,
-                        pricePerLiter = price,
-                        amount = liters * price,
+                        pricePerLiter = pricePerLiter,
+                        amount = amount,
                         fullTank = fullTank,
                         station = station,
                         uniqueId = fields.getOrNull(idxUniqueId)?.trim() ?: "",
+                        missedPreviousFillUp = missed,
                     )
+                }
+            }
+            "vehicle" -> {
+                // Real Fuelio exports store vehicle metadata as its own header+data row (not
+                // the "Car;MyCar" key-value lines the block above guards against), e.g.
+                // "Name","Description",...,"Plate",... followed by "V-Cross M/AT 2022","",...
+                val lowerFields = fields.map { it.lowercase() }
+                if (!idxVehicleHeaderSeen && lowerFields.any { it == "name" } && lowerFields.any { it.contains("distunit") || it.contains("fuelunit") }) {
+                    idxVehicleHeaderSeen = true
+                    idxVehicleName = lowerFields.indexOfFirst { it == "name" }
+                    idxVehiclePlate = lowerFields.indexOfFirst { it == "plate" }
+                } else if (idxVehicleHeaderSeen && idxVehicleName >= 0) {
+                    vehicleName = vehicleName ?: fields.getOrNull(idxVehicleName)?.trim()?.takeIf { it.isNotBlank() }
+                    vehicleRegistration = vehicleRegistration ?: fields.getOrNull(idxVehiclePlate)?.trim()?.takeIf { it.isNotBlank() }
                 }
             }
             "costcategories" -> {
@@ -518,7 +565,14 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                     idxCostIncome = normalizedFields.indexOfFirst { it == "isincome" || it == "income" }
                     idxCostUniqueId = normalizedFields.indexOfFirst { it == "uniqueid" || it == "costid" || it == "id" }
                 } else if (idxCostDate >= 0) {
-                    val date = fields.getOrNull(idxCostDate)?.let(::parseFuelioDate) ?: ""
+                    // Fuelio's ##Costs "Date" column is also a combined "yyyy-MM-dd HH:mm"
+                    // value (same as ##Log's "Data" column) — parseFuelioDate() only returns
+                    // the date portion, so the time is split out the same way here.
+                    val rawCostDateTime = (fields.getOrNull(idxCostDate) ?: "").trim()
+                    val costSpaceIdx = rawCostDateTime.indexOf(' ')
+                    val rawCostDate = if (costSpaceIdx > 0) rawCostDateTime.substring(0, costSpaceIdx) else rawCostDateTime
+                    val timeFromCostDate = if (costSpaceIdx > 0) rawCostDateTime.substring(costSpaceIdx + 1).trim() else ""
+                    val date = parseFuelioDate(rawCostDate)
                     val amount = fields.getOrNull(idxCostPrice)?.toDoubleOrNull() ?: 0.0
                     if (date.isBlank() || amount <= 0) continue
                     val categoryRaw = fields.getOrNull(idxCostCategory) ?: ""
@@ -526,7 +580,9 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                     val title = fields.getOrNull(idxCostTitle) ?: ""
                     val odo = fields.getOrNull(idxCostOdo)?.toDoubleOrNull()
                     val income = fields.getOrNull(idxCostIncome)?.let { it == "1" || it.equals("true", true) } ?: false
-                    val time = fields.getOrNull(idxCostTime)?.trim()?.takeIf { it.isNotBlank() } ?: "00:00"
+                    val time = timeFromCostDate.takeIf { it.isNotBlank() }
+                        ?: fields.getOrNull(idxCostTime)?.trim()?.takeIf { it.isNotBlank() }
+                        ?: "00:00"
                     costRows += FuelioCostRow(
                         date = date,
                         time = time,
@@ -540,16 +596,25 @@ private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPar
                 }
             }
             "pictures" -> {
+                // "Type" (1 = ##Log row, 2 = ##Costs row) disambiguates the shared UniqueId
+                // numbering — see the comment on resolvePhotoUri(). Both a type-scoped key
+                // ("type:targetId") and a bare targetId key are stored so exports without a
+                // Type column still resolve via the fallback lookup.
                 val lowerFields = fields.map { it.lowercase() }
                 val looksLikeHeader = lowerFields.any { it == "filename" } && lowerFields.any { it.replace("_", "") == "targetid" }
                 if (idxPicFilename < 0 && looksLikeHeader) {
                     idxPicFilename = lowerFields.indexOfFirst { it == "filename" }
                     idxPicTargetId = lowerFields.indexOfFirst { it.replace("_", "") == "targetid" }
+                    idxPicType = lowerFields.indexOfFirst { it == "type" }
                 } else if (idxPicFilename >= 0) {
                     val targetId = fields.getOrNull(idxPicTargetId)?.trim() ?: ""
                     val filename = fields.getOrNull(idxPicFilename)?.trim() ?: ""
+                    val type = if (idxPicType >= 0) fields.getOrNull(idxPicType)?.trim().orEmpty() else ""
                     if (targetId.isNotBlank() && filename.isNotBlank()) {
                         pictureMap.getOrPut(targetId) { mutableListOf() } += filename
+                        if (type.isNotBlank()) {
+                            pictureMap.getOrPut("$type:$targetId") { mutableListOf() } += filename
+                        }
                     }
                 }
             }

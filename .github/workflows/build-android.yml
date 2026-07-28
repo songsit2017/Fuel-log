@@ -121,3 +121,23 @@ jobs:
             --notes "สร้างอัตโนมัติจาก commit ${GITHUB_SHA} ([ดู workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))" \
             --generate-notes \
             --prerelease
+
+  cleanup:
+    name: Delete old workflow runs
+    runs-on: ubuntu-latest
+    needs: android
+    if: always()
+    permissions:
+      actions: write
+    steps:
+      - name: Keep only latest 3 runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow "${{ github.workflow }}" \
+            --limit 100 \
+            --json databaseId \
+            --jq '.[3:][].databaseId' | \
+          xargs -r -I {} gh run delete {} --repo "$GITHUB_REPOSITORY"

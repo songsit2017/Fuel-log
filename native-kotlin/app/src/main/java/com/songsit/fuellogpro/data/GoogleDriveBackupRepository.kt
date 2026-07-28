@@ -27,8 +27,11 @@ data class DriveBackupResult(
 // latency (TLS + Drive API processing), not just raw bytes, so overlapping several requests
 // meaningfully speeds up wall-clock backup time on connections with real bandwidth to spare —
 // this was tuned down from a fully-sequential one-file-at-a-time loop after a user reported a
-// 100+ photo backup crawling at a few percent per minute despite a fast connection.
-private const val UPLOAD_CONCURRENCY = 4
+// 100+ photo backup crawling at a few percent per minute despite a fast connection. 4 was still
+// leaving bandwidth idle on fast connections for a first-time backup (all-new, mostly-small
+// photos, steady but slow crawl) since wall-clock time there is ~photoCount/concurrency ×
+// per-request latency rather than bandwidth-bound, so this was raised further.
+private const val UPLOAD_CONCURRENCY = 10
 
 /**
  * Backs up a JSON export and every original-resolution photo to the signed-in user's own

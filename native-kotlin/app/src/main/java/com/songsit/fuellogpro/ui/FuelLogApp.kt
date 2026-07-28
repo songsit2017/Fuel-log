@@ -266,6 +266,8 @@ fun FuelLogApp(
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
     importSummaryResult: BackupImportResult? = null,
     onDismissImportSummary: () -> Unit = {},
+    driveBackupProgress: Int? = null,
+    onDriveBackup: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
@@ -312,6 +314,22 @@ fun FuelLogApp(
             onDismiss = onDismissImportSummary,
         )
     }
+    driveBackupProgress?.let { percent ->
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            title = { Text("กำลังสำรองไป Google ไดรฟ์") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LinearProgressIndicator(
+                        progress = { percent / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("กำลังอัปโหลด... $percent%")
+                }
+            },
+        )
+    }
     if (showSettings) {
         SettingsScreen(
             onDismiss = { showSettings = false },
@@ -331,6 +349,7 @@ fun FuelLogApp(
             onJoinByCode = onJoinByCode,
             displaySettings = displaySettings,
             onDisplaySettingsChange = onDisplaySettingsChange,
+            onDriveBackup = onDriveBackup,
         )
     } else if (showAddVehicle || editingVehicle != null) {
         VehicleEditScreen(
@@ -1810,6 +1829,7 @@ private fun SettingsScreen(
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     displaySettings: DisplaySettings = DisplaySettings(),
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
+    onDriveBackup: (() -> Unit)? = null,
 ) {
     var showUnitDialog by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
@@ -1831,6 +1851,7 @@ private fun SettingsScreen(
             onSignOut = onSignOut,
             syncConflicts = syncConflicts,
             onResolveConflict = onResolveConflict,
+            onDriveBackup = onDriveBackup,
         )
         return
     }
@@ -2073,6 +2094,7 @@ private fun ImportExportScreen(
     onSignOut: () -> Unit,
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
+    onDriveBackup: (() -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -2104,6 +2126,16 @@ private fun ImportExportScreen(
                     leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = onImportBackup,
                 )
+            }
+            if (onDriveBackup != null) {
+                item {
+                    PreferenceListItem(
+                        title = "สำรองข้อมูล Google ไดรฟ์",
+                        subtitle = "อัปโหลด JSON และรูปต้นฉบับไปที่ Drive/Android/FuelLog Pro (แบบเดียวกับ Fuelio)",
+                        leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onDriveBackup,
+                    )
+                }
             }
 
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }

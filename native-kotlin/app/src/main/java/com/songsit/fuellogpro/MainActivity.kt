@@ -58,10 +58,86 @@ private const val MAX_PICK_PHOTOS = 3
 class MainActivity : ComponentActivity() {
     private lateinit var backupRepository: LocalBackupRepository
     private lateinit var csvExportRepository: LocalCsvExportRepository
+    private val driveBackupRepository = com.songsit.fuellogpro.data.GoogleDriveBackupRepository()
+    private val driveBackupProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {}
+
+    // Google Drive backup (drive.file scope, app-created files only): incremental authorization
+    // via the Identity Services Authorization API, requested separately from the Firebase
+    // sign-in above (Credential Manager's ID-token flow has no way to carry OAuth scopes).
+    private var pendingDriveAuthResult: ((String?) -> Unit)? = null
+    private val driveAuthorizationLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val callback = pendingDriveAuthResult
+        pendingDriveAuthResult = null
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            runCatching {
+                com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+                    .getAuthorizationResultFromIntent(result.data!!)
+                    .accessToken
+            }.onSuccess { token -> callback?.invoke(token) }
+                .onFailure { callback?.invoke(null) }
+        } else {
+            callback?.invoke(null)
+        }
+    }
+
+    private fun requestDriveAccessToken(onResult: (String?) -> Unit) {
+        val scope = com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")
+        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(scope))
+            .build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+            .authorize(request)
+            .addOnSuccessListener { authResult ->
+                if (authResult.hasResolution()) {
+                    pendingDriveAuthResult = onResult
+                    val intentSenderRequest = androidx.activity.result.IntentSenderRequest
+                        .Builder(authResult.pendingIntent!!.intentSender)
+                        .build()
+                    driveAuthorizationLauncher.launch(intentSenderRequest)
+                } else {
+                    onResult(authResult.accessToken)
+                }
+            }
+            .addOnFailureListener { onResult(null) }
+    }
+
+    // Uploads a fresh JSON export plus every photo under filesDir/photos and
+    // filesDir/fuelio_images to Drive (see GoogleDriveBackupRepository for the folder layout).
+    private fun performDriveBackup() {
+        requestDriveAccessToken { token ->
+            if (token == null) {
+                Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
+                return@requestDriveAccessToken
+            }
+            lifecycleScope.launch {
+                driveBackupProgress.value = 0
+                runCatching {
+                    val json = backupRepository.exportJson()
+                    val photosDir = java.io.File(filesDir, "photos")
+                    val fuelioImagesDir = java.io.File(filesDir, "fuelio_images")
+                    val photos = (photosDir.listFiles()?.toList().orEmpty() + fuelioImagesDir.listFiles()?.toList().orEmpty())
+                        .filter { it.isFile }
+                    driveBackupRepository.backup(token, json, photos) { percent -> driveBackupProgress.value = percent }
+                }.onSuccess { result ->
+                    driveBackupProgress.value = null
+                    Toast.makeText(
+                        this@MainActivity,
+                        "สำรองไป Google ไดรฟ์สำเร็จ • อัปโหลดรูปใหม่ ${result.photosUploaded} รูป (ข้าม ${result.photosSkipped} รูปที่มีอยู่แล้ว)",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }.onFailure {
+                    driveBackupProgress.value = null
+                    Toast.makeText(this@MainActivity, it.message ?: "สำรองไป Google ไดรฟ์ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     // Permission gate for the nearby-fuel-station finder (item 1). We store the pending
     // result/error callbacks and re-run the location lookup once permission is granted.
@@ -334,6 +410,7 @@ class MainActivity : ComponentActivity() {
             val state by viewModel.state.collectAsState()
             val importProgressPercent by importProgress.collectAsState()
             val importSummaryResult by pendingImportSummaryResult.collectAsState()
+            val driveBackupPercent by driveBackupProgress.collectAsState()
             var vehicleMembers by remember { mutableStateOf<List<VehicleMember>>(emptyList()) }
             LaunchedEffect(state.selectedVehicleId, cloudState.uid) {
                 val vehicleId = state.selectedVehicleId
@@ -348,6 +425,8 @@ class MainActivity : ComponentActivity() {
                 importProgressPercent = importProgressPercent,
                 importSummaryResult = importSummaryResult,
                 onDismissImportSummary = { pendingImportSummaryResult.value = null },
+                driveBackupProgress = driveBackupPercent,
+                onDriveBackup = { performDriveBackup() },
                 onAddFuel = viewModel::addFuel,
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,

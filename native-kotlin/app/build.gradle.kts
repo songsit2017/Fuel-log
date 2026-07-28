@@ -97,6 +97,11 @@ dependencies {
     // V8's Claude OCR — the Anthropic key stays server-side as a Secret, never in the app.
     implementation("com.google.firebase:firebase-functions")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    // Google Drive backup: Identity Services' Authorization API (Identity.getAuthorizationClient)
+    // for incremental drive.file scope consent. The actual Drive REST calls are hand-rolled
+    // HttpURLConnection (see GoogleDriveBackupRepository), matching this project's existing
+    // lightweight *Repository style, so no google-api-services-drive client SDK is pulled in.
+    implementation("com.google.android.gms:play-services-auth:21.4.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-maps:19.1.0")
     implementation("com.google.maps.android:maps-compose:6.4.1")

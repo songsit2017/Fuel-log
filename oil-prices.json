@@ -27,7 +27,10 @@
       "grades": {
         "gasohol_95": 36.69,
         "gasohol_91": 36.32,
+        "e20": 31.69,
+        "e85": 27.63,
         "diesel_b7": 36.69,
+        "diesel_b20": 31.69,
         "premium_95": 47.79
       }
     },
@@ -38,8 +41,37 @@
       "grades": {
         "gasohol_95": null,
         "gasohol_91": 33.19,
+        "e20": null,
+        "e85": null,
         "diesel_b7": null,
+        "diesel_b20": null,
         "premium_95": 49.89
+      }
+    },
+    "pt": {
+      "source": "https://www.ptmaxoil.com/th/oil-price",
+      "updatedAt": "2026-07-28T09:21:10+00:00",
+      "grades": {
+        "gasohol_95": 36.69,
+        "gasohol_91": 36.32,
+        "e20": 31.69,
+        "e85": 27.63,
+        "diesel_b7": 36.69,
+        "diesel_b20": 31.69,
+        "premium_95": null
+      }
+    },
+    "caltex": {
+      "source": "https://www.caltexthailand.com/th/retail/products/fuels/oil-prices.html",
+      "updatedAt": "2026-07-28T09:21:10+00:00",
+      "grades": {
+        "gasohol_95": 36.69,
+        "gasohol_91": 36.32,
+        "e20": 31.69,
+        "e85": 27.63,
+        "diesel_b7": 36.69,
+        "diesel_b20": 31.69,
+        "premium_95": null
       }
     }
   }

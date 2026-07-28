@@ -920,49 +920,142 @@ private fun Dashboard(
     }
 }
 
+// Brand logo resource lookup — maps the display-label used in BrandOilPrices to the
+// matching drawable so the card header can render the real logo instead of a text chip.
+private fun oilBrandLogoRes(brand: String): Int? = when {
+    brand.contains("ปตท") || brand.contains("ptt", ignoreCase = true) ->
+        com.songsit.fuellogpro.R.drawable.ic_logo_ptt
+    brand.contains("เชลล์") || brand.contains("shell", ignoreCase = true) ->
+        com.songsit.fuellogpro.R.drawable.ic_logo_shell
+    brand.contains("พีที") || brand == "PT" || brand.contains(" pt", ignoreCase = true) ||
+        brand.startsWith("pt", ignoreCase = true) ->
+        com.songsit.fuellogpro.R.drawable.ic_logo_pt
+    brand.contains("คาลเท็กซ์") || brand.contains("caltex", ignoreCase = true) ->
+        com.songsit.fuellogpro.R.drawable.ic_logo_caltex
+    else -> null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OilPriceCard(info: OilPriceInfo) {
-    // Brand tab state lives only here — it's local to this card and never touches Dashboard's
-    // own state, so switching brands can't affect any other section of the screen.
-    var tab by remember { mutableIntStateOf(0) }
-    val selectedTab = tab.coerceIn(0, info.brands.lastIndex)
-    val selected = info.brands[selectedTab]
+    // Brand selection state lives only inside this card — never propagates upward.
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    val safeIndex = selectedIndex.coerceIn(0, info.brands.lastIndex)
+    val selected = info.brands[safeIndex]
+
     Card(shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("ราคาน้ำมันวันนี้", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                info.brands.forEachIndexed { index, brand ->
-                    SegmentedButton(
-                        selected = index == selectedTab,
-                        onClick = { tab = index },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = info.brands.size),
-                        label = { Text(brand.brand) },
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            // ── Card header ────────────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "ราคาน้ำมันวันนี้",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                // Show the selected brand's logo next to the title
+                val logoRes = oilBrandLogoRes(selected.brand)
+                if (logoRes != null) {
+                    AsyncImage(
+                        model = logoRes,
+                        contentDescription = selected.brand,
+                        modifier = Modifier.height(28.dp),
+                        contentScale = ContentScale.Fit,
                     )
                 }
             }
-            OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
-            OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
-            OilPriceRow("ดีเซล B7", selected.dieselB7)
+
+            Spacer(Modifier.height(10.dp))
+
+            // ── Brand filter chips (horizontal scroll, 4 brands) ──────────────────
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                info.brands.forEachIndexed { index, brand ->
+                    item(key = brand.brand) {
+                        val isSelected = index == safeIndex
+                        val logoRes = oilBrandLogoRes(brand.brand)
+                        androidx.compose.material3.FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedIndex = index },
+                            label = {
+                                if (logoRes != null) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        AsyncImage(
+                                            model = logoRes,
+                                            contentDescription = null,
+                                            modifier = Modifier.height(20.dp),
+                                            contentScale = ContentScale.Fit,
+                                        )
+                                        Text(brand.brand, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                } else {
+                                    Text(brand.brand, style = MaterialTheme.typography.labelMedium)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(10.dp))
+
+            // ── Grade price rows — null grades are skipped entirely (no dash) ─────
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
+                OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
+                OilPriceRow("E20", selected.e20)
+                OilPriceRow("E85", selected.e85)
+                OilPriceRow("ดีเซล B7", selected.dieselB7)
+                OilPriceRow("ดีเซล B20", selected.dieselB20)
+                OilPriceRow("พรีเมียม 95", selected.premium95)
+            }
+
             if (info.dateLabel.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
                 Text(
                     info.dateLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
         }
     }
 }
 
+// Renders a grade row only when the price is not null — a null price means the brand
+// genuinely doesn't carry that grade, so we hide the row rather than showing "—".
 @Composable
 private fun OilPriceRow(label: String, price: Double?) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    if (price == null) return
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
         Text(
-            price?.let { thaiCurrency.format(it) } ?: "—",
+            thaiCurrency.format(price),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a same-origin oil-price file from official Bangchak, OR and Shell sources."""
+"""Build a same-origin oil-price file from official Bangchak, PTT, Shell, PT, and Caltex sources."""
 from __future__ import annotations
 
 import html
@@ -14,8 +14,12 @@ from pathlib import Path
 BANGCHAK_URL = "https://oil-price.bangchak.co.th/ApiOilPrice2/th"
 PTT_URL = "https://orapiweb.pttor.com/oilservice/OilPrice.asmx"
 SHELL_URL = "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH"
+# PT (พีที) official price endpoint – documented at https://ptmax.th
+PT_URL = "https://www.ptmaxoil.com/th/oil-price"
+# Caltex (คาลเท็กซ์) – Chevron Thailand official price page
+CALTEX_URL = "https://www.caltexthailand.com/th/retail/products/fuels/oil-prices.html"
 OUT = Path(__file__).resolve().parents[1] / "oil-prices.json"
-HEADERS = {"User-Agent": "FuelLog-Pro/7.6.1 (+GitHub Actions)"}
+HEADERS = {"User-Agent": "FuelLog-Pro/9.0.0 (+GitHub Actions)"}
 
 
 def read_url(url: str, *, data: bytes | None = None, headers: dict | None = None) -> bytes:
@@ -70,7 +74,10 @@ def fetch_ptt():
     grades = {
         "gasohol_95": prices.get("gasohol 95"),
         "gasohol_91": prices.get("gasohol 91"),
-        "diesel_b7": prices.get("diesel"),
+        "e20": prices.get("gasohol e20") or prices.get("e20"),
+        "e85": prices.get("gasohol e85") or prices.get("e85"),
+        "diesel_b7": prices.get("diesel") or prices.get("hi diesel") or prices.get("hi-diesel"),
+        "diesel_b20": prices.get("diesel b20") or prices.get("b20"),
         "premium_95": prices.get("super power gsh95"),
     }
     if not any(grades.values()):
@@ -94,7 +101,10 @@ def fetch_shell():
     grades = {
         "gasohol_95": positive(prices.get("midgrade_gasoline")),
         "gasohol_91": positive(prices.get("low_octane_gasoline")),
-        "diesel_b7": positive(prices.get("fuelsave_regular_diesel")),
+        "e20": positive(prices.get("e20") or prices.get("e20_gasoline")),
+        "e85": positive(prices.get("e85") or prices.get("e85_gasoline")),
+        "diesel_b7": positive(prices.get("fuelsave_regular_diesel") or prices.get("regular_diesel")),
+        "diesel_b20": positive(prices.get("b20") or prices.get("b20_diesel")),
         "premium_95": positive(prices.get("premium_gasoline")),
     }
     if not any(grades.values()):
@@ -104,6 +114,56 @@ def fetch_shell():
         "updatedAt": pricing.get("updated"),
         "station": location.get("name"),
         "grades": grades,
+    }
+
+
+def fetch_pt():
+    """Scrape PT (พีที) official price page for grade prices."""
+    page = read_url(PT_URL).decode("utf-8", "replace")
+    # PT page typically lists prices in a table with product names and prices
+    prices = {}
+    # Look for common price patterns: digit(s).digit(s) near fuel grade keywords
+    for pattern, key in [
+        (r"(?:แก๊สโซฮอล์\s*95|gasohol\s*95)[^\d]*(\d{2,3}\.\d{2})", "gasohol_95"),
+        (r"(?:แก๊สโซฮอล์\s*91|gasohol\s*91)[^\d]*(\d{2,3}\.\d{2})", "gasohol_91"),
+        (r"(?:E20|แก๊สโซฮอล์\s*E20)[^\d]*(\d{2,3}\.\d{2})", "e20"),
+        (r"(?:E85|แก๊สโซฮอล์\s*E85)[^\d]*(\d{2,3}\.\d{2})", "e85"),
+        (r"(?:ดีเซล\s*B7|diesel\s*b7|Hi-Diesel)[^\d]*(\d{2,3}\.\d{2})", "diesel_b7"),
+        (r"(?:ดีเซล\s*B20|diesel\s*b20)[^\d]*(\d{2,3}\.\d{2})", "diesel_b20"),
+    ]:
+        m = re.search(pattern, page, re.IGNORECASE)
+        if m:
+            prices[key] = positive(m.group(1))
+    if not any(prices.values()):
+        raise ValueError("PT price page returned no recognized prices")
+    return {
+        "source": PT_URL,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "grades": prices,
+    }
+
+
+def fetch_caltex():
+    """Scrape Caltex (Chevron Thailand) official price page."""
+    page = read_url(CALTEX_URL).decode("utf-8", "replace")
+    prices = {}
+    for pattern, key in [
+        (r"(?:Techron\s*95|แก๊สโซฮอล์\s*95)[^\d]*(\d{2,3}\.\d{2})", "gasohol_95"),
+        (r"(?:Techron\s*91|แก๊สโซฮอล์\s*91)[^\d]*(\d{2,3}\.\d{2})", "gasohol_91"),
+        (r"(?:E20)[^\d]*(\d{2,3}\.\d{2})", "e20"),
+        (r"(?:E85)[^\d]*(\d{2,3}\.\d{2})", "e85"),
+        (r"(?:Diesel\s*B7|ดีเซล\s*B7|Hi-Diesel)[^\d]*(\d{2,3}\.\d{2})", "diesel_b7"),
+        (r"(?:Diesel\s*B20|ดีเซล\s*B20)[^\d]*(\d{2,3}\.\d{2})", "diesel_b20"),
+    ]:
+        m = re.search(pattern, page, re.IGNORECASE)
+        if m:
+            prices[key] = positive(m.group(1))
+    if not any(prices.values()):
+        raise ValueError("Caltex price page returned no recognized prices")
+    return {
+        "source": CALTEX_URL,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "grades": prices,
     }
 
 
@@ -119,7 +179,13 @@ def main():
     previous = old_comparison()
     bangchak = fetch_bangchak()
     comparison = {}
-    for key, fetcher in (("ptt", fetch_ptt), ("shell", fetch_shell)):
+    fetchers = [
+        ("ptt", fetch_ptt),
+        ("shell", fetch_shell),
+        ("pt", fetch_pt),
+        ("caltex", fetch_caltex),
+    ]
+    for key, fetcher in fetchers:
         try:
             comparison[key] = fetcher()
             print(f"updated {key} official prices")

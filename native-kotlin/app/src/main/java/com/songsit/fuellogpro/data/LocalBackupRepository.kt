@@ -16,6 +16,7 @@ data class BackupImportResult(
     val expenses: Int,
     val maintenanceTasks: Int,
     val trips: Int,
+    val photos: Int = 0,
 ) {
     val totalRecords: Int
         get() = vehicles + fuelEntries + expenses + maintenanceTasks + trips

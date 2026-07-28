@@ -200,6 +200,7 @@ class MainActivity : ComponentActivity() {
     // registerForActivityResult callbacks live outside setContent; setContent collects this
     // as state and passes it down to FuelLogApp.
     private val importProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+    private val pendingImportSummaryResult = kotlinx.coroutines.flow.MutableStateFlow<com.songsit.fuellogpro.data.BackupImportResult?>(null)
 
     private fun queryFileSize(uri: android.net.Uri): Long? =
         contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
@@ -245,11 +246,7 @@ class MainActivity : ComponentActivity() {
                 }
             }.onSuccess {
                 importProgress.value = null
-                Toast.makeText(
-                    this@MainActivity,
-                    "นำเข้าแบบไม่ลบข้อมูลเดิม ${it.totalRecords} รายการ",
-                    Toast.LENGTH_LONG,
-                ).show()
+                pendingImportSummaryResult.value = it
             }.onFailure {
                 importProgress.value = null
                 Toast.makeText(this@MainActivity, it.message ?: "นำเข้าไม่สำเร็จ", Toast.LENGTH_LONG).show()
@@ -330,6 +327,7 @@ class MainActivity : ComponentActivity() {
             )
             val state by viewModel.state.collectAsState()
             val importProgressPercent by importProgress.collectAsState()
+            val importSummaryResult by pendingImportSummaryResult.collectAsState()
             var vehicleMembers by remember { mutableStateOf<List<VehicleMember>>(emptyList()) }
             LaunchedEffect(state.selectedVehicleId, cloudState.uid) {
                 val vehicleId = state.selectedVehicleId
@@ -342,6 +340,8 @@ class MainActivity : ComponentActivity() {
             FuelLogApp(
                 state = state,
                 importProgressPercent = importProgressPercent,
+                importSummaryResult = importSummaryResult,
+                onDismissImportSummary = { pendingImportSummaryResult.value = null },
                 onAddFuel = viewModel::addFuel,
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,

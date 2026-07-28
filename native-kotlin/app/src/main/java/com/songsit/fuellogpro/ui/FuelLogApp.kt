@@ -87,6 +87,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.songsit.fuellogpro.settings.DisplaySettings
+import com.songsit.fuellogpro.data.BackupImportResult
 import com.songsit.fuellogpro.data.NearbyStation
 import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.ReceiptScanResult
@@ -252,6 +253,8 @@ fun FuelLogApp(
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     displaySettings: DisplaySettings = DisplaySettings(),
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
+    importSummaryResult: BackupImportResult? = null,
+    onDismissImportSummary: () -> Unit = {},
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
@@ -557,6 +560,12 @@ fun FuelLogApp(
                 onDismiss = { showAddTrip = false; editingTrip = null },
                 onSave = onAddTrip,
                 onUpdate = onUpdateTrip,
+            )
+        }
+        importSummaryResult?.let { result ->
+            ImportSummaryDialog(
+                result = result,
+                onDismiss = onDismissImportSummary,
             )
         }
         state.errorMessage?.let { message ->
@@ -1725,6 +1734,47 @@ private fun VehiclesListScreen(
     }
 }
 
+@Composable
+private fun PreferenceCategoryHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun PreferenceListItem(
+    title: String,
+    subtitle: String? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (trailing != null) {
+            trailing()
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(
@@ -1746,132 +1796,303 @@ private fun SettingsScreen(
     displaySettings: DisplaySettings = DisplaySettings(),
     onDisplaySettingsChange: (DisplaySettings) -> Unit = {},
 ) {
+    var showUnitDialog by remember { mutableStateOf(false) }
+    var showCurrencyDialog by remember { mutableStateOf(false) }
+    var showDecimalsDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("ตั้งค่า") },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "ปิด") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
                 },
             )
         },
     ) { padding ->
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            DisplaySettingsCard(
-                settings = displaySettings,
-                onChange = onDisplaySettingsChange,
-            )
-        }
-        if (cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            // ── หมวด 1: กำหนดลักษณะหลัก ──────────────────────────────────────────────
+            item { PreferenceCategoryHeader("กำหนดลักษณะหลัก") }
+
             item {
-                VehicleSharingCard(
-                    members = vehicleMembers,
-                    onCreateInvite = onCreateInvite,
-                    onJoinByCode = onJoinByCode,
+                val volumeLabel = if (displaySettings.volumeUnit == "gal") "แกลลอน" else "ลิตร"
+                val distLabel = if (displaySettings.distanceUnit == "mi") "ไมล์" else "กิโลเมตร"
+                PreferenceListItem(
+                    title = "หน่วย",
+                    subtitle = "เชื้อเพลิง $volumeLabel, ระยะทาง $distLabel, ปริมาณการใช้หน่วย (กม./ลิตร/mpg...ฯลฯ)",
+                    onClick = { showUnitDialog = true },
                 )
             }
-        }
-        item {
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(
-                    Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text("การแจ้งเตือน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    NotificationSettingRow(
-                        label = "ตามวันที่",
-                        checked = reminderSettings.dateReminders,
-                        onCheckedChange = {
-                            onReminderSettingsChange(reminderSettings.copy(dateReminders = it))
-                        },
-                    )
-                    NotificationSettingRow(
-                        label = "ตามเลขไมล์",
-                        checked = reminderSettings.odometerReminders,
-                        onCheckedChange = {
-                            onReminderSettingsChange(reminderSettings.copy(odometerReminders = it))
-                        },
-                    )
-                    NotificationSettingRow(
-                        label = "กำหนดชำระ",
-                        checked = reminderSettings.paymentReminders,
-                        onCheckedChange = {
-                            onReminderSettingsChange(reminderSettings.copy(paymentReminders = it))
-                        },
-                    )
-                }
+
+            item {
+                val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
+                PreferenceListItem(
+                    title = "สกุลเงิน",
+                    subtitle = currencyOption.label,
+                    onClick = { showCurrencyDialog = true },
+                )
             }
-        }
-        item {
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Cloud sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            item {
+                PreferenceListItem(
+                    title = "หมายเลข",
+                    subtitle = "แสดงตัวเลข ${displaySettings.decimals} หลักหลังจุดทศนิยม",
+                    trailing = {
+                        Checkbox(
+                            checked = displaySettings.decimals > 0,
+                            onCheckedChange = { checked ->
+                                onDisplaySettingsChange(displaySettings.copy(decimals = if (checked) 2 else 0))
+                            },
+                        )
+                    },
+                    onClick = { showDecimalsDialog = true },
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "รูปแบบวัน",
+                    subtitle = "รูปแบบวันของบันทึกระยะไมล์ (yyyy-MM-dd)",
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "ต้นค่าเริ่มต้นฉบับหน้าปัด",
+                    subtitle = "การตั้งค่าเริ่มต้นในขณะที่เพิ่มสัมผัสใหม่",
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "วันแรกของสัปดาห์",
+                    subtitle = "วันอาทิตย์",
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "แบบอักษร",
+                    subtitle = "เริ่มต้น",
+                )
+            }
+
+            item {
+                PreferenceListItem(
+                    title = "ธีมมืดอัตโนมัติ",
+                    subtitle = "ระบบเปิดโหมดประหยัดพลังงาน หรือตามระบบ",
+                    trailing = {
+                        Checkbox(
+                            checked = displaySettings.themeMode != "light",
+                            onCheckedChange = { checked ->
+                                onDisplaySettingsChange(displaySettings.copy(themeMode = if (checked) "dark" else "light"))
+                            },
+                        )
+                    },
+                    onClick = { showThemeDialog = true },
+                )
+            }
+
+            item { PreferenceListItem("ชุดรูปแบบ") }
+            item { PreferenceListItem("บ้าน") }
+            item { PreferenceListItem("บันทึกเดินทาง") }
+            item { PreferenceListItem("รูปภาพ") }
+            item { PreferenceListItem("สภาพอากาศ") }
+            item { PreferenceListItem("การตั้งค่าอื่น ๆ") }
+
+            // ── หมวด 2: แบ็คอัพข้อมูล (Import/Export options) ───────────────────────
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item { PreferenceCategoryHeader("แบ็คอัพข้อมูล (Import/Export options)") }
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text("สร้าง/กู้คืน", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text("เมฆและสำรองข้อมูลท้องถิ่น", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onExportBackup) { Text("สำรองข้อมูล (JSON)") }
+                        TextButton(onClick = onImportBackup) { Text("นำเข้าข้อมูล (.fuelio/JSON)") }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     if (cloudState.uid == null) {
-                        Text("เข้าสู่ระบบเพื่อรวมข้อมูลกับ Firebase โดยไม่เขียนทับรายการที่ขัดแย้งกัน")
                         Button(onClick = onGoogleSignIn, enabled = !cloudState.syncing) {
-                            Text(if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบด้วย Google")
+                            Text(if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบ Google Sync")
                         }
                     } else {
-                        Text(cloudState.email ?: "เชื่อมต่อบัญชี Google แล้ว")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(cloudState.email ?: "Google Connected", style = MaterialTheme.typography.bodySmall)
                             Button(onClick = onCloudSync, enabled = !cloudState.syncing) {
                                 Text(if (cloudState.syncing) "กำลังซิงก์…" else "ซิงก์ตอนนี้")
                             }
-                            TextButton(onClick = onSignOut, enabled = !cloudState.syncing) { Text("ออกจากระบบ") }
+                            TextButton(onClick = onSignOut) { Text("ออกจากระบบ") }
                         }
                     }
-                    cloudState.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    if (syncConflicts.isNotEmpty()) {
-                        Text(
-                            "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
+                }
+            }
+
+            if (cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)) {
+                item {
+                    VehicleSharingCard(
+                        members = vehicleMembers,
+                        onCreateInvite = onCreateInvite,
+                        onJoinByCode = onJoinByCode,
+                    )
+                }
+            }
+
+            // ── หมวด 3: จดหมายเตือนชำระเงิน ─────────────────────────────────────────
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item { PreferenceCategoryHeader("จดหมายเตือนชำระเงิน") }
+            item {
+                PreferenceListItem(
+                    title = "เตือนวันที่",
+                    subtitle = "จำนวนวันก่อนการสิ้นสุดของการทำเครื่องหมายรายการเป็นสำคัญ (การแจ้งเตือนสีแดง)",
+                    trailing = {
+                        Checkbox(
+                            checked = reminderSettings.dateReminders,
+                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(dateReminders = it)) },
                         )
-                        syncConflicts.take(5).forEach { conflict ->
-                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                    Text(
-                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        TextButton(
-                                            onClick = { onResolveConflict(conflict.key, true) },
-                                            enabled = !cloudState.syncing,
-                                        ) { Text("ใช้ข้อมูลในเครื่อง") }
-                                        TextButton(
-                                            onClick = { onResolveConflict(conflict.key, false) },
-                                            enabled = !cloudState.syncing,
-                                        ) { Text("ใช้ข้อมูล Cloud") }
-                                    }
-                                }
+                    },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "เตือนที่หน้าปัด",
+                    subtitle = "จำนวนวันก่อนการสิ้นสุดของการทำเครื่องหมายรายการเป็นสำคัญ (การแจ้งเตือนสีแดง)",
+                    trailing = {
+                        Checkbox(
+                            checked = reminderSettings.odometerReminders,
+                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(odometerReminders = it)) },
+                        )
+                    },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "บริการพื้นหลัง",
+                    subtitle = "จะตรวจสอบทุกวันและแสดงการแจ้งเตือนแม้ว่า Fuelio ถูกปิด",
+                    trailing = {
+                        Checkbox(
+                            checked = reminderSettings.paymentReminders,
+                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(paymentReminders = it)) },
+                        )
+                    },
+                )
+            }
+
+            // ── หมวด 4: ข้อมูล ───────────────────────────────────────────────────────
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item { PreferenceCategoryHeader("ข้อมูล") }
+            item { PreferenceListItem("ใบอนุญาตเปิดแหล่งที่มา") }
+            item { PreferenceListItem("การเปลี่ยนแปลงสู่ระบบ") }
+            item { PreferenceListItem("อัตรา Fuelio") }
+            item { PreferenceListItem("Fuelio 10.3.1 (FuelLog Native Engine)") }
+            item { PreferenceListItem("ข้อกำหนดการใช้งาน (EULA)") }
+            item { PreferenceListItem("นโยบายการเก็บข้อมูลส่วนบุคคล") }
+        }
+    }
+
+    if (showUnitDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnitDialog = false },
+            title = { Text("ตั้งค่าหน่วย") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ระยะทาง", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("km" to "กิโลเมตร (กม.)", "mi" to "ไมล์ (mi)").forEach { (valKey, label) ->
+                            if (displaySettings.distanceUnit == valKey) {
+                                Button(onClick = { onDisplaySettingsChange(displaySettings.copy(distanceUnit = valKey)) }) { Text(label) }
+                            } else {
+                                TextButton(onClick = { onDisplaySettingsChange(displaySettings.copy(distanceUnit = valKey)) }) { Text(label) }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("ปริมาตรน้ำมัน", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("liters" to "ลิตร (L)", "gal" to "แกลลอน (US gal)").forEach { (valKey, label) ->
+                            if (displaySettings.volumeUnit == valKey) {
+                                Button(onClick = { onDisplaySettingsChange(displaySettings.copy(volumeUnit = valKey)) }) { Text(label) }
+                            } else {
+                                TextButton(onClick = { onDisplaySettingsChange(displaySettings.copy(volumeUnit = valKey)) }) { Text(label) }
                             }
                         }
                     }
                 }
-            }
-        }
-        item {
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("ข้อมูลของฉัน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "สำรองเป็น JSON หรือนำเข้ากลับแบบรวมข้อมูลโดยไม่ลบรายการเดิม",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onExportBackup) { Text("สำรองข้อมูล") }
-                        TextButton(onClick = onImportBackup) { Text("นำเข้าข้อมูล") }
+            },
+            confirmButton = { TextButton(onClick = { showUnitDialog = false }) { Text("ตกลง") } },
+        )
+    }
+
+    if (showCurrencyDialog) {
+        AlertDialog(
+            onDismissRequest = { showCurrencyDialog = false },
+            title = { Text("เลือกสกุลเงิน") },
+            text = {
+                LazyColumn {
+                    items(CURRENCY_OPTIONS) { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onDisplaySettingsChange(displaySettings.copy(currency = option.code))
+                                    showCurrencyDialog = false
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(option.label, modifier = Modifier.weight(1f))
+                            if (displaySettings.currency == option.code) {
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
                 }
-            }
-        }
+            },
+            confirmButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text("ยกเลิก") } },
+        )
     }
+
+    if (showDecimalsDialog) {
+        AlertDialog(
+            onDismissRequest = { showDecimalsDialog = false },
+            title = { Text("จำนวนทศนิยม") },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (0..3).forEach { d ->
+                        if (displaySettings.decimals == d) {
+                            Button(onClick = { onDisplaySettingsChange(displaySettings.copy(decimals = d)); showDecimalsDialog = false }) { Text("$d") }
+                        } else {
+                            TextButton(onClick = { onDisplaySettingsChange(displaySettings.copy(decimals = d)); showDecimalsDialog = false }) { Text("$d") }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDecimalsDialog = false }) { Text("ปิด") } },
+        )
+    }
+
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = { Text("เลือกธีม") },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("light" to "สว่าง", "dark" to "มืด", "system" to "ตามระบบ").forEach { (valKey, label) ->
+                        if (displaySettings.themeMode == valKey) {
+                            Button(onClick = { onDisplaySettingsChange(displaySettings.copy(themeMode = valKey)); showThemeDialog = false }) { Text(label) }
+                        } else {
+                            TextButton(onClick = { onDisplaySettingsChange(displaySettings.copy(themeMode = valKey)); showThemeDialog = false }) { Text(label) }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("ปิด") } },
+        )
     }
 }
 
@@ -2764,20 +2985,33 @@ private fun PhotoAttachmentRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         photoUris.forEach { uri ->
-            val bitmap = remember(uri) {
-                runCatching { BitmapFactory.decodeFile(uri) }.getOrNull()
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
+            Box(contentAlignment = Alignment.TopEnd) {
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.size(64.dp),
+                ) {
+                    AsyncImage(
+                        model = uri,
                         contentDescription = "รูปที่แนบ",
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(8.dp)),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 }
-                TextButton(onClick = { onRemove(uri) }) { Text("ลบ") }
+                IconButton(
+                    onClick = { onRemove(uri) },
+                    modifier = Modifier
+                        .padding(2.dp)
+                        .size(20.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "ลบ",
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
             }
         }
         if (photoUris.size < MAX_PHOTOS) {
@@ -3194,5 +3428,41 @@ private fun AddTripDialog(
             ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+}
+
+@Composable
+private fun ImportSummaryDialog(
+    result: BackupImportResult,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("สรุปผลการนำเข้าข้อมูล", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("นำเข้าและรวมข้อมูลเรียบร้อยแล้ว:", style = MaterialTheme.typography.bodyMedium)
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("จำนวนรถที่นำเข้า/อัปเดต:")
+                    Text("${result.vehicles} คัน", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("รายการเติมน้ำมัน:")
+                    Text("${result.fuelEntries} รายการ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("รายการค่าใช้จ่ายอื่นๆ:")
+                    Text("${result.expenses} รายการ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("รูปภาพประกอบที่นำเข้าสำเร็จ:")
+                    Text("${result.photos} รูป", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) { Text("ตกลง") }
+        },
     )
 }

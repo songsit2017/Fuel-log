@@ -121,6 +121,7 @@ class FuelioImportRepository(
             expenses = expenses.size,
             maintenanceTasks = 0,
             trips = 0,
+            photos = imageMap.size,
         )
     }
 
@@ -158,7 +159,7 @@ class FuelioImportRepository(
     // outer stream before pass 1 finishes walking the rest of the top-level entries.
     private fun extractPictures(source: InputStream, onBytesRead: (Int) -> Unit): Map<String, String> {
         val imageMap = mutableMapOf<String, String>()
-        val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
+        val photosDir = File(context.filesDir, "fuelio_images").apply { mkdirs() }
         CountingInputStream(source, onBytesRead).use { counting ->
             ZipInputStream(counting).use { zip ->
                 var entry = zip.nextEntry

@@ -38,6 +38,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.NativeAppState
@@ -191,14 +193,21 @@ private fun ExpenseTimelineContent(expense: Expense) {
 // but read-only and capped at 3 thumbnails per Item C/E.
 @Composable
 private fun TimelineThumbnails(photoUris: List<String>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         photoUris.take(3).forEach { uri ->
-            val bitmap = remember(uri) { runCatching { BitmapFactory.decodeFile(uri) }.getOrNull() }
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
+            Card(
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.size(52.dp),
+            ) {
+                AsyncImage(
+                    model = uri,
                     contentDescription = "รูปที่แนบ",
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
         }

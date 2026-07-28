@@ -99,6 +99,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
@@ -1800,6 +1801,7 @@ private fun SettingsScreen(
     var showCurrencyDialog by remember { mutableStateOf(false) }
     var showDecimalsDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     Scaffold(
         topBar = {
@@ -1927,7 +1929,31 @@ private fun SettingsScreen(
             // ── หมวด 3: ข้อมูล ───────────────────────────────────────────────────────
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { PreferenceCategoryHeader("ข้อมูล") }
-            item { PreferenceListItem("FuelLog Pro v1.0.0") }
+            item {
+                PreferenceListItem(
+                    title = "FuelLog Pro v1.0.0",
+                    subtitle = "แอปบันทึกการเติมน้ำมัน ค่าใช้จ่ายรถ และแชร์ข้อมูลกับสมาชิกในครอบครัว " +
+                        "พัฒนาต่อยอดจากแนวคิดของ Fuelio",
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "ผู้พัฒนา",
+                    subtitle = "songsit2017 • songsit2017@gmail.com",
+                    onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
+                )
+            }
+            item { PreferenceCategoryHeader("แหล่งที่มาข้อมูล") }
+            item { PreferenceListItem(title = "ราคาน้ำมันวันนี้", subtitle = "บางจาก, ปตท., เชลล์ (Bangchak Open API)") }
+            item { PreferenceListItem(title = "ค้นหาปั๊มใกล้ฉัน", subtitle = "Google Places API") }
+            item { PreferenceListItem(title = "สภาพอากาศขณะเติมน้ำมัน", subtitle = "Open-Meteo") }
+            item {
+                PreferenceListItem(
+                    title = "ซอร์สโค้ดโปรเจกต์",
+                    subtitle = "github.com/songsit2017/Fuel-log",
+                    onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
+                )
+            }
         }
     }
 

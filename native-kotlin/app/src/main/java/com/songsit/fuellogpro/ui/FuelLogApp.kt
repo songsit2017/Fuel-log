@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -294,6 +295,29 @@ fun FuelLogApp(
     val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // No NavController in this app — screens/sub-screens are toggled boolean/int state, not a
+    // back stack. This single handler replaces that missing back stack: it closes whichever
+    // overlay is open, else returns Timeline/Calculator/Map or a drawer section to the Overview
+    // tab, and is disabled (enabled = false) exactly at Overview with nothing open, so the
+    // system default back press applies there and exits the app normally.
+    val atRoot = tab == 0 && homeTab == 0 &&
+        !showSettings && !showAddVehicle && !showAddExpense && !showAddFuel &&
+        !showAddMaintenance && !showAddTrip &&
+        editingVehicle == null && editingExpense == null && editingFuel == null &&
+        editingMaintenance == null && editingTrip == null
+    BackHandler(enabled = !atRoot) {
+        when {
+            showSettings -> showSettings = false
+            showAddVehicle || editingVehicle != null -> { showAddVehicle = false; editingVehicle = null }
+            showAddExpense || editingExpense != null -> { showAddExpense = false; editingExpense = null }
+            showAddFuel || editingFuel != null -> { showAddFuel = false; editingFuel = null }
+            showAddMaintenance || editingMaintenance != null -> { showAddMaintenance = false; editingMaintenance = null }
+            showAddTrip || editingTrip != null -> { showAddTrip = false; editingTrip = null }
+            tab != 0 -> { tab = 0; homeTab = 0 }
+            homeTab != 0 -> homeTab = 0
+        }
+    }
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {

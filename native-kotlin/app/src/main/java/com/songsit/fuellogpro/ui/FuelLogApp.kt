@@ -130,6 +130,8 @@ import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.notifications.ReminderSettings
 import com.songsit.fuellogpro.ui.stats.StatsScreen
 import com.songsit.fuellogpro.ui.timeline.TimelineScreen
+import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
+import com.songsit.fuellogpro.ui.timeline.FuelUsageRecordScreen
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -291,6 +293,8 @@ fun FuelLogApp(
     var dashboardFabExpanded by remember { mutableStateOf(false) }
     var homeTab by remember { mutableIntStateOf(0) }
     var recordsMode by remember { mutableIntStateOf(0) }
+    var viewingImagePath by remember { mutableStateOf<String?>(null) }
+    var viewingFuelRecord by remember { mutableStateOf<FuelEntry?>(null) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ")
     val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
@@ -303,11 +307,12 @@ fun FuelLogApp(
     // system default back press applies there and exits the app normally.
     val atRoot = tab == 0 && homeTab == 0 &&
         !showSettings && !showAddVehicle && !showAddExpense && !showAddFuel &&
-        !showAddMaintenance && !showAddTrip &&
+        !showAddMaintenance && !showAddTrip && viewingFuelRecord == null &&
         editingVehicle == null && editingExpense == null && editingFuel == null &&
         editingMaintenance == null && editingTrip == null
     BackHandler(enabled = !atRoot) {
         when {
+            viewingFuelRecord != null -> viewingFuelRecord = null
             showSettings -> showSettings = false
             showAddVehicle || editingVehicle != null -> { showAddVehicle = false; editingVehicle = null }
             showAddExpense || editingExpense != null -> { showAddExpense = false; editingExpense = null }
@@ -406,6 +411,12 @@ fun FuelLogApp(
             onDismiss = { showAddExpense = false; editingExpense = null },
             onSave = onAddExpense,
             onUpdate = onUpdateExpense,
+        )
+    } else if (viewingFuelRecord != null) {
+        FuelUsageRecordScreen(
+            entry = viewingFuelRecord!!,
+            onDismiss = { viewingFuelRecord = null },
+            onImageClick = { viewingImagePath = it },
         )
     } else {
         val drawerDestinations = listOf(
@@ -561,7 +572,12 @@ fun FuelLogApp(
             when (tab) {
                 0 -> when (homeTab) {
                     0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
-                    1 -> TimelineScreen(state, Modifier.padding(padding))
+                    1 -> TimelineScreen(
+                        state,
+                        Modifier.padding(padding),
+                        onImageClick = { viewingImagePath = it },
+                        onFuelRecordClick = { viewingFuelRecord = it },
+                    )
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
                     else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
                 }
@@ -640,6 +656,9 @@ fun FuelLogApp(
             )
         }
         }
+    }
+    viewingImagePath?.let { path ->
+        FullScreenImageViewer(imagePath = path, onDismiss = { viewingImagePath = null })
     }
     }
     }

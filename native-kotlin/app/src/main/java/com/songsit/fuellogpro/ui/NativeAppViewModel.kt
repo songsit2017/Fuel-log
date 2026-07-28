@@ -12,6 +12,7 @@ import com.songsit.fuellogpro.domain.FuelSummary
 import com.songsit.fuellogpro.domain.calculateFuelSummary
 import com.songsit.fuellogpro.domain.calculateExpenseSummary
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.FuelEntryFormValues
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
 import com.songsit.fuellogpro.domain.model.VehicleFormValues
@@ -189,81 +190,48 @@ class NativeAppViewModel(
         }
     }
 
-    fun addFuel(
-        date: String,
-        time: String,
-        odometerKm: Double,
-        liters: Double,
-        pricePerLiter: Double,
-        fullTank: Boolean,
-        station: String,
-        photoUri: String? = null,
-        onSaved: () -> Unit,
-    ) {
+    fun addFuel(values: FuelEntryFormValues, onSaved: () -> Unit) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
             error.value = "กรุณาเพิ่มรถก่อนบันทึกการเติมน้ำมัน"
             return
         }
-        if (odometerKm <= 0 || liters <= 0 || pricePerLiter <= 0) {
+        if (values.odometerKm <= 0 || values.liters <= 0 || values.pricePerLiter <= 0) {
             error.value = "กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง"
             return
         }
         viewModelScope.launch {
             saving.value = true
             error.value = null
-            runCatching {
-                fuelRepository.add(
-                    vehicleId = vehicleId,
-                    date = date,
-                    time = time,
-                    odometerKm = odometerKm,
-                    liters = liters,
-                    pricePerLiter = pricePerLiter,
-                    fullTank = fullTank,
-                    station = station,
-                    photoUri = photoUri,
-                )
-            }.onSuccess {
-                onReminderDataChanged()
-                onSaved()
-            }
+            runCatching { fuelRepository.add(vehicleId, values) }
+                .onSuccess {
+                    onReminderDataChanged()
+                    onSaved()
+                }
                 .onFailure { error.value = it.message ?: "บันทึกไม่สำเร็จ" }
             saving.value = false
         }
     }
 
-    fun updateFuel(
-        id: String,
-        date: String,
-        time: String,
-        odometerKm: Double,
-        liters: Double,
-        pricePerLiter: Double,
-        fullTank: Boolean,
-        station: String,
-        photoUri: String? = null,
-        onSaved: () -> Unit,
-    ) {
+    fun updateFuel(id: String, values: FuelEntryFormValues, onSaved: () -> Unit) {
         val vehicleId = state.value.entries.firstOrNull { it.id == id }?.vehicleId
             ?: state.value.selectedVehicle?.id
         if (vehicleId == null) {
             error.value = "ไม่พบรถสำหรับรายการนี้"
             return
         }
-        if (odometerKm <= 0 || liters <= 0 || pricePerLiter <= 0) {
+        if (values.odometerKm <= 0 || values.liters <= 0 || values.pricePerLiter <= 0) {
             error.value = "กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง"
             return
         }
         viewModelScope.launch {
             saving.value = true
             error.value = null
-            runCatching {
-                fuelRepository.update(id, vehicleId, date, time, odometerKm, liters, pricePerLiter, fullTank, station, photoUri)
-            }.onSuccess {
-                onReminderDataChanged()
-                onSaved()
-            }.onFailure { error.value = it.message ?: "แก้ไขไม่สำเร็จ" }
+            runCatching { fuelRepository.update(id, vehicleId, values) }
+                .onSuccess {
+                    onReminderDataChanged()
+                    onSaved()
+                }.onFailure { error.value = it.message ?: "แก้ไขไม่สำเร็จ" }
             saving.value = false
         }
     }

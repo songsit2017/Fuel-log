@@ -24,6 +24,7 @@ import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.OilPriceRepository
 import com.songsit.fuellogpro.data.OcrRepository
 import com.songsit.fuellogpro.data.ClaudeOcrRepository
+import com.songsit.fuellogpro.data.WeatherRepository
 import com.songsit.fuellogpro.data.ReceiptScanResult
 import com.songsit.fuellogpro.data.firebase.FirestoreSyncRepository
 import com.songsit.fuellogpro.data.firebase.VehicleSharingRepository
@@ -66,6 +67,11 @@ class MainActivity : ComponentActivity() {
     // result/error callbacks and re-run the location lookup once permission is granted.
     private var pendingNearbyResult: ((List<com.songsit.fuellogpro.data.NearbyStation>) -> Unit)? = null
     private var pendingNearbyError: ((String) -> Unit)? = null
+
+    // Same permission gate, for the "capture weather at fill-up" lookup.
+    private var pendingWeatherResult: ((com.songsit.fuellogpro.data.WeatherInfo) -> Unit)? = null
+    private var pendingWeatherError: ((String) -> Unit)? = null
+    private val weatherRepository = WeatherRepository()
 
     // Item 2/3/C (photo attachment + OCR + multi-photo): each picked image is copied into
     // app-private storage (context.filesDir/photos) so it survives even if the source
@@ -150,16 +156,25 @@ class MainActivity : ComponentActivity() {
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", destFile)
         takePicture.launch(uri)
     }
+    // The "add fill-up" dialog can request nearby-station lookup and weather capture back-to-back
+    // on open, both needing location permission — this flag stops the second request from calling
+    // launch() on the shared registerForActivityResult launcher while the first is still pending.
+    private var locationPermissionRequestInFlight = false
     private val locationPermission = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
+        locationPermissionRequestInFlight = false
         val hasLocation = granted.values.any { it }
         if (hasLocation) {
-            performNearbyStationLookup()
+            if (pendingNearbyResult != null) performNearbyStationLookup()
+            if (pendingWeatherResult != null) performWeatherFetch()
         } else {
             pendingNearbyResult = null
             pendingNearbyError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้ฉัน")
             pendingNearbyError = null
+            pendingWeatherResult = null
+            pendingWeatherError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อดึงสภาพอากาศ")
+            pendingWeatherError = null
         }
     }
     private val createBackup = registerForActivityResult(
@@ -337,7 +352,21 @@ class MainActivity : ComponentActivity() {
                     val hasPermission = hasLocationPermission()
                     if (hasPermission) {
                         performNearbyStationLookup()
-                    } else {
+                    } else if (!locationPermissionRequestInFlight) {
+                        locationPermissionRequestInFlight = true
+                        locationPermission.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        )
+                    }
+                },
+                onFetchWeather = { onResult, onError ->
+                    pendingWeatherResult = onResult
+                    pendingWeatherError = onError
+                    val hasPermission = hasLocationPermission()
+                    if (hasPermission) {
+                        performWeatherFetch()
+                    } else if (!locationPermissionRequestInFlight) {
+                        locationPermissionRequestInFlight = true
                         locationPermission.launch(
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
                         )
@@ -492,6 +521,25 @@ class MainActivity : ComponentActivity() {
                 NearbyStationRepository().fetchNearbyStations(applicationContext, location.latitude, location.longitude)
             }.onSuccess { stations -> onResult(stations) }
                 .onFailure { onError?.invoke(it.message ?: "ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง") }
+        }
+    }
+
+    // Weather Integration: captures conditions at the device's current location for the "add
+    // fill-up" form, same permission/location flow as performNearbyStationLookup() above.
+    private fun performWeatherFetch() {
+        val onResult = pendingWeatherResult
+        val onError = pendingWeatherError
+        pendingWeatherResult = null
+        pendingWeatherError = null
+        if (onResult == null) return
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        lifecycleScope.launch {
+            runCatching {
+                val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
+                    ?: error("ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS")
+                weatherRepository.fetchCurrent(location.latitude, location.longitude)
+            }.onSuccess { weather -> onResult(weather) }
+                .onFailure { onError?.invoke(it.message ?: "ดึงข้อมูลสภาพอากาศไม่สำเร็จ") }
         }
     }
 }

@@ -37,6 +37,9 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -45,6 +48,7 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -63,7 +67,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -84,6 +90,7 @@ import com.songsit.fuellogpro.settings.DisplaySettings
 import com.songsit.fuellogpro.data.NearbyStation
 import com.songsit.fuellogpro.data.OilPriceInfo
 import com.songsit.fuellogpro.data.ReceiptScanResult
+import com.songsit.fuellogpro.data.WeatherInfo
 import com.songsit.fuellogpro.data.firebase.VehicleMember
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
@@ -94,6 +101,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.FuelEntryFormValues
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.Vehicle
 import com.songsit.fuellogpro.domain.model.VehicleFormValues
@@ -204,8 +212,8 @@ data class CloudUiState(
 @Composable
 fun FuelLogApp(
     state: NativeAppState,
-    onAddFuel: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
-    onUpdateFuel: (String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
+    onAddFuel: (FuelEntryFormValues, () -> Unit) -> Unit,
+    onUpdateFuel: (String, FuelEntryFormValues, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
     onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
@@ -234,6 +242,7 @@ fun FuelLogApp(
     onDeleteVehicle: (String) -> Unit,
     onClearError: () -> Unit,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
@@ -503,7 +512,9 @@ fun FuelLogApp(
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingFuel,
                 vehicleFuelType = state.selectedVehicle?.fuelType ?: "",
+                vehicleTankCapacity = state.selectedVehicle?.tankCapacity,
                 onFindNearbyStations = onFindNearbyStations,
+                onFetchWeather = onFetchWeather,
                 onPickPhoto = onPickPhoto,
                 onPickCameraPhoto = onPickCameraPhoto,
                 onDismiss = { showAddFuel = false; editingFuel = null },
@@ -1926,6 +1937,9 @@ private fun VehicleEditScreen(
     onUpdate: (String, VehicleFormValues, () -> Unit) -> Unit,
 ) {
     var name by remember { mutableStateOf(editing?.name ?: "") }
+    var brand by remember { mutableStateOf(editing?.brand ?: "") }
+    var model by remember { mutableStateOf(editing?.model ?: "") }
+    var modelYear by remember { mutableStateOf(editing?.modelYear?.toString() ?: "") }
     var registration by remember { mutableStateOf(editing?.registration ?: "") }
     var fuelType by remember { mutableStateOf(editing?.fuelType?.ifBlank { "เบนซิน" } ?: "เบนซิน") }
     var imageUri by remember { mutableStateOf(editing?.imageUri) }
@@ -1942,6 +1956,9 @@ private fun VehicleEditScreen(
     fun handleSave() {
         val values = VehicleFormValues(
             name = name,
+            brand = brand,
+            model = model,
+            modelYear = modelYear.toIntOrNull(),
             registration = registration,
             fuelType = fuelType,
             imageUri = imageUri,
@@ -2027,6 +2044,22 @@ private fun VehicleEditScreen(
                 }
             }
             item { OutlinedTextField(name, { name = it }, label = { Text("ชื่อรถ") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { Text("ข้อมูลรถ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(brand, { brand = it }, label = { Text("แบรนด์รถ") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(model, { model = it }, label = { Text("รุ่นรถ") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+            }
+            item {
+                OutlinedTextField(
+                    modelYear,
+                    { modelYear = it },
+                    label = { Text("ปี MY") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             item { Text("หน่วย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item { UnitDropdownField("หน่วยระยะทาง", distanceUnit, listOf("km", "mi")) { distanceUnit = it } }
             item { UnitDropdownField("หน่วยปริมาตร", volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
@@ -2077,12 +2110,14 @@ private fun AddFuelDialog(
     latestOdometer: Double?,
     editing: FuelEntry? = null,
     vehicleFuelType: String = "",
+    vehicleTankCapacity: Double? = null,
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, Double, Double, Double, Boolean, String, String?, () -> Unit) -> Unit)? = null,
+    onSave: (FuelEntryFormValues, () -> Unit) -> Unit,
+    onUpdate: ((String, FuelEntryFormValues, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
@@ -2127,6 +2162,27 @@ private fun AddFuelDialog(
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var odometerIsTripMeter by remember { mutableStateOf(editing?.odometerIsTripMeter ?: false) }
+    var tankLevelEnabled by remember { mutableStateOf(editing?.tankLevelEnabled ?: false) }
+    var tankLevelTiming by remember { mutableStateOf(editing?.tankLevelTiming ?: "after") }
+    var tankLevelPercent by remember { mutableStateOf(editing?.tankLevelPercent) }
+    var tankLevelLiters by remember { mutableStateOf(editing?.tankLevelLiters) }
+    var tankLevelCapacityInput by remember {
+        mutableStateOf(vehicleTankCapacity?.let { "%.1f".format(Locale.US, it) } ?: "")
+    }
+    var showTankLevelDialog by remember { mutableStateOf(false) }
+    var discountEnabled by remember { mutableStateOf(editing?.discountEnabled ?: false) }
+    var discountAmount by remember {
+        mutableStateOf(editing?.discountAmount?.takeIf { it > 0 }?.let { "%.2f".format(Locale.US, it) } ?: "")
+    }
+    var discountPerLiter by remember { mutableStateOf(editing?.discountPerLiter ?: false) }
+    var missedPreviousFillUp by remember { mutableStateOf(editing?.missedPreviousFillUp ?: false) }
+    var weatherDescription by remember { mutableStateOf(editing?.weatherDescription) }
+    var weatherTemperatureC by remember { mutableStateOf(editing?.weatherTemperatureC) }
+    var weatherLatitude by remember { mutableStateOf(editing?.weatherLatitude) }
+    var weatherLongitude by remember { mutableStateOf(editing?.weatherLongitude) }
+    var weatherFetching by remember { mutableStateOf(false) }
+    var weatherError by remember { mutableStateOf<String?>(null) }
     val stationOptions = nearbyStations.map { it.name }.distinct()
         .filter { station.isBlank() || it.contains(station, ignoreCase = true) }
     // Nearby Search doesn't return distance itself (computed locally in NearbyStationRepository),
@@ -2157,6 +2213,25 @@ private fun AddFuelDialog(
     // existing entry already has its station filled in.
     LaunchedEffect(Unit) {
         if (editing == null && onFindNearbyStations != null) runNearbySearch()
+    }
+    LaunchedEffect(Unit) {
+        if (editing == null && onFetchWeather != null) {
+            weatherFetching = true
+            weatherError = null
+            onFetchWeather.invoke(
+                { info ->
+                    weatherFetching = false
+                    weatherDescription = info.description
+                    weatherTemperatureC = info.temperatureC
+                    weatherLatitude = info.latitude
+                    weatherLongitude = info.longitude
+                },
+                { message ->
+                    weatherFetching = false
+                    weatherError = message
+                },
+            )
+        }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2193,11 +2268,12 @@ private fun AddFuelDialog(
                 }
                 item {
                     FormRow(Icons.Filled.Speed) {
-                        OutlinedTextField(
-                            odometer,
-                            { odometer = it },
-                            label = { Text("มาตรวัดระยะทางรวม (km)") },
-                            singleLine = true,
+                        OdometerField(
+                            value = odometer,
+                            onValueChange = { odometer = it },
+                            isTripMeter = odometerIsTripMeter,
+                            onModeChange = { odometerIsTripMeter = it },
+                            latestOdometer = latestOdometer,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -2288,23 +2364,246 @@ private fun AddFuelDialog(
                         Switch(checked = fullTank, onCheckedChange = { fullTank = it })
                     }
                 }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("ตั้งค่าระดับถัง")
+                        Switch(checked = tankLevelEnabled, onCheckedChange = { tankLevelEnabled = it })
+                    }
+                }
+                if (tankLevelEnabled) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { showTankLevelDialog = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            val summary = tankLevelLiters?.let {
+                                val timingLabel = if (tankLevelTiming == "before") "ก่อนเติม" else "หลังเติม"
+                                "$timingLabel ${tankLevelPercent?.toInt() ?: 0}% (${"%.1f".format(Locale.US, it)} L)"
+                            } ?: "ไม่ได้ตั้งค่า"
+                            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "ตั้งค่าระดับน้ำมันเชื้อเพลิง",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+                if (onFetchWeather != null) {
+                    item { Text("สภาพอากาศ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    item {
+                        FormRow(Icons.Filled.WbSunny) {
+                            val description = weatherDescription
+                            val summary = when {
+                                weatherFetching -> "กำลังเรียกข้อมูลสภาพอากาศ..."
+                                description != null -> description + (weatherTemperatureC?.let { " • %.1f°C".format(Locale.US, it) } ?: "")
+                                weatherError != null -> weatherError ?: ""
+                                else -> "ไม่มีข้อมูลสภาพอากาศ"
+                            }
+                            Text(summary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("ส่วนลด")
+                        Switch(checked = discountEnabled, onCheckedChange = { discountEnabled = it })
+                    }
+                }
+                if (discountEnabled) {
+                    item {
+                        FormRow(Icons.Filled.Percent) {
+                            OutlinedTextField(
+                                discountAmount,
+                                { discountAmount = it },
+                                label = { Text(if (discountPerLiter) "ส่วนลด (บาท/ลิตร)" else "ส่วนลด (บาท)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            UnitDropdownField(
+                                "หน่วยส่วนลด",
+                                if (discountPerLiter) "บาท/ลิตร" else "บาท",
+                                listOf("บาท", "บาท/ลิตร"),
+                                modifier = Modifier.weight(1f),
+                            ) { discountPerLiter = it == "บาท/ลิตร" }
+                        }
+                    }
+                }
+                item {
+                    FormRow(Icons.Filled.Info) {
+                        Text("ก่อนหน้าพลาดการ เติม-เพิ่ม", modifier = Modifier.weight(1f))
+                        Switch(checked = missedPreviousFillUp, onCheckedChange = { missedPreviousFillUp = it })
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = !saving,
                 onClick = {
-                    val odometerValue = odometer.toDoubleOrNull() ?: 0.0
+                    val enteredOdometer = odometer.toDoubleOrNull() ?: 0.0
+                    val odometerValue = if (odometerIsTripMeter) (latestOdometer ?: 0.0) + enteredOdometer else enteredOdometer
                     val litersValue = liters.toDoubleOrNull() ?: 0.0
                     val priceValue = price.toDoubleOrNull() ?: 0.0
                     val photoUri = PhotoUris.join(photoUris)
+                    val values = FuelEntryFormValues(
+                        date = date,
+                        time = time,
+                        odometerKm = odometerValue,
+                        liters = litersValue,
+                        pricePerLiter = priceValue,
+                        fullTank = fullTank,
+                        station = station,
+                        photoUri = photoUri,
+                        odometerIsTripMeter = odometerIsTripMeter,
+                        tankLevelEnabled = tankLevelEnabled,
+                        tankLevelTiming = tankLevelTiming,
+                        tankLevelPercent = tankLevelPercent,
+                        tankLevelLiters = tankLevelLiters,
+                        discountEnabled = discountEnabled,
+                        discountAmount = discountAmount.toDoubleOrNull() ?: 0.0,
+                        discountPerLiter = discountPerLiter,
+                        missedPreviousFillUp = missedPreviousFillUp,
+                        weatherDescription = weatherDescription,
+                        weatherTemperatureC = weatherTemperatureC,
+                        weatherLatitude = weatherLatitude,
+                        weatherLongitude = weatherLongitude,
+                    )
                     if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, date, time, odometerValue, litersValue, priceValue, fullTank, station, photoUri, onDismiss)
+                        onUpdate(editing.id, values, onDismiss)
                     } else {
-                        onSave(date, time, odometerValue, litersValue, priceValue, fullTank, station, photoUri, onDismiss)
+                        onSave(values, onDismiss)
                     }
                 },
             ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+    )
+    if (showTankLevelDialog) {
+        TankLevelDialog(
+            timing = tankLevelTiming,
+            percent = tankLevelPercent ?: 0.0,
+            tankCapacityInput = tankLevelCapacityInput,
+            onDismiss = { showTankLevelDialog = false },
+            onSave = { timing, percent, capacityInput, estimatedLiters ->
+                tankLevelTiming = timing
+                tankLevelPercent = percent
+                tankLevelCapacityInput = capacityInput
+                tankLevelLiters = estimatedLiters
+                showTankLevelDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun OdometerField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isTripMeter: Boolean,
+    onModeChange: (Boolean) -> Unit,
+    latestOdometer: Double?,
+    modifier: Modifier = Modifier,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Column(modifier = modifier) {
+        Box {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(if (isTripMeter) "มาตรวัดการเดินทาง (km)" else "มาตรวัดระยะทางรวม (km)") },
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกมาตรวัด")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(text = { Text("มาตรวัดระยะทางรวม") }, onClick = { onModeChange(false); menuExpanded = false })
+                DropdownMenuItem(text = { Text("มาตรวัดการเดินทาง") }, onClick = { onModeChange(true); menuExpanded = false })
+            }
+        }
+        if (latestOdometer != null) {
+            Text(
+                "ค่าสุดท้าย: ${"%.0f".format(Locale.US, latestOdometer)} km",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+            )
+        }
+    }
+}
+
+// Fuelio's tank-level set dialog: pick whether the % reading is before or after this fill-up,
+// confirm the tank capacity, and drag a slider to estimate the liters currently in the tank.
+@Composable
+private fun TankLevelDialog(
+    timing: String,
+    percent: Double,
+    tankCapacityInput: String,
+    onDismiss: () -> Unit,
+    onSave: (timing: String, percent: Double, capacityInput: String, estimatedLiters: Double?) -> Unit,
+) {
+    var localTiming by remember { mutableStateOf(timing) }
+    var localCapacity by remember { mutableStateOf(tankCapacityInput) }
+    var localPercent by remember { mutableStateOf(percent.toFloat()) }
+    val capacityValue = localCapacity.toDoubleOrNull()
+    val estimatedLiters = capacityValue?.let { it * localPercent / 100.0 }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ระดับน้ำมันเชื้อเพลิง") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("ระดับถังก่อนเติม หรือ หลังเติม", style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = localTiming == "before", onClick = { localTiming = "before" })
+                    Text(
+                        "ก่อนหน้า",
+                        modifier = Modifier.clickable { localTiming = "before" },
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    RadioButton(selected = localTiming == "after", onClick = { localTiming = "after" })
+                    Text(
+                        "หลังจาก",
+                        modifier = Modifier.clickable { localTiming = "after" },
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        localCapacity,
+                        { localCapacity = it },
+                        label = { Text("ความจุถัง (L)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        estimatedLiters?.let { "%.1f".format(Locale.US, it) } ?: "-",
+                        {},
+                        readOnly = true,
+                        label = { Text("น้ำมันเชื้อเพลิงโดยประมาณ (L)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Slider(value = localPercent, onValueChange = { localPercent = it }, valueRange = 0f..100f)
+                Text("${localPercent.toInt()}%", style = MaterialTheme.typography.labelMedium)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(localTiming, localPercent.toDouble(), localCapacity, estimatedLiters) }) { Text("บันทึก") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
     )

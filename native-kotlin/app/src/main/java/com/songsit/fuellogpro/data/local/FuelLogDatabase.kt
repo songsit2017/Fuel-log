@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncConflictEntity::class,
         DeletionTombstoneEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -186,6 +186,29 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
+        // Fuelio parity: vehicle brand/model/MY, plus fill-up trip-meter mode, tank-level
+        // set dialog, discount, missed-previous-fill-up flag, and captured weather.
+        private val migration11To12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN brand TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN model TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN modelYear INTEGER")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN odometerIsTripMeter INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN tankLevelEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN tankLevelTiming TEXT NOT NULL DEFAULT 'after'")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN tankLevelPercent REAL")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN tankLevelLiters REAL")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN discountEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN discountAmount REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN discountPerLiter INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN missedPreviousFillUp INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN weatherDescription TEXT")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN weatherTemperatureC REAL")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN weatherLatitude REAL")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN weatherLongitude REAL")
+            }
+        }
+
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -203,6 +226,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration8To9,
                     migration9To10,
                     migration10To11,
+                    migration11To12,
                 )
                     .build()
                     .also { instance = it }

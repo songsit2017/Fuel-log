@@ -19,4 +19,7 @@ data class VehicleEntity(
     val vin: String = "",
     val insurance: String = "",
     val isActive: Boolean = true,
+    val brand: String = "",
+    val model: String = "",
+    val modelYear: Int? = null,
 )

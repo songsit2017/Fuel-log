@@ -19,6 +19,7 @@ fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
     for (index in 1 until fullEntries.size) {
         val previous = fullEntries[index - 1]
         val current = fullEntries[index]
+        if (current.missedPreviousFillUp) continue
         val intervalDistance = current.odometerKm - previous.odometerKm
         if (intervalDistance > 0 && current.liters > 0) {
             distance += intervalDistance
@@ -45,6 +46,7 @@ fun calculatePerEntryKmPerLiter(entries: List<FuelEntry>): Map<String, Double> {
     for (index in 1 until fullEntries.size) {
         val previous = fullEntries[index - 1]
         val current = fullEntries[index]
+        if (current.missedPreviousFillUp) continue
         val intervalDistance = current.odometerKm - previous.odometerKm
         if (intervalDistance > 0 && current.liters > 0) {
             result[current.id] = intervalDistance / current.liters

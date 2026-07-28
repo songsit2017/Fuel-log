@@ -2,6 +2,7 @@ package com.songsit.fuellogpro.data
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import com.songsit.fuellogpro.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,6 +14,13 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+private const val TAG = "NearbyStationRepo"
+// local.defaults.properties ships this literal string when no real key is configured — the
+// secrets-gradle-plugin bakes it into BuildConfig/manifest as-is rather than leaving it blank,
+// so a plain isBlank() check doesn't catch it and the app was sending the literal string
+// "MISSING" to Google as the API key, which surfaces as REQUEST_DENIED "API key is invalid".
+private const val PLACEHOLDER_KEY = "MISSING"
 
 data class NearbyStation(
     val name: String,
@@ -37,8 +45,12 @@ class NearbyStationRepository {
                 .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
                 .metaData?.getString("com.google.android.geo.API_KEY")
         }.getOrNull()
-        return manifestKey?.takeIf { it.isNotBlank() } ?: BuildConfig.MAPS_API_KEY
+        return manifestKey?.takeIf { it.isNotBlank() && it != PLACEHOLDER_KEY }
+            ?: BuildConfig.MAPS_API_KEY.takeIf { it != PLACEHOLDER_KEY }
+            ?: ""
     }
+
+    private fun maskKey(key: String) = if (key.length > 8) key.take(8) + "..." else "***"
 
     suspend fun fetchNearbyStations(context: Context, lat: Double, lon: Double, radiusMeters: Int = 7000): List<NearbyStation> =
         withContext(Dispatchers.IO) {
@@ -64,20 +76,25 @@ class NearbyStationRepository {
                 val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
                 val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
                 if (responseCode !in 200..299) {
+                    Log.e(TAG, "Places API HTTP $responseCode key=${maskKey(apiKey)} body=$body")
                     error("เรียก Google Places API ไม่สำเร็จ (HTTP $responseCode)")
                 }
-                parsePlacesResponse(body, lat, lon)
+                parsePlacesResponse(body, lat, lon, apiKey)
             } finally {
                 connection.disconnect()
             }
         }
 
-    private fun parsePlacesResponse(body: String, lat: Double, lon: Double): List<NearbyStation> {
+    private fun parsePlacesResponse(body: String, lat: Double, lon: Double, apiKey: String): List<NearbyStation> {
         val root = JSONObject(body)
         val status = root.optString("status")
         if (status == "ZERO_RESULTS") return emptyList()
         if (status != "OK") {
+            // Places' legacy Nearby Search always answers HTTP 200, even for auth failures —
+            // the actual cause (bad key, billing disabled, API not enabled, ...) only shows up
+            // in this JSON body, hence logging it here rather than at the HTTP-status check.
             val errorMessage = root.optString("error_message").takeIf { it.isNotBlank() }
+            Log.e(TAG, "Places API status=$status message=${errorMessage ?: "-"} key=${maskKey(apiKey)}")
             if (status == "REQUEST_DENIED") {
                 error("ไม่สามารถเชื่อมต่อ Google Maps ได้ (API Key ไม่ถูกต้อง) กรุณาตรวจสอบการตั้งค่า")
             } else {

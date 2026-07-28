@@ -587,7 +587,8 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
     var distanceKm by remember { mutableStateOf("") }
     var pricePerLiter by remember { mutableStateOf("") }
     var consumptionKmPerLiter by remember { mutableStateOf("") }
-    var costResult by remember { mutableStateOf("") }
+    var budgetAmount by remember { mutableStateOf("") }
+    var fuelVolumeLiters by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
 
     val latestPrice = state.entries.maxByOrNull { it.date + it.time }?.pricePerLiter
@@ -629,7 +630,7 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
                 }
             }
         }
-        if (mode != 3) {
+        if (mode != 1) {
             QuickPickField(
                 value = distanceKm,
                 onValueChange = { distanceKm = it },
@@ -637,7 +638,7 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
                 quickChoices = distanceQuickChoices,
             )
         }
-        if (mode != 1) {
+        if (mode == 0 || mode == 1) {
             QuickPickField(
                 value = pricePerLiter,
                 onValueChange = { pricePerLiter = it },
@@ -653,24 +654,28 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
                 quickChoices = consumptionQuickChoices,
             )
         }
-        if (mode == 0) {
-            QuickPickField(value = costResult, onValueChange = { costResult = it }, label = "ค่าใช้จ่าย (ไม่บังคับ)")
+        if (mode == 1) {
+            QuickPickField(value = budgetAmount, onValueChange = { budgetAmount = it }, label = "งบประมาณ ($)")
+        }
+        if (mode == 2) {
+            QuickPickField(value = fuelVolumeLiters, onValueChange = { fuelVolumeLiters = it }, label = "ปริมาณน้ำมัน (L)")
         }
         Button(
             onClick = {
                 val distance = distanceKm.toDoubleOrNull()
                 val price = pricePerLiter.toDoubleOrNull()
                 val consumption = consumptionKmPerLiter.toDoubleOrNull()
-                val cost = costResult.toDoubleOrNull()
+                val budget = budgetAmount.toDoubleOrNull()
+                val volume = fuelVolumeLiters.toDoubleOrNull()
                 result = when (mode) {
                     0 -> if (distance != null && price != null && consumption != null && consumption > 0) {
                         thaiCurrency.format((distance / consumption) * price)
                     } else null
-                    1 -> if (cost != null && price != null && consumption != null && price > 0) {
-                        "%.1f km".format((cost / price) * consumption)
+                    1 -> if (budget != null && price != null && consumption != null && price > 0) {
+                        "%.1f km".format((budget / price) * consumption)
                     } else null
-                    2 -> if (distance != null && price != null && cost != null && cost > 0) {
-                        "%.2f km/L".format(distance / (cost / price))
+                    2 -> if (distance != null && volume != null && volume > 0) {
+                        "%.2f km/L".format(distance / volume)
                     } else null
                     else -> if (distance != null && consumption != null && consumption > 0) {
                         "%.2f L".format(distance / consumption)

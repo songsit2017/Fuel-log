@@ -1,5 +1,7 @@
 package com.songsit.fuellogpro.data
 
+import android.content.Context
+import android.content.pm.PackageManager
 import com.songsit.fuellogpro.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,26 +23,38 @@ data class NearbyStation(
 
 /**
  * Queries the Google Places API's Nearby Search endpoint for amenity=gas_station places within
- * ~7km of the device, using the MAPS_API_KEY wired up via the Secrets Gradle Plugin
- * (BuildConfig.MAPS_API_KEY). Places doesn't return a distance itself, so each result's distance
- * from the device is computed locally via haversine, same as the previous Overpass-based lookup.
+ * ~7km of the device. The key is resolved the same way the native Maps SDK resolves it for
+ * NearbyStationsMapScreen's GoogleMap composable — from the com.google.android.geo.API_KEY
+ * meta-data in AndroidManifest.xml — falling back to BuildConfig.MAPS_API_KEY if that's missing.
+ * Places doesn't return a distance itself, so each result's distance from the device is computed
+ * locally via haversine, same as the previous Overpass-based lookup.
  */
 class NearbyStationRepository {
 
-    suspend fun fetchNearbyStations(lat: Double, lon: Double, radiusMeters: Int = 7000): List<NearbyStation> =
+    private fun resolveApiKey(context: Context): String {
+        val manifestKey = runCatching {
+            context.packageManager
+                .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+                .metaData?.getString("com.google.android.geo.API_KEY")
+        }.getOrNull()
+        return manifestKey?.takeIf { it.isNotBlank() } ?: BuildConfig.MAPS_API_KEY
+    }
+
+    suspend fun fetchNearbyStations(context: Context, lat: Double, lon: Double, radiusMeters: Int = 7000): List<NearbyStation> =
         withContext(Dispatchers.IO) {
+            val apiKey = resolveApiKey(context)
             // Builds without a real key configured (e.g. CI, or a fresh checkout with no
             // local.properties) get the "MISSING" placeholder from local.defaults.properties —
             // real Google API keys always start with "AIza", so this check works for both that
             // placeholder and a genuinely blank value.
-            if (!BuildConfig.MAPS_API_KEY.startsWith("AIza")) {
+            if (!apiKey.startsWith("AIza")) {
                 error("ไม่ได้ตั้งค่า Google Maps API Key (MAPS_API_KEY)")
             }
             val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
                 "?location=${URLEncoder.encode("$lat,$lon", "UTF-8")}" +
                 "&radius=$radiusMeters" +
                 "&type=gas_station" +
-                "&key=${BuildConfig.MAPS_API_KEY}"
+                "&key=$apiKey"
             val connection = (URL(url).openConnection() as HttpURLConnection)
             connection.requestMethod = "GET"
             connection.connectTimeout = 10_000

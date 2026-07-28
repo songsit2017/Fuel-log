@@ -489,7 +489,7 @@ class MainActivity : ComponentActivity() {
             runCatching {
                 val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
                     ?: error("ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS")
-                NearbyStationRepository().fetchNearbyStations(location.latitude, location.longitude)
+                NearbyStationRepository().fetchNearbyStations(applicationContext, location.latitude, location.longitude)
             }.onSuccess { stations -> onResult(stations) }
                 .onFailure { onError?.invoke(it.message ?: "ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง") }
         }

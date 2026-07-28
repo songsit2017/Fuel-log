@@ -63,6 +63,10 @@ jobs:
             -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+      - name: Generate local.properties
+        working-directory: native-kotlin
+        run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > local.properties
+
       - name: Test and build native preview
         working-directory: native-kotlin
         run: gradle testDebugUnitTest assembleDebug --no-daemon

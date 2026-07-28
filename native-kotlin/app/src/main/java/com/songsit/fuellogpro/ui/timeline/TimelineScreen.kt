@@ -204,7 +204,7 @@ private fun TimelineThumbnails(photoUris: List<String>) {
                 modifier = Modifier.size(52.dp),
             ) {
                 AsyncImage(
-                    model = uri,
+                    model = if (uri.startsWith("/")) java.io.File(uri) else uri,
                     contentDescription = "รูปที่แนบ",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

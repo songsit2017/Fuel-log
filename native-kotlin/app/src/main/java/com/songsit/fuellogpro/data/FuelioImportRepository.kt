@@ -81,11 +81,16 @@ class FuelioImportRepository(
                 while (entry != null) {
                     val name = entry.name
                     if (!entry.isDirectory && name.lowercase().endsWith(".csv")) {
-                        val parsed = parseFuelioCsv(zip.readBytes().toString(Charsets.UTF_8))
+                        val isCostFile = name.lowercase().contains("cost") || name.lowercase().contains("expense")
+                        val defaultSection = if (isCostFile) "costs" else ""
+                        val parsed = parseFuelioCsv(zip.readBytes().toString(Charsets.UTF_8), defaultSection)
                         if (parsed.fuelRows.isNotEmpty() || parsed.costRows.isNotEmpty()) {
-                            val vehicleName = parsed.vehicleName
+                            var parsedVehicleName = parsed.vehicleName
                                 ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
-                            val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
+                            if (isCostFile && (parsedVehicleName.lowercase().contains("cost") || parsedVehicleName.lowercase().contains("expense"))) {
+                                parsedVehicleName = existingVehicles.firstOrNull()?.name ?: "รถนำเข้า"
+                            }
+                            val matchedVehicle = existingVehicles.find { it.name.trim().equals(parsedVehicleName.trim(), ignoreCase = true) }
                             val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
                             if (matchedVehicle == null) {
                                 val newVehicle = VehicleEntity(
@@ -362,7 +367,7 @@ private fun parseFuelioDate(raw: String): String {
     return value
 }
 
-private fun parseFuelioCsv(text: String): FuelioParseResult {
+private fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioParseResult {
     val rawLines = text.split('\n').map { it.trimEnd('\r') }
     var vehicleName: String? = null
     var vehicleRegistration: String? = null
@@ -372,7 +377,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     val costCategories = mutableMapOf<String, String>()
     val pictureMap = mutableMapOf<String, MutableList<String>>()
 
-    var section = ""
+    var section = defaultSection
     var headerColumns: List<String> = emptyList()
     var idxDate = -1
     var idxTime = -1
@@ -407,7 +412,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
         // Vehicle metadata is often on lines before the "##Log" header, e.g. "Car;MyCar",
         // "Plate;1กก1234", "Fuel;Gasoline". Ported alongside the vehicle name lookup so
         // registration/fuel type aren't silently dropped when the source file has them.
-        if (section.isEmpty() && (vehicleName == null || vehicleRegistration == null || vehicleFuelType == null)) {
+        if ((section.isEmpty() || section == "costs") && (vehicleName == null || vehicleRegistration == null || vehicleFuelType == null)) {
             val delimiter = detectDelimiter(line)
             val fields = splitLine(line, delimiter)
             if (fields.size >= 2) {

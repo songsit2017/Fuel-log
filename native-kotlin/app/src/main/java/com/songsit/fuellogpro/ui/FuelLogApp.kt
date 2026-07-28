@@ -1671,7 +1671,7 @@ private fun VehiclesListScreen(
                 Box(Modifier.fillMaxSize()) {
                     if (!vehicle.imageUri.isNullOrBlank()) {
                         AsyncImage(
-                            model = vehicle.imageUri,
+                            model = if (vehicle.imageUri.startsWith("/")) java.io.File(vehicle.imageUri) else vehicle.imageUri,
                             contentDescription = vehicle.name,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
@@ -2264,7 +2264,7 @@ private fun VehicleEditScreen(
                 Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(20.dp))) {
                     if (!imageUri.isNullOrBlank()) {
                         AsyncImage(
-                            model = imageUri,
+                            model = if (imageUri!!.startsWith("/")) java.io.File(imageUri!!) else imageUri,
                             contentDescription = name,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
@@ -2925,7 +2925,7 @@ private fun PhotoAttachmentRow(
                     modifier = Modifier.size(64.dp),
                 ) {
                     AsyncImage(
-                        model = uri,
+                        model = if (uri.startsWith("/")) java.io.File(uri) else uri,
                         contentDescription = "รูปที่แนบ",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,

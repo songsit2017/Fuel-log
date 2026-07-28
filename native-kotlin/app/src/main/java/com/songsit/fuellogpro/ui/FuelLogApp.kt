@@ -2460,6 +2460,19 @@ private fun AddFuelScreen(
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+        photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
+        // Claude OCR (functions/index.js scanReceipt) fills these when signed
+        // in and reachable; falls back to on-device amount-only OCR otherwise.
+        scanResult?.date?.let { date = it }
+        scanResult?.station?.let { station = it }
+        scanResult?.liters?.let { onLitersChange("%.2f".format(Locale.US, it)) }
+        scanResult?.pricePerLiter?.let { onPriceChange("%.2f".format(Locale.US, it)) }
+        scanResult?.total?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+        if (scanResult?.total == null) {
+            scanResult?.amount?.takeIf { total.isBlank() }?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+        }
+    }
     var odometerIsTripMeter by remember { mutableStateOf(editing?.odometerIsTripMeter ?: false) }
     var tankLevelEnabled by remember { mutableStateOf(editing?.tankLevelEnabled ?: false) }
     var tankLevelTiming by remember { mutableStateOf(editing?.tankLevelTiming ?: "after") }
@@ -2696,25 +2709,25 @@ private fun AddFuelScreen(
                 }
                 if (onPickPhoto != null) {
                     item {
-                        val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
-                            photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
-                            // Claude OCR (functions/index.js scanReceipt) fills these when signed
-                            // in and reachable; falls back to on-device amount-only OCR otherwise.
-                            scanResult?.date?.let { date = it }
-                            scanResult?.station?.let { station = it }
-                            scanResult?.liters?.let { onLitersChange("%.2f".format(Locale.US, it)) }
-                            scanResult?.pricePerLiter?.let { onPriceChange("%.2f".format(Locale.US, it)) }
-                            scanResult?.total?.let { onTotalChange("%.2f".format(Locale.US, it)) }
-                            if (scanResult?.total == null) {
-                                scanResult?.amount?.takeIf { total.isBlank() }?.let { onTotalChange("%.2f".format(Locale.US, it)) }
-                            }
-                        }
                         PhotoAttachmentRow(
                             photoUris = photoUris,
                             onPickGallery = { onPickPhoto("fuel", handlePicked) },
                             onPickCamera = onPickCameraPhoto?.let { pick -> { pick("fuel", handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
+                    }
+                    item {
+                        Button(
+                            onClick = {
+                                val scanPicker = onPickCameraPhoto ?: onPickPhoto
+                                scanPicker.invoke("fuel", handlePicked)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("สแกนบิล/ใบเสร็จด้วย AI")
+                        }
                     }
                 }
                 item {

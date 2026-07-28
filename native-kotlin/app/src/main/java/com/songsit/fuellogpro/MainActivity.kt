@@ -435,6 +435,25 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 oilPriceInfo = oilPriceRepository.fetchTodayPrices()
             }
+            // Pull the latest family-shared data as soon as the app opens (if already signed
+            // in), so a vehicle another member edited elsewhere shows up without the user
+            // having to remember to tap "ซิงก์ตอนนี้" first. Runs once per process launch.
+            LaunchedEffect(Unit) {
+                val uid = authRepository.currentUid
+                if (uid != null) {
+                    cloudState = cloudState.copy(syncing = true, message = null)
+                    runCatching {
+                        cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName)
+                    }.onSuccess { result ->
+                        cloudState = cloudState.copy(
+                            syncing = false,
+                            message = "ซิงก์อัตโนมัติ • อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",
+                        )
+                    }.onFailure {
+                        cloudState = cloudState.copy(syncing = false, message = it.message ?: "ซิงก์อัตโนมัติไม่สำเร็จ")
+                    }
+                }
+            }
             val viewModel: NativeAppViewModel = viewModel(
                 factory = NativeAppViewModelFactory(
                     fuelRepository,
@@ -447,6 +466,16 @@ class MainActivity : ComponentActivity() {
                         // Fuelio-style auto-sync: mirror every add/edit to Drive in the
                         // background, matching the ("ซิงค์อัตโนมัติ ในขณะเพิ่ม/แก้ไขใหม่") checkbox.
                         if (backupSettings.driveAutoSyncEnabled) performDriveBackup(silent = true)
+                        // Family sharing: push every add/edit to Firestore too, silently, so
+                        // other members see the change without anyone tapping "ซิงก์ตอนนี้".
+                        val uid = authRepository.currentUid
+                        if (uid != null) {
+                            composeScope.launch {
+                                runCatching {
+                                    cloudRepository.sync(uid, authRepository.currentEmail, authRepository.currentDisplayName)
+                                }
+                            }
+                        }
                     },
                 ),
             )

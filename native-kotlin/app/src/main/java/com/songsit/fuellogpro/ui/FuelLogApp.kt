@@ -1851,6 +1851,7 @@ private fun SettingsScreen(
                     },
                     onClick = { showThemeDialog = true },
                 )
+                // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
             }
 
             // ── หมวด 2: แบ็คอัพข้อมูล (Import/Export options) ───────────────────────

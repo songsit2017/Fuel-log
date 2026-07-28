@@ -1741,7 +1741,7 @@ private fun PreferenceCategoryHeader(title: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, top = 16.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
     )
 }
 
@@ -2879,23 +2879,22 @@ private fun AddFuelScreen(
                     }
                 }
             }
-    } // end LazyColumn
-    } // end Scaffold
-    } // end Box
-    if (showTankLevelDialog) {
-        TankLevelDialog(
-            timing = tankLevelTiming,
-            percent = tankLevelPercent ?: 0.0,
-            tankCapacityInput = tankLevelCapacityInput,
-            onDismiss = { showTankLevelDialog = false },
-            onSave = { timing, percent, capacityInput, estimatedLiters ->
-                tankLevelTiming = timing
-                tankLevelPercent = percent
-                tankLevelCapacityInput = capacityInput
-                tankLevelLiters = estimatedLiters
-                showTankLevelDialog = false
-            },
-        )
+        }
+        if (showTankLevelDialog) {
+            TankLevelDialog(
+                timing = tankLevelTiming,
+                percent = tankLevelPercent ?: 0.0,
+                tankCapacityInput = tankLevelCapacityInput,
+                onDismiss = { showTankLevelDialog = false },
+                onSave = { timing, percent, capacityInput, estimatedLiters ->
+                    tankLevelTiming = timing
+                    tankLevelPercent = percent
+                    tankLevelCapacityInput = capacityInput
+                    tankLevelLiters = estimatedLiters
+                    showTankLevelDialog = false
+                },
+            )
+        }
     }
 }
 

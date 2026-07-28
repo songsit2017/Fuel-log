@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
     private val importProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
     private val pendingImportSummaryResult = kotlinx.coroutines.flow.MutableStateFlow<com.songsit.fuellogpro.data.BackupImportResult?>(null)
 
-    private fun InputStream.readTextLimited(maxBytes: Int = 20_000_000): String {
+    private fun java.io.InputStream.readTextLimited(maxBytes: Int = 20_000_000): String {
         val bytes = readBytes()
         require(bytes.size <= maxBytes) { "ไฟล์ใหญ่เกินขนาดที่รองรับ" }
         return bytes.toString(Charsets.UTF_8)
@@ -455,9 +455,11 @@ class MainActivity : ComponentActivity() {
                     composeScope.launch {
                         cloudState = cloudState.copy(syncing = true, message = null)
                         runCatching {
+                            val resId = resources.getIdentifier("default_web_client_id", "string", packageName)
+                            val webClientId = if (resId != 0) getString(resId) else ""
                             authRepository.signIn(
                                 this@MainActivity,
-                                getString(R.string.default_web_client_id),
+                                webClientId,
                             )
                         }.onSuccess { uid ->
                             cloudState = CloudUiState(

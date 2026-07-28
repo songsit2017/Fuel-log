@@ -212,6 +212,7 @@ data class CloudUiState(
 @Composable
 fun FuelLogApp(
     state: NativeAppState,
+    importProgressPercent: Int? = null,
     onAddFuel: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdateFuel: (String, FuelEntryFormValues, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
@@ -275,6 +276,22 @@ fun FuelLogApp(
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
     FuelLogTheme(themeMode = displaySettings.themeMode) {
+    importProgressPercent?.let { percent ->
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            title = { Text("กำลังนำเข้าข้อมูล") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LinearProgressIndicator(
+                        progress = { percent / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("กำลังนำเข้าข้อมูล... $percent%")
+                }
+            },
+        )
+    }
     if (showSettings) {
         SettingsScreen(
             onDismiss = { showSettings = false },

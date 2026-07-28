@@ -7,8 +7,10 @@ import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.data.local.VehicleEntity
-import java.io.ByteArrayInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipInputStream
 import kotlin.math.abs
@@ -25,55 +27,86 @@ import kotlin.math.abs
  *
  * Re-importing the same (or an updated) Fuelio backup must not create duplicate rows:
  * a vehicle is matched by name, and within that vehicle a fuel/cost row is matched by
- * date + odometer (+ title, for costs) against what's already stored — see
+ * date + time + odometer (+ title, for costs) against what's already stored — see
  * [findMatchingFuelEntry]/[findMatchingExpense]. A match updates the existing row in
  * place (keeping its id and, unless it has none yet, its photo) instead of inserting a
  * new one.
+ *
+ * [importFuelioZip] never buffers the whole backup (or its bundled photos) into memory: it
+ * re-opens the source twice via [openStream] and streams both passes through
+ * ZipInputStream, so a 160MB+ .fuelio full of receipt/odometer photos imports without an
+ * OutOfMemoryError. Pass 1 streams every photo inside the nested `pictures.data` zip
+ * straight to app-private storage (one photo's bytes in memory at a time); pass 2 streams
+ * each vehicle's small text .csv entry and merges its rows against the local DB.
  */
 class FuelioImportRepository(
     private val context: Context,
     private val database: FuelLogDatabase,
 ) {
-    suspend fun importFuelioZip(bytes: ByteArray): BackupImportResult {
-        val zipEntries = readZipEntries(bytes)
-        val picturesDataBytes = zipEntries.entries
-            .firstOrNull { (name, _) -> name.substringAfterLast('/').equals("pictures.data", ignoreCase = true) }
-            ?.value
-        val imageMap: Map<String, ByteArray> = picturesDataBytes
-            ?.let(::readZipEntries)
-            ?.mapKeys { (name, _) -> name.substringAfterLast('/').substringAfterLast('\\').lowercase() }
-            ?: emptyMap()
+    suspend fun importFuelioZip(
+        openStream: () -> InputStream,
+        totalBytes: Long? = null,
+        onProgress: (percent: Int) -> Unit = {},
+    ): BackupImportResult = withContext(Dispatchers.IO) {
+        val totalWorkBytes = totalBytes?.let { it * 2 } // two full streaming passes over the source
+        var bytesReadSoFar = 0L
+        var lastReportedPercent = -1
+        val reportProgress: (Int) -> Unit = { count ->
+            bytesReadSoFar += count
+            val total = totalWorkBytes
+            if (total != null && total > 0) {
+                val percent = ((bytesReadSoFar * 100) / total).toInt().coerceIn(0, 99)
+                if (percent != lastReportedPercent) {
+                    lastReportedPercent = percent
+                    onProgress(percent)
+                }
+            }
+        }
 
+        // Pass 1: extract every photo inside the nested pictures.data zip straight to disk,
+        // keyed by lowercased filename, without ever holding more than one photo in memory.
+        val imageMap = extractPictures(openStream(), reportProgress)
+
+        // Pass 2: re-open the same source and stream each vehicle's (small, text-only) .csv
+        // entry, merging its rows against what's already in the local DB.
         val existingVehicles = database.vehicleDao().getAll().toMutableList()
         val vehiclesToUpsert = mutableListOf<VehicleEntity>()
         val fuelEntries = mutableListOf<FuelEntryEntity>()
         val expenses = mutableListOf<ExpenseEntity>()
         var vehicleCount = 0
 
-        for ((name, csvBytes) in zipEntries) {
-            if (!name.lowercase().endsWith(".csv")) continue
-            val parsed = parseFuelioCsv(csvBytes.toString(Charsets.UTF_8))
-            if (parsed.fuelRows.isEmpty() && parsed.costRows.isEmpty()) continue
-
-            val vehicleName = parsed.vehicleName
-                ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
-            val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
-            val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
-            if (matchedVehicle == null) {
-                val newVehicle = VehicleEntity(
-                    id = vehicleId,
-                    name = vehicleName,
-                    registration = parsed.vehicleRegistration ?: "",
-                    fuelType = parsed.vehicleFuelType ?: "",
-                    createdAt = System.currentTimeMillis(),
-                )
-                vehiclesToUpsert += newVehicle
-                existingVehicles += newVehicle
+        CountingInputStream(openStream(), reportProgress).use { counting ->
+            ZipInputStream(counting).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (!entry.isDirectory && name.lowercase().endsWith(".csv")) {
+                        val parsed = parseFuelioCsv(zip.readBytes().toString(Charsets.UTF_8))
+                        if (parsed.fuelRows.isNotEmpty() || parsed.costRows.isNotEmpty()) {
+                            val vehicleName = parsed.vehicleName
+                                ?: name.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
+                            val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
+                            val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
+                            if (matchedVehicle == null) {
+                                val newVehicle = VehicleEntity(
+                                    id = vehicleId,
+                                    name = vehicleName,
+                                    registration = parsed.vehicleRegistration ?: "",
+                                    fuelType = parsed.vehicleFuelType ?: "",
+                                    createdAt = System.currentTimeMillis(),
+                                )
+                                vehiclesToUpsert += newVehicle
+                                existingVehicles += newVehicle
+                            }
+                            vehicleCount++
+                            fuelEntries += mergeFuelRows(vehicleId, parsed, imageMap)
+                            expenses += mergeCostRows(vehicleId, parsed, imageMap)
+                        }
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
             }
-            vehicleCount++
-
-            fuelEntries += mergeFuelRows(vehicleId, parsed, imageMap)
-            expenses += mergeCostRows(vehicleId, parsed, imageMap)
         }
 
         database.withTransaction {
@@ -81,7 +114,8 @@ class FuelioImportRepository(
             database.fuelEntryDao().upsertAll(fuelEntries)
             database.expenseDao().upsertAll(expenses)
         }
-        return BackupImportResult(
+        onProgress(100)
+        BackupImportResult(
             vehicles = vehicleCount,
             fuelEntries = fuelEntries.size,
             expenses = expenses.size,
@@ -92,7 +126,7 @@ class FuelioImportRepository(
 
     // Single, un-zipped .csv (one vehicle) — Fuelio also supports exporting just this.
     // There is no nested pictures.data to draw photos from here.
-    suspend fun importFuelioCsv(text: String): BackupImportResult {
+    suspend fun importFuelioCsv(text: String): BackupImportResult = withContext(Dispatchers.IO) {
         val parsed = parseFuelioCsv(text)
         val vehicleName = parsed.vehicleName ?: "รถนำเข้า"
         val existingVehicles = database.vehicleDao().getAll()
@@ -114,13 +148,49 @@ class FuelioImportRepository(
             database.fuelEntryDao().upsertAll(fuelEntries)
             database.expenseDao().upsertAll(expenses)
         }
-        return BackupImportResult(if (matchedVehicle == null) 1 else 0, fuelEntries.size, expenses.size, 0, 0)
+        BackupImportResult(if (matchedVehicle == null) 1 else 0, fuelEntries.size, expenses.size, 0, 0)
+    }
+
+    // Streams the backup once, looking only for the nested pictures.data entry (itself a
+    // zip). Its contents are read via a second ZipInputStream wrapped around the *outer*
+    // stream — safe because a nested ZipInputStream naturally stops at its entry's data
+    // boundary — with close() on that inner wrapper intercepted so it doesn't take down the
+    // outer stream before pass 1 finishes walking the rest of the top-level entries.
+    private fun extractPictures(source: InputStream, onBytesRead: (Int) -> Unit): Map<String, String> {
+        val imageMap = mutableMapOf<String, String>()
+        val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
+        CountingInputStream(source, onBytesRead).use { counting ->
+            ZipInputStream(counting).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val baseName = entry.name.substringAfterLast('/').substringAfterLast('\\')
+                    if (!entry.isDirectory && baseName.equals("pictures.data", ignoreCase = true)) {
+                        ZipInputStream(NonClosingInputStream(zip)).use { inner ->
+                            var innerEntry = inner.nextEntry
+                            while (innerEntry != null) {
+                                if (!innerEntry.isDirectory) {
+                                    val innerBase = innerEntry.name.substringAfterLast('/').substringAfterLast('\\').lowercase()
+                                    val destFile = File(photosDir, "${UUID.randomUUID()}.jpg")
+                                    destFile.outputStream().use { output -> inner.copyTo(output) }
+                                    imageMap[innerBase] = destFile.absolutePath
+                                }
+                                inner.closeEntry()
+                                innerEntry = inner.nextEntry
+                            }
+                        }
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        }
+        return imageMap
     }
 
     private suspend fun mergeFuelRows(
         vehicleId: String,
         parsed: FuelioParseResult,
-        imageMap: Map<String, ByteArray>,
+        imageMap: Map<String, String>,
     ): List<FuelEntryEntity> {
         val existingEntries = database.fuelEntryDao().getForVehicle(vehicleId)
         return parsed.fuelRows.map { row ->
@@ -145,7 +215,7 @@ class FuelioImportRepository(
     private suspend fun mergeCostRows(
         vehicleId: String,
         parsed: FuelioParseResult,
-        imageMap: Map<String, ByteArray>,
+        imageMap: Map<String, String>,
     ): List<ExpenseEntity> {
         val existingExpenses = database.expenseDao().getForVehicle(vehicleId)
         return parsed.costRows.map { row ->
@@ -154,6 +224,7 @@ class FuelioImportRepository(
                 id = existing?.id ?: UUID.randomUUID().toString(),
                 vehicleId = vehicleId,
                 date = row.date,
+                time = row.time,
                 category = row.category,
                 description = row.title,
                 amount = row.amount,
@@ -168,11 +239,12 @@ class FuelioImportRepository(
     }
 
     private fun findMatchingFuelEntry(existing: List<FuelEntryEntity>, row: FuelioFuelRow): FuelEntryEntity? =
-        existing.find { it.date == row.date && abs(it.odometerKm - row.odometerKm) < 0.01 }
+        existing.find { it.date == row.date && it.time == row.time && abs(it.odometerKm - row.odometerKm) < 0.01 }
 
     private fun findMatchingExpense(existing: List<ExpenseEntity>, row: FuelioCostRow): ExpenseEntity? =
         existing.find {
             it.date == row.date &&
+                it.time == row.time &&
                 it.description.trim().equals(row.title.trim(), ignoreCase = true) &&
                 odometerMatches(it.odometerKm, row.odometerKm)
         }
@@ -184,42 +256,54 @@ class FuelioImportRepository(
     }
 
     // Only fills in a photo when the matched record doesn't already have one, so a
-    // re-import never overwrites a photo the user already attached or imported.
+    // re-import never overwrites a photo the user already attached or imported. The photo
+    // itself was already streamed to disk in pass 1 — this just looks up its saved path.
     private fun resolvePhotoUri(
         existingPhotoUri: String?,
         uniqueId: String,
         pictureMap: Map<String, List<String>>,
-        imageMap: Map<String, ByteArray>,
+        imageMap: Map<String, String>,
     ): String? {
         if (!existingPhotoUri.isNullOrBlank()) return existingPhotoUri
         if (uniqueId.isBlank()) return existingPhotoUri
         val filenames = pictureMap[uniqueId].orEmpty()
         if (filenames.isEmpty()) return existingPhotoUri
-        val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
         val savedPaths = filenames.mapNotNull { filename ->
             val base = filename.substringAfterLast('/').substringAfterLast('\\').lowercase()
-            val imageBytes = imageMap[base] ?: return@mapNotNull null
-            val destFile = File(photosDir, "${UUID.randomUUID()}.jpg")
-            destFile.writeBytes(imageBytes)
-            destFile.absolutePath
+            imageMap[base]
         }
         return PhotoUris.join(savedPaths) ?: existingPhotoUri
     }
+}
 
-    private fun readZipEntries(bytes: ByteArray): Map<String, ByteArray> {
-        val result = LinkedHashMap<String, ByteArray>()
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                if (!entry.isDirectory) {
-                    result[entry.name] = zip.readBytes()
-                }
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
-        }
+// Tracks cumulative bytes read from the delegate stream, reporting each chunk so the
+// caller can turn it into a rough "X% imported" figure without needing to buffer anything.
+private class CountingInputStream(
+    private val delegate: InputStream,
+    private val onBytesRead: (Int) -> Unit,
+) : InputStream() {
+    override fun read(): Int {
+        val result = delegate.read()
+        if (result >= 0) onBytesRead(1)
         return result
     }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val count = delegate.read(b, off, len)
+        if (count > 0) onBytesRead(count)
+        return count
+    }
+
+    override fun close() = delegate.close()
+}
+
+// Wraps a stream (the outer ZipInputStream, while positioned on its pictures.data entry) so
+// a nested ZipInputStream can be closed after reading that entry's inner zip without closing
+// the outer stream out from under the pass-1 loop that still needs to reach later entries.
+private class NonClosingInputStream(private val delegate: InputStream) : InputStream() {
+    override fun read(): Int = delegate.read()
+    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
+    override fun close() {}
 }
 
 private data class FuelioFuelRow(
@@ -236,6 +320,7 @@ private data class FuelioFuelRow(
 
 private data class FuelioCostRow(
     val date: String,
+    val time: String,
     val title: String,
     val category: String,
     val odometerKm: Double?,
@@ -289,6 +374,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     var section = ""
     var headerColumns: List<String> = emptyList()
     var idxDate = -1
+    var idxTime = -1
     var idxOdo = -1
     var idxFuel = -1
     var idxFull = -1
@@ -298,6 +384,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
     var idxUniqueId = -1
     // ##Costs columns
     var idxCostDate = -1
+    var idxCostTime = -1
     var idxCostOdo = -1
     var idxCostCategory = -1
     var idxCostTitle = -1
@@ -342,6 +429,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                 if (headerColumns.isEmpty() && looksLikeHeader) {
                     headerColumns = lowerFields
                     idxDate = headerColumns.indexOfFirst { it.contains("date") }
+                    idxTime = headerColumns.indexOfFirst { it.contains("time") }
                     idxOdo = headerColumns.indexOfFirst { it.contains("odo") }
                     idxFuel = headerColumns.indexOfFirst { it.contains("fuel") || it.contains("liter") || it.contains("volume") }
                     idxFull = headerColumns.indexOfFirst { it.contains("full") }
@@ -359,9 +447,10 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                     val station = fields.getOrNull(idxStation)?.takeIf { it.isNotBlank() } ?: ""
                     val fullField = fields.getOrNull(idxFull)?.lowercase()
                     val fullTank = fullField == null || fullField == "1" || fullField == "true" || fullField == "full"
+                    val time = fields.getOrNull(idxTime)?.trim()?.takeIf { it.isNotBlank() } ?: "00:00"
                     fuelRows += FuelioFuelRow(
                         date = date,
-                        time = "00:00",
+                        time = time,
                         odometerKm = odo,
                         liters = liters,
                         pricePerLiter = price,
@@ -382,6 +471,7 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                 val looksLikeHeader = lowerFields.any { it.contains("title") } && lowerFields.any { it.contains("price") || it.contains("amount") }
                 if (idxCostDate < 0 && looksLikeHeader) {
                     idxCostDate = lowerFields.indexOfFirst { it.contains("date") }
+                    idxCostTime = lowerFields.indexOfFirst { it.contains("time") }
                     idxCostOdo = lowerFields.indexOfFirst { it.contains("odo") }
                     idxCostCategory = lowerFields.indexOfFirst { it.contains("categ") }
                     idxCostTitle = lowerFields.indexOfFirst { it.contains("title") }
@@ -397,8 +487,10 @@ private fun parseFuelioCsv(text: String): FuelioParseResult {
                     val title = fields.getOrNull(idxCostTitle) ?: ""
                     val odo = fields.getOrNull(idxCostOdo)?.toDoubleOrNull()
                     val income = fields.getOrNull(idxCostIncome)?.let { it == "1" || it.equals("true", true) } ?: false
+                    val time = fields.getOrNull(idxCostTime)?.trim()?.takeIf { it.isNotBlank() } ?: "00:00"
                     costRows += FuelioCostRow(
                         date = date,
+                        time = time,
                         title = title,
                         category = category,
                         odometerKm = odo,

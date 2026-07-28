@@ -195,22 +195,47 @@ class MainActivity : ComponentActivity() {
     }
     private lateinit var fuelioImportRepository: FuelioImportRepository
 
+    // Drives the "กำลังนำเข้าข้อมูล... N%" progress dialog while openBackup below is running —
+    // null means no import in progress. A plain class field (not Compose state) because
+    // registerForActivityResult callbacks live outside setContent; setContent collects this
+    // as state and passes it down to FuelLogApp.
+    private val importProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+
+    private fun queryFileSize(uri: android.net.Uri): Long? =
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+            if (sizeIndex >= 0 && cursor.moveToFirst() && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else null
+        }
+
     // Handles both the native JSON backup format and a Fuelio .fuelio/.zip/.csv export
-    // (item 3). Format is sniffed from the file bytes, not the extension, since Android's
-    // OpenDocument picker doesn't reliably surface .fuelio as a distinct mime type.
+    // (item 3). Format is sniffed by peeking the first bytes, not the extension, since
+    // Android's OpenDocument picker doesn't reliably surface .fuelio as a distinct mime
+    // type — and the zip branch below streams straight from the picked Uri (re-opening it
+    // as needed) instead of buffering the whole backup into memory, so multi-hundred-MB
+    // .fuelio exports full of photos import without hitting an OutOfMemoryError.
     private val openBackup = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri ?: return@registerForActivityResult
         lifecycleScope.launch {
+            importProgress.value = 0
             runCatching {
-                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytesLimited(20_000_000) }
-                    ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
-                val isZip = bytes.size >= 2 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()
+                val header = contentResolver.openInputStream(uri)?.use { stream ->
+                    val prefix = ByteArray(4)
+                    val read = stream.read(prefix)
+                    prefix.copyOf(if (read < 0) 0 else read)
+                } ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
+                val isZip = header.size >= 2 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()
                 if (isZip) {
-                    fuelioImportRepository.importFuelioZip(bytes)
+                    val totalBytes = queryFileSize(uri)
+                    fuelioImportRepository.importFuelioZip(
+                        openStream = { contentResolver.openInputStream(uri) ?: error("ไม่สามารถเปิดไฟล์สำรองได้") },
+                        totalBytes = totalBytes,
+                        onProgress = { percent -> importProgress.value = percent },
+                    )
                 } else {
-                    val text = bytes.toString(Charsets.UTF_8)
+                    val text = contentResolver.openInputStream(uri)?.use { it.bufferedReader(Charsets.UTF_8).readText() }
+                        ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
                     val looksLikeFuelioCsv = text.contains("##Log") || text.contains("##Costs")
                     if (looksLikeFuelioCsv) {
                         fuelioImportRepository.importFuelioCsv(text)
@@ -219,12 +244,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }.onSuccess {
+                importProgress.value = null
                 Toast.makeText(
                     this@MainActivity,
                     "นำเข้าแบบไม่ลบข้อมูลเดิม ${it.totalRecords} รายการ",
                     Toast.LENGTH_LONG,
                 ).show()
             }.onFailure {
+                importProgress.value = null
                 Toast.makeText(this@MainActivity, it.message ?: "นำเข้าไม่สำเร็จ", Toast.LENGTH_LONG).show()
             }
         }
@@ -302,6 +329,7 @@ class MainActivity : ComponentActivity() {
                 ),
             )
             val state by viewModel.state.collectAsState()
+            val importProgressPercent by importProgress.collectAsState()
             var vehicleMembers by remember { mutableStateOf<List<VehicleMember>>(emptyList()) }
             LaunchedEffect(state.selectedVehicleId, cloudState.uid) {
                 val vehicleId = state.selectedVehicleId
@@ -313,6 +341,7 @@ class MainActivity : ComponentActivity() {
             }
             FuelLogApp(
                 state = state,
+                importProgressPercent = importProgressPercent,
                 onAddFuel = viewModel::addFuel,
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,
@@ -542,28 +571,4 @@ class MainActivity : ComponentActivity() {
                 .onFailure { onError?.invoke(it.message ?: "ดึงข้อมูลสภาพอากาศไม่สำเร็จ") }
         }
     }
-}
-
-private fun java.io.Reader.readTextLimited(maxChars: Int): String {
-    val result = StringBuilder()
-    val buffer = CharArray(8_192)
-    while (true) {
-        val count = read(buffer)
-        if (count < 0) break
-        require(result.length + count <= maxChars) { "ไฟล์สำรองมีขนาดใหญ่เกิน 20 MB" }
-        result.append(buffer, 0, count)
-    }
-    return result.toString()
-}
-
-private fun java.io.InputStream.readBytesLimited(maxBytes: Int): ByteArray {
-    val buffer = java.io.ByteArrayOutputStream()
-    val chunk = ByteArray(8_192)
-    while (true) {
-        val count = read(chunk)
-        if (count < 0) break
-        require(buffer.size() + count <= maxBytes) { "ไฟล์สำรองมีขนาดใหญ่เกิน 20 MB" }
-        buffer.write(chunk, 0, count)
-    }
-    return buffer.toByteArray()
 }

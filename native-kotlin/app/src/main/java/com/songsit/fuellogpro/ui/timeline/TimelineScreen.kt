@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
@@ -33,10 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -254,43 +250,3 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
     }
 }
 
-// Basic detail view for a single fuel record, reached by tapping a Timeline fuel card. Uses the
-// same Scaffold+TopAppBar+onDismiss "back" pattern as the other full-screen overlays in
-// FuelLogApp.kt (AddFuelScreen, SettingsScreen, ...) since there's no NavController here either.
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-fun FuelUsageRecordScreen(entry: FuelEntry, onDismiss: () -> Unit, onImageClick: (String) -> Unit, modifier: Modifier = Modifier) {
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("รายละเอียดการเติมน้ำมัน") },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(),
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RecordDetailRow("วันที่", "${entry.date} ${entry.time}")
-            RecordDetailRow("เลขไมล์", "${timelineNumber.format(entry.odometerKm)} กม.")
-            RecordDetailRow("ปริมาณ", "${timelineNumber.format(entry.liters)} ลิตร")
-            RecordDetailRow("ราคาต่อลิตร", timelineCurrency.format(entry.pricePerLiter))
-            RecordDetailRow("ยอดรวม", timelineCurrency.format(entry.amount))
-            RecordDetailRow("สถานี", entry.station.ifBlank { "-" })
-            if (entry.photoUrls.isNotEmpty()) TimelineThumbnails(entry.photoUrls, onImageClick)
-        }
-    }
-}
-
-@Composable
-private fun RecordDetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-    }
-}

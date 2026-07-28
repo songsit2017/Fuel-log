@@ -95,7 +95,7 @@ class FuelioImportRepository(
                             if (matchedVehicle == null) {
                                 val newVehicle = VehicleEntity(
                                     id = vehicleId,
-                                    name = vehicleName,
+                                    name = parsedVehicleName,
                                     registration = parsed.vehicleRegistration ?: "",
                                     fuelType = parsed.vehicleFuelType ?: "",
                                     createdAt = System.currentTimeMillis(),

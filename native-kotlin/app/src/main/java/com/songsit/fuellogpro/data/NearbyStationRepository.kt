@@ -43,12 +43,12 @@ class NearbyStationRepository {
     suspend fun fetchNearbyStations(context: Context, lat: Double, lon: Double, radiusMeters: Int = 7000): List<NearbyStation> =
         withContext(Dispatchers.IO) {
             val apiKey = resolveApiKey(context)
-            // Builds without a real key configured (e.g. CI, or a fresh checkout with no
-            // local.properties) get the "MISSING" placeholder from local.defaults.properties —
-            // real Google API keys always start with "AIza", so this check works for both that
-            // placeholder and a genuinely blank value.
-            if (!apiKey.startsWith("AIza")) {
-                error("ไม่ได้ตั้งค่า Google Maps API Key (MAPS_API_KEY)")
+            // Key is resolved from the manifest meta-data (com.google.android.geo.API_KEY,
+            // injected via manifestPlaceholders in build.gradle.kts → local.properties) or falls
+            // back to BuildConfig.MAPS_API_KEY. If the key is genuinely blank we surface a clean
+            // error; otherwise we let the Places API validate it and report any auth issue itself.
+            if (apiKey.isBlank()) {
+                error("กรุณาตั้งค่า MAPS_API_KEY ใน local.properties")
             }
             val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
                 "?location=${URLEncoder.encode("$lat,$lon", "UTF-8")}" +

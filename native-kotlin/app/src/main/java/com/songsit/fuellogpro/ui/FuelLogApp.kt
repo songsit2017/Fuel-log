@@ -524,7 +524,7 @@ fun FuelLogApp(
             }
         }
         if (showAddFuel || editingFuel != null) {
-            AddFuelDialog(
+            AddFuelScreen(
                 saving = state.saving,
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingFuel,
@@ -2214,8 +2214,13 @@ private fun VehicleEditScreen(
     }
 }
 
+// Full-screen add/edit fuel entry — replaces the old AlertDialog popup so the form has
+// room for all fields and matches the Fuelio-style layout shown in the design reference.
+// The composable occupies the entire screen via Box(fillMaxSize) + its own Scaffold so
+// the parent's BottomNavigationBar is visually covered while this screen is open.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddFuelDialog(
+private fun AddFuelScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: FuelEntry? = null,
@@ -2343,11 +2348,76 @@ private fun AddFuelDialog(
             )
         }
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (editing != null) "แก้ไขการเติมน้ำมัน" else "เพิ่มการเติมน้ำมัน") },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Compute the save action once so both the TopAppBar icon and the internal confirm
+    // button below share exactly the same lambda without duplicating the validation logic.
+    val doSave = {
+        val enteredOdometer = odometer.toDoubleOrNull() ?: 0.0
+        val odometerValue = if (odometerIsTripMeter) (latestOdometer ?: 0.0) + enteredOdometer else enteredOdometer
+        val litersValue = liters.toDoubleOrNull() ?: 0.0
+        val priceValue = price.toDoubleOrNull() ?: 0.0
+        val photoUri = PhotoUris.join(photoUris)
+        val values = FuelEntryFormValues(
+            date = date,
+            time = time,
+            odometerKm = odometerValue,
+            liters = litersValue,
+            pricePerLiter = priceValue,
+            fullTank = fullTank,
+            station = station,
+            photoUri = photoUri,
+            odometerIsTripMeter = odometerIsTripMeter,
+            tankLevelEnabled = tankLevelEnabled,
+            tankLevelTiming = tankLevelTiming,
+            tankLevelPercent = tankLevelPercent,
+            tankLevelLiters = tankLevelLiters,
+            discountEnabled = discountEnabled,
+            discountAmount = discountAmount.toDoubleOrNull() ?: 0.0,
+            discountPerLiter = discountPerLiter,
+            missedPreviousFillUp = missedPreviousFillUp,
+            weatherDescription = weatherDescription,
+            weatherTemperatureC = weatherTemperatureC,
+            weatherLatitude = weatherLatitude,
+            weatherLongitude = weatherLongitude,
+        )
+        if (editing != null && onUpdate != null) {
+            onUpdate(editing.id, values, onDismiss)
+        } else {
+            onSave(values, onDismiss)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                    }
+                },
+                title = {
+                    Text(
+                        if (editing != null) "แก้ไขการเติมน้ำมัน" else "เติมน้ำมัน",
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                actions = {
+                    IconButton(onClick = doSave, enabled = !saving) {
+                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 12.dp),
+    ) {
                 item {
                     AutocompleteTextField(
                         value = station,
@@ -2557,49 +2627,9 @@ private fun AddFuelDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                enabled = !saving,
-                onClick = {
-                    val enteredOdometer = odometer.toDoubleOrNull() ?: 0.0
-                    val odometerValue = if (odometerIsTripMeter) (latestOdometer ?: 0.0) + enteredOdometer else enteredOdometer
-                    val litersValue = liters.toDoubleOrNull() ?: 0.0
-                    val priceValue = price.toDoubleOrNull() ?: 0.0
-                    val photoUri = PhotoUris.join(photoUris)
-                    val values = FuelEntryFormValues(
-                        date = date,
-                        time = time,
-                        odometerKm = odometerValue,
-                        liters = litersValue,
-                        pricePerLiter = priceValue,
-                        fullTank = fullTank,
-                        station = station,
-                        photoUri = photoUri,
-                        odometerIsTripMeter = odometerIsTripMeter,
-                        tankLevelEnabled = tankLevelEnabled,
-                        tankLevelTiming = tankLevelTiming,
-                        tankLevelPercent = tankLevelPercent,
-                        tankLevelLiters = tankLevelLiters,
-                        discountEnabled = discountEnabled,
-                        discountAmount = discountAmount.toDoubleOrNull() ?: 0.0,
-                        discountPerLiter = discountPerLiter,
-                        missedPreviousFillUp = missedPreviousFillUp,
-                        weatherDescription = weatherDescription,
-                        weatherTemperatureC = weatherTemperatureC,
-                        weatherLatitude = weatherLatitude,
-                        weatherLongitude = weatherLongitude,
-                    )
-                    if (editing != null && onUpdate != null) {
-                        onUpdate(editing.id, values, onDismiss)
-                    } else {
-                        onSave(values, onDismiss)
-                    }
-                },
-            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
-    )
+    } // end LazyColumn
+    } // end Scaffold
+    } // end Box
     if (showTankLevelDialog) {
         TankLevelDialog(
             timing = tankLevelTiming,

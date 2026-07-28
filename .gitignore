@@ -14,3 +14,4 @@ native-kotlin/gradle/
 native-kotlin/gradlew
 native-kotlin/gradlew.bat
 native-kotlin/app/google-services.json
+test_output.txt

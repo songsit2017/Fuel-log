@@ -76,6 +76,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -249,6 +250,7 @@ fun FuelLogApp(
     onSignOut: () -> Unit,
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
+    onResolveAllConflicts: (Boolean) -> Unit,
     onSelectVehicle: (String) -> Unit,
     onAddVehicle: (VehicleFormValues, () -> Unit) -> Unit,
     onUpdateVehicle: (String, VehicleFormValues, () -> Unit) -> Unit,
@@ -344,6 +346,7 @@ fun FuelLogApp(
             onSignOut = onSignOut,
             syncConflicts = syncConflicts,
             onResolveConflict = onResolveConflict,
+            onResolveAllConflicts = onResolveAllConflicts,
             reminderSettings = reminderSettings,
             onReminderSettingsChange = onReminderSettingsChange,
             hasSelectedVehicle = state.selectedVehicle != null,
@@ -1827,6 +1830,7 @@ private fun SettingsScreen(
     onSignOut: () -> Unit,
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
+    onResolveAllConflicts: (Boolean) -> Unit,
     reminderSettings: ReminderSettings,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     hasSelectedVehicle: Boolean,
@@ -1860,6 +1864,7 @@ private fun SettingsScreen(
             onSignOut = onSignOut,
             syncConflicts = syncConflicts,
             onResolveConflict = onResolveConflict,
+            onResolveAllConflicts = onResolveAllConflicts,
             onDriveBackup = onDriveBackup,
             onDriveRestore = onDriveRestore,
             driveAutoSyncEnabled = driveAutoSyncEnabled,
@@ -2106,6 +2111,7 @@ private fun ImportExportScreen(
     onSignOut: () -> Unit,
     syncConflicts: List<SyncConflictEntity>,
     onResolveConflict: (String, Boolean) -> Unit,
+    onResolveAllConflicts: (Boolean) -> Unit,
     onDriveBackup: (() -> Unit)? = null,
     onDriveRestore: (() -> Unit)? = null,
     driveAutoSyncEnabled: Boolean = false,
@@ -2228,6 +2234,33 @@ private fun ImportExportScreen(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
+                }
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { onResolveAllConflicts(true) },
+                            enabled = !cloudState.syncing,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("ใช้ข้อมูลในเครื่องทั้งหมด") }
+                        OutlinedButton(
+                            onClick = { onResolveAllConflicts(false) },
+                            enabled = !cloudState.syncing,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("ใช้ข้อมูล Cloud ทั้งหมด") }
+                    }
+                }
+                if (syncConflicts.size > 5) {
+                    item {
+                        Text(
+                            "แสดง 5 จากทั้งหมด ${syncConflicts.size} รายการ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        )
+                    }
                 }
                 items(syncConflicts.take(5)) { conflict ->
                     Card(

@@ -683,6 +683,24 @@ class MainActivity : ComponentActivity() {
                             }
                     }
                 },
+                onResolveAllConflicts = { useLocal ->
+                    composeScope.launch {
+                        cloudState = cloudState.copy(syncing = true, message = null)
+                        runCatching { cloudRepository.resolveAllConflicts(useLocal) }
+                            .onSuccess { count ->
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = if (useLocal) "ใช้ข้อมูลในเครื่องแล้ว $count รายการ" else "ใช้ข้อมูล Cloud แล้ว $count รายการ",
+                                )
+                            }
+                            .onFailure {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = it.message ?: "แก้รายการขัดแย้งไม่สำเร็จ",
+                                )
+                            }
+                    }
+                },
                 onSelectVehicle = viewModel::selectVehicle,
                 onAddVehicle = viewModel::addVehicle,
                 onUpdateVehicle = viewModel::updateVehicle,

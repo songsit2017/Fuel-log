@@ -15,6 +15,9 @@ import com.songsit.fuellogpro.data.local.TripEntity
 import com.songsit.fuellogpro.data.local.VehicleEntity
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
 import com.songsit.fuellogpro.data.local.deletionTombstoneKey
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import com.songsit.fuellogpro.domain.SyncDecision
 import com.songsit.fuellogpro.domain.decideSync
@@ -31,7 +34,13 @@ class FirestoreSyncRepository(
     private val database: FuelLogDatabase,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
-    suspend fun sync(uid: String, email: String?, displayName: String?): CloudSyncResult {
+    // Overlapping sync() calls (launch, every-edit, manual button, join-by-code
+    // can all fire close together) each take their own non-atomic local/cloud
+    // snapshots; running them concurrently produced spurious sync conflicts.
+    // Serializing them here removes that race for every call site at once.
+    private val syncMutex = Mutex()
+
+    suspend fun sync(uid: String, email: String?, displayName: String?): CloudSyncResult = syncMutex.withLock {
         normalizeLegacyVehicleId()
         val cloudVehicles = discoverVehicles(uid)
         val localVehicles = database.vehicleDao().getAll().associateBy(VehicleEntity::id)
@@ -201,6 +210,15 @@ class FirestoreSyncRepository(
             }
         }
         database.syncConflictDao().deleteByKey(key)
+    }
+
+    suspend fun resolveAllConflicts(useLocal: Boolean): Int {
+        val conflicts = database.syncConflictDao().observeAll().first()
+        var resolved = 0
+        for (conflict in conflicts) {
+            runCatching { resolveConflict(conflict.key, useLocal) }.onSuccess { resolved++ }
+        }
+        return resolved
     }
 
     private suspend fun normalizeLegacyVehicleId() {

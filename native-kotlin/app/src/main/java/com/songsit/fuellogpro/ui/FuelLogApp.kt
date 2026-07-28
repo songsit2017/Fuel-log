@@ -1839,50 +1839,6 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "หมายเลข",
-                    subtitle = "แสดงตัวเลข ${displaySettings.decimals} หลักหลังจุดทศนิยม",
-                    trailing = {
-                        Checkbox(
-                            checked = displaySettings.decimals > 0,
-                            onCheckedChange = { checked ->
-                                onDisplaySettingsChange(displaySettings.copy(decimals = if (checked) 2 else 0))
-                            },
-                        )
-                    },
-                    onClick = { showDecimalsDialog = true },
-                )
-            }
-
-            item {
-                PreferenceListItem(
-                    title = "รูปแบบวัน",
-                    subtitle = "รูปแบบวันของบันทึกระยะไมล์ (yyyy-MM-dd)",
-                )
-            }
-
-            item {
-                PreferenceListItem(
-                    title = "ต้นค่าเริ่มต้นฉบับหน้าปัด",
-                    subtitle = "การตั้งค่าเริ่มต้นในขณะที่เพิ่มสัมผัสใหม่",
-                )
-            }
-
-            item {
-                PreferenceListItem(
-                    title = "วันแรกของสัปดาห์",
-                    subtitle = "วันอาทิตย์",
-                )
-            }
-
-            item {
-                PreferenceListItem(
-                    title = "แบบอักษร",
-                    subtitle = "เริ่มต้น",
-                )
-            }
-
-            item {
-                PreferenceListItem(
                     title = "ธีมมืดอัตโนมัติ",
                     subtitle = "ระบบเปิดโหมดประหยัดพลังงาน หรือตามระบบ",
                     trailing = {
@@ -1896,13 +1852,6 @@ private fun SettingsScreen(
                     onClick = { showThemeDialog = true },
                 )
             }
-
-            item { PreferenceListItem("ชุดรูปแบบ") }
-            item { PreferenceListItem("บ้าน") }
-            item { PreferenceListItem("บันทึกเดินทาง") }
-            item { PreferenceListItem("รูปภาพ") }
-            item { PreferenceListItem("สภาพอากาศ") }
-            item { PreferenceListItem("การตั้งค่าอื่น ๆ") }
 
             // ── หมวด 2: แบ็คอัพข้อมูล (Import/Export options) ───────────────────────
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
@@ -1974,56 +1923,10 @@ private fun SettingsScreen(
                 }
             }
 
-            // ── หมวด 3: จดหมายเตือนชำระเงิน ─────────────────────────────────────────
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader("จดหมายเตือนชำระเงิน") }
-            item {
-                PreferenceListItem(
-                    title = "เตือนวันที่",
-                    subtitle = "จำนวนวันก่อนการสิ้นสุดของการทำเครื่องหมายรายการเป็นสำคัญ (การแจ้งเตือนสีแดง)",
-                    trailing = {
-                        Checkbox(
-                            checked = reminderSettings.dateReminders,
-                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(dateReminders = it)) },
-                        )
-                    },
-                )
-            }
-            item {
-                // NotificationSettingRow: ตามเลขไมล์
-                PreferenceListItem(
-                    title = "เตือนที่หน้าปัด (ตามเลขไมล์)",
-                    subtitle = "จำนวนวันก่อนการสิ้นสุดของการทำเครื่องหมายรายการเป็นสำคัญ (การแจ้งเตือนสีแดง)",
-                    trailing = {
-                        Checkbox(
-                            checked = reminderSettings.odometerReminders,
-                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(odometerReminders = it)) },
-                        )
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = "บริการพื้นหลัง",
-                    subtitle = "จะตรวจสอบทุกวันและแสดงการแจ้งเตือนแม้ว่า Fuelio ถูกปิด",
-                    trailing = {
-                        Checkbox(
-                            checked = reminderSettings.paymentReminders,
-                            onCheckedChange = { onReminderSettingsChange(reminderSettings.copy(paymentReminders = it)) },
-                        )
-                    },
-                )
-            }
-
-            // ── หมวด 4: ข้อมูล ───────────────────────────────────────────────────────
+            // ── หมวด 3: ข้อมูล ───────────────────────────────────────────────────────
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { PreferenceCategoryHeader("ข้อมูล") }
-            item { PreferenceListItem("ใบอนุญาตเปิดแหล่งที่มา") }
-            item { PreferenceListItem("การเปลี่ยนแปลงสู่ระบบ") }
-            item { PreferenceListItem("อัตรา Fuelio") }
-            item { PreferenceListItem("Fuelio 10.3.1 (FuelLog Native Engine)") }
-            item { PreferenceListItem("ข้อกำหนดการใช้งาน (EULA)") }
-            item { PreferenceListItem("นโยบายการเก็บข้อมูลส่วนบุคคล") }
+            item { PreferenceListItem("FuelLog Pro v1.0.0") }
         }
     }
 

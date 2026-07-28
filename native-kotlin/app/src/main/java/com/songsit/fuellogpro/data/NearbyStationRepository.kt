@@ -78,7 +78,11 @@ class NearbyStationRepository {
         if (status == "ZERO_RESULTS") return emptyList()
         if (status != "OK") {
             val errorMessage = root.optString("error_message").takeIf { it.isNotBlank() }
-            error("Google Places API: $status${errorMessage?.let { " ($it)" } ?: ""}")
+            if (status == "REQUEST_DENIED") {
+                error("ไม่สามารถเชื่อมต่อ Google Maps ได้ (API Key ไม่ถูกต้อง) กรุณาตรวจสอบการตั้งค่า")
+            } else {
+                error("Google Places API: $status${errorMessage?.let { " ($it)" } ?: ""}")
+            }
         }
         val results = root.optJSONArray("results") ?: return emptyList()
         val stations = mutableListOf<NearbyStation>()

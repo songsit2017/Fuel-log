@@ -115,10 +115,13 @@ class FuelioImportRepositoryTest {
         assertEquals("V-Cross M/AT 2022", vehicle1.vehicleName)
         assertEquals("Toyota​-CHR​ Hybrid", vehicle2.vehicleName)
 
+        // Mirrors importFuelioZip's combine step, including its dedup — the real fixture
+        // repeats this exact ##Pictures row verbatim in *both* vehicles' own .csv files.
         val combinedPictureMap = mutableMapOf<String, MutableList<String>>()
         for (parsed in listOf(vehicle1, vehicle2)) {
             for ((targetId, filenames) in parsed.pictureMap) {
-                combinedPictureMap.getOrPut(targetId) { mutableListOf() } += filenames
+                val existing = combinedPictureMap.getOrPut(targetId) { mutableListOf() }
+                filenames.forEach { if (it !in existing) existing += it }
             }
         }
 

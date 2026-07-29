@@ -95,10 +95,15 @@ class FuelioImportRepository(
             }
         }
 
+        // Real multi-vehicle exports repeat the *same* ##Pictures rows verbatim in every
+        // vehicle's own .csv (confirmed against a real two-vehicle backup — not just the
+        // legitimate different-vehicle-owns-the-picture-row case the doc describes), so combine
+        // must dedupe per target id or a photo shared this way ends up attached twice.
         val combinedPictureMap = mutableMapOf<String, MutableList<String>>()
         for (csvEntry in parsedEntries) {
             for ((targetId, filenames) in csvEntry.parsed.pictureMap) {
-                combinedPictureMap.getOrPut(targetId) { mutableListOf() } += filenames
+                val existing = combinedPictureMap.getOrPut(targetId) { mutableListOf() }
+                filenames.forEach { if (it !in existing) existing += it }
             }
         }
 

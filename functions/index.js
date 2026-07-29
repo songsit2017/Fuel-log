@@ -27,7 +27,7 @@ function enforceRateLimit(uid) {
 
 function safeJson(text) {
   const parsed = JSON.parse(String(text).replace(/```json|```/gi, '').trim());
-  const allowed = ['date', 'liters', 'pricePerLiter', 'total', 'station', 'title', 'amount'];
+  const allowed = ['date', 'liters', 'pricePerLiter', 'total', 'station', 'title', 'amount', 'odometer'];
   return Object.fromEntries(allowed.filter(key => parsed[key] !== undefined).map(key => [key, parsed[key]]));
 }
 
@@ -44,15 +44,21 @@ exports.scanReceipt = onCall({
 
   const { imageBase64, mediaType, type } = request.data || {};
   if (!allowedMediaTypes.has(mediaType)) throw new HttpsError('invalid-argument', 'ชนิดรูปไม่รองรับ');
-  if (!['fuel', 'expense'].includes(type)) throw new HttpsError('invalid-argument', 'ประเภทเอกสารไม่ถูกต้อง');
+  if (!['fuel', 'expense', 'odometer'].includes(type)) throw new HttpsError('invalid-argument', 'ประเภทเอกสารไม่ถูกต้อง');
   if (typeof imageBase64 !== 'string' || imageBase64.length < 100 || imageBase64.length > 7_000_000) {
     throw new HttpsError('invalid-argument', 'รูปมีขนาดไม่ถูกต้อง');
   }
 
   const isFuel = type === 'fuel';
-  const schema = isFuel
-    ? '{"date":"YYYY-MM-DD or null","liters":number|null,"pricePerLiter":number|null,"total":number|null,"station":string|null}'
-    : '{"date":"YYYY-MM-DD or null","title":string|null,"amount":number|null}';
+  const isOdometer = type === 'odometer';
+  const schema = isOdometer
+    ? '{"odometer":number|null}'
+    : isFuel
+      ? '{"date":"YYYY-MM-DD or null","liters":number|null,"pricePerLiter":number|null,"total":number|null,"station":string|null}'
+      : '{"date":"YYYY-MM-DD or null","title":string|null,"amount":number|null}';
+  const prompt = isOdometer
+    ? `Read the odometer (total distance / mileage) display on this car instrument cluster photo. Return JSON only using ${schema}. Ignore speed, RPM, fuel gauge, clock, and warning lights — only the cumulative odometer reading. If there's a smaller trip/tenths digit shown in a different color or box, include it as a decimal. Use null if no odometer digits are legible.`
+    : `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable, convert Buddhist years to Gregorian${isFuel ? ', and normalize fuel volume to liters and unit price to price per liter' : ''}.`;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -67,7 +73,7 @@ exports.scanReceipt = onCall({
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-          { type: 'text', text: `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable, convert Buddhist years to Gregorian${isFuel ? ', and normalize fuel volume to liters and unit price to price per liter' : ''}.` }
+          { type: 'text', text: prompt }
         ]
       }]
     })

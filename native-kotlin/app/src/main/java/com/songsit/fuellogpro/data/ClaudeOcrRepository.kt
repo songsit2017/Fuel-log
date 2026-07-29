@@ -15,6 +15,7 @@ data class ReceiptScanResult(
     val station: String? = null,
     val title: String? = null,
     val amount: Double? = null,
+    val odometer: Double? = null,
 )
 
 /**
@@ -48,6 +49,7 @@ class ClaudeOcrRepository {
                 station = payload["station"] as? String,
                 title = payload["title"] as? String,
                 amount = (payload["amount"] as? Number)?.toDouble(),
+                odometer = (payload["odometer"] as? Number)?.toDouble(),
             )
         }.getOrNull()
     }

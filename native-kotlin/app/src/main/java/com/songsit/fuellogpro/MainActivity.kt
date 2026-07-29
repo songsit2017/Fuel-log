@@ -207,8 +207,13 @@ class MainActivity : ComponentActivity() {
         if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
             claudeOcrRepository.scanReceipt(path, type)?.let { return it }
         }
-        val amount = runCatching { ocrRepository.extractAmount(path) }.getOrNull()
-        return amount?.let { ReceiptScanResult(amount = it) }
+        return if (type == "odometer") {
+            val odometer = runCatching { ocrRepository.extractOdometer(path) }.getOrNull()
+            odometer?.let { ReceiptScanResult(odometer = it) }
+        } else {
+            val amount = runCatching { ocrRepository.extractAmount(path) }.getOrNull()
+            amount?.let { ReceiptScanResult(amount = it) }
+        }
     }
 
     private val pickPhoto = registerForActivityResult(

@@ -3059,6 +3059,7 @@ private fun AddFuelScreen(
         if (scanResult?.total == null) {
             scanResult?.amount?.takeIf { total.isBlank() }?.let { onTotalChange("%.2f".format(Locale.US, it)) }
         }
+        if (scanResult?.odometer != null) odometer = "%.0f".format(Locale.US, scanResult.odometer)
     }
     var odometerIsTripMeter by remember { mutableStateOf(editing?.odometerIsTripMeter ?: false) }
     var tankLevelEnabled by remember { mutableStateOf(editing?.tankLevelEnabled ?: false) }
@@ -3247,6 +3248,7 @@ private fun AddFuelScreen(
                             onModeChange = { odometerIsTripMeter = it },
                             latestOdometer = latestOdometer,
                             modifier = Modifier.weight(1f),
+                            onScanClick = onPickCameraPhoto?.let { pick -> { pick("odometer", handlePicked) } },
                         )
                     }
                 }
@@ -3447,6 +3449,7 @@ private fun OdometerField(
     onModeChange: (Boolean) -> Unit,
     latestOdometer: Double?,
     modifier: Modifier = Modifier,
+    onScanClick: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -3457,8 +3460,15 @@ private fun OdometerField(
                 label = { Text(if (isTripMeter) "มาตรวัดการเดินทาง (km)" else "มาตรวัดระยะทางรวม (km)") },
                 singleLine = true,
                 trailingIcon = {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกมาตรวัด")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onScanClick != null) {
+                            IconButton(onClick = onScanClick) {
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = "สแกนเลขไมล์")
+                            }
+                        }
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกมาตรวัด")
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

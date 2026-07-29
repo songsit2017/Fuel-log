@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui.timeline
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -40,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -235,6 +238,7 @@ private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -
 // Dialog default, so the system Back button already closes this without extra wiring.
 @Composable
 fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AsyncImage(
@@ -243,10 +247,38 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
-            IconButton(onClick = onDismiss, modifier = Modifier.padding(8.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
+            }
+            IconButton(
+                onClick = { shareTimelineImage(context, imagePath) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = "แชร์", tint = Color.White)
             }
         }
     }
+}
+
+// Local photos share as the actual image via FileProvider (same authority the camera capture
+// flow already registers in the manifest). Remote URLs (family-synced entries) share as a link
+// instead of fetching bytes just to attach them.
+private fun shareTimelineImage(context: android.content.Context, imagePath: String) {
+    val intent = if (imagePath.startsWith("/")) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", java.io.File(imagePath),
+        )
+        Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    } else {
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, imagePath)
+        }
+    }
+    context.startActivity(Intent.createChooser(intent, "แชร์รูปภาพ"))
 }
 

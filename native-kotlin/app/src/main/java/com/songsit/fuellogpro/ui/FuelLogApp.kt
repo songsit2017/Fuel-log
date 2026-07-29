@@ -142,14 +142,21 @@ import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.launch
@@ -884,6 +891,75 @@ private fun matchOilPrice(brand: StationBrand, oilPriceInfo: OilPriceInfo?): Dou
         ?: prices.premium95 ?: prices.e85 ?: prices.dieselB20
 }
 
+// Pre-renders each station's logo+price pin to a plain Bitmap once (cached by remember) instead
+// of using MarkerComposable, which re-runs a full Compose->View->Bitmap snapshot per marker and
+// made pinch-zoom on the nearby-stations map visibly stutter with more than a few pins on screen.
+@Composable
+private fun rememberStationMarkerIcon(
+    logoRes: Int?,
+    price: Double?,
+): com.google.android.gms.maps.model.BitmapDescriptor {
+    val context = LocalContext.current
+    val badgeSizePx = with(LocalDensity.current) { 36.dp.roundToPx() }
+    val primaryColor = MaterialTheme.colorScheme.primary.toArgb()
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary.toArgb()
+    return remember(logoRes, price, badgeSizePx, primaryColor, onPrimaryColor) {
+        com.google.android.gms.maps.model.BitmapDescriptorFactory.fromBitmap(
+            buildStationMarkerBitmap(context, logoRes, price, badgeSizePx, primaryColor, onPrimaryColor),
+        )
+    }
+}
+
+private fun buildStationMarkerBitmap(
+    context: android.content.Context,
+    logoRes: Int?,
+    price: Double?,
+    badgeSizePx: Int,
+    primaryColor: Int,
+    onPrimaryColor: Int,
+): Bitmap {
+    val pillHeightPx = if (price != null) (badgeSizePx * 0.6f).toInt() else 0
+    val pillGapPx = if (price != null) (badgeSizePx * 0.1f).toInt() else 0
+    val bitmap = Bitmap.createBitmap(badgeSizePx, pillHeightPx + pillGapPx + badgeSizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    if (price != null) {
+        val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = primaryColor }
+        canvas.drawRoundRect(
+            RectF(0f, 0f, badgeSizePx.toFloat(), pillHeightPx.toFloat()),
+            pillHeightPx / 2f, pillHeightPx / 2f, pillPaint,
+        )
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = onPrimaryColor
+            textSize = pillHeightPx * 0.5f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        val text = "฿" + "%.2f".format(Locale.US, price)
+        val textY = pillHeightPx / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+        canvas.drawText(text, badgeSizePx / 2f, textY, textPaint)
+    }
+
+    val circleTop = pillHeightPx + pillGapPx
+    val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE }
+    canvas.drawCircle(badgeSizePx / 2f, circleTop + badgeSizePx / 2f, badgeSizePx / 2f, circlePaint)
+
+    if (logoRes != null) {
+        val logoSizePx = (badgeSizePx * 0.72f).toInt()
+        val logoBitmap = androidx.core.content.ContextCompat.getDrawable(context, logoRes)?.toBitmap(logoSizePx, logoSizePx)
+        if (logoBitmap != null) {
+            canvas.drawBitmap(
+                logoBitmap,
+                (badgeSizePx - logoSizePx) / 2f,
+                circleTop + (badgeSizePx - logoSizePx) / 2f,
+                null,
+            )
+        }
+    }
+
+    return bitmap
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NearbyStationsMapScreen(
@@ -911,44 +987,28 @@ private fun NearbyStationsMapScreen(
             )
         }
     }
+    val mapProperties = remember { com.google.maps.android.compose.MapProperties(isMyLocationEnabled = true) }
+    val mapUiSettings = remember { com.google.maps.android.compose.MapUiSettings(myLocationButtonEnabled = true) }
     Box(modifier = modifier.fillMaxSize()) {
         com.google.maps.android.compose.GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = com.google.maps.android.compose.MapProperties(isMyLocationEnabled = true),
-            uiSettings = com.google.maps.android.compose.MapUiSettings(myLocationButtonEnabled = true),
+            properties = mapProperties,
+            uiSettings = mapUiSettings,
         ) {
             stations.forEach { station ->
                 val brand = remember(station.name) { detectStationBrand(station.name) }
                 val price = remember(station.name, oilPriceInfo) {
                     brand?.let { matchOilPrice(it, oilPriceInfo) }
                 }
-                com.google.maps.android.compose.MarkerComposable(
+                val icon = rememberStationMarkerIcon(brand?.logoRes, price)
+                com.google.maps.android.compose.Marker(
                     state = com.google.maps.android.compose.rememberMarkerState(
                         position = com.google.android.gms.maps.model.LatLng(station.lat, station.lon),
                     ),
                     title = station.name,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (price != null) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.primary,
-                                shadowElevation = 3.dp,
-                            ) {
-                                Text(
-                                    text = "฿" + "%.2f".format(Locale.US, price),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                )
-                            }
-                            Spacer(Modifier.height(2.dp))
-                        }
-                        StationBadge(stationName = station.name, size = 36.dp)
-                    }
-                }
+                    icon = icon,
+                )
             }
         }
 

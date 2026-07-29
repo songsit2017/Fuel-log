@@ -153,6 +153,20 @@ private val fuelTypeOptions = listOf(
     "เบนซิน", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ 91", "E20", "E85", "ดีเซล", "ดีเซล B7", "ดีเซล B20", "LPG", "NGV", "EV",
 )
 
+private fun getFuelTypeOptionsForVehicle(vehicleFuelType: String): List<String> {
+    val petrolOptions = listOf("เบนซิน", "แก๊สโซฮอล์ 95", "แก๊สโซฮอล์ 91", "E20", "E85")
+    val dieselOptions = listOf("ดีเซล", "ดีเซล B7", "ดีเซล B20")
+    
+    return when (vehicleFuelType) {
+        in petrolOptions -> petrolOptions
+        in dieselOptions -> dieselOptions
+        "LPG" -> listOf("LPG")
+        "NGV" -> listOf("NGV")
+        "EV" -> listOf("EV")
+        else -> fuelTypeOptions
+    }
+}
+
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
     maximumFractionDigits = 2
@@ -3104,10 +3118,11 @@ private fun AddFuelScreen(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
+                        val availableFuelTypes = remember(vehicleFuelType) { getFuelTypeOptionsForVehicle(vehicleFuelType) }
                         UnitDropdownField(
                             "ชนิดเชื้อเพลิง",
                             fuelType,
-                            fuelTypeOptions,
+                            availableFuelTypes,
                             modifier = Modifier.weight(1f),
                         ) { fuelType = it }
                     }

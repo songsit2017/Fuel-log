@@ -7,6 +7,16 @@ service cloud.firestore {
     function member(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor','viewer']; }
     function editor(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.members[request.auth.uid].role in ['owner','editor']; }
     function owner(vid) { return signedIn() && vehicleExists(vid) && vehicleDoc(vid).data.ownerUid == request.auth.uid; }
+    // Lets an existing (non-owner) member refresh their own name/photo — e.g. after signing
+    // in with a Google account that now has a profile photo — without needing a fresh invite
+    // code. Only the caller's own members.{uid} entry may change, and their role must stay
+    // the same, so this can't touch anyone else's membership or self-promote.
+    function selfProfileRefresh(vid) {
+      return member(vid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+        request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]) &&
+        request.resource.data.members[request.auth.uid].role == resource.data.members[request.auth.uid].role;
+    }
     function canReadVehicleResource() {
       return signedIn() && (
         resource.data.ownerUid == request.auth.uid ||
@@ -22,7 +32,7 @@ service cloud.firestore {
       // memberUids array-contains uid queries without exposing other vehicles.
       allow read: if canReadVehicleResource();
       allow delete: if owner(vid);
-      allow update: if owner(vid) || (signedIn() && request.resource.data.lastJoinCode is string && exists(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)) && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.vehicleId == vid && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.emailLower == request.auth.token.email && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.expiresAt > request.time.toMillis());
+      allow update: if owner(vid) || selfProfileRefresh(vid) || (signedIn() && request.resource.data.lastJoinCode is string && exists(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)) && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.vehicleId == vid && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.emailLower == request.auth.token.email && get(/databases/$(database)/documents/invites/$(request.resource.data.lastJoinCode)).data.expiresAt > request.time.toMillis());
       match /{document=**} {
         allow read: if member(vid);
         allow create, update: if editor(vid);

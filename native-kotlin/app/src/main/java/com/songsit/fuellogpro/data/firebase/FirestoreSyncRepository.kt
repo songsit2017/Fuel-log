@@ -1,16 +1,19 @@
 package com.songsit.fuellogpro.data.firebase
 
+import android.net.Uri
 import androidx.room.withTransaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.storage.FirebaseStorage
 import com.songsit.fuellogpro.data.local.DeletionTombstoneEntity
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
 import com.songsit.fuellogpro.data.local.MaintenanceEntity
+import com.songsit.fuellogpro.data.local.PhotoUris
 import com.songsit.fuellogpro.data.local.TripEntity
 import com.songsit.fuellogpro.data.local.VehicleEntity
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
@@ -21,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import com.songsit.fuellogpro.domain.SyncDecision
 import com.songsit.fuellogpro.domain.decideSync
+import java.io.File
 import java.util.UUID
 
 data class CloudSyncResult(
@@ -33,6 +37,7 @@ data class CloudSyncResult(
 class FirestoreSyncRepository(
     private val database: FuelLogDatabase,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
 ) {
     // Overlapping sync() calls (launch, every-edit, manual button, join-by-code
     // can all fire close together) each take their own non-atomic local/cloud
@@ -112,6 +117,11 @@ class FirestoreSyncRepository(
                 }
             } catch (e: Exception) {
                 throw Exception("Sync failed on vehicle '$vehicleId' collection '_deletions': ${e.message}", e)
+            }
+            try {
+                uploadPendingPhotos(vehicleId)
+            } catch (e: Exception) {
+                throw Exception("Sync failed on vehicle '$vehicleId' photo upload: ${e.message}", e)
             }
             try {
                 syncCollection(
@@ -298,6 +308,40 @@ class FirestoreSyncRepository(
             }
         }
         return tombstones.map { it.recordId }.toSet()
+    }
+
+    // Uploads any still-local photos (paths starting with "/") attached to this vehicle's fuel
+    // entries and expenses to Storage, then rewrites the local record's photoUri to the
+    // resulting download URL(s) before syncCollection() re-reads and encodes it below — so
+    // other family members' devices, which only ever get the Firestore doc and never this
+    // device's files, can still load the photo from its URL.
+    private suspend fun uploadPendingPhotos(vehicleId: String) {
+        for (entry in database.fuelEntryDao().getAll().filter { it.vehicleId == vehicleId }) {
+            val uploaded = uploadLocalPhotos(vehicleId, entry.id, entry.photoUri) ?: continue
+            database.fuelEntryDao().upsert(entry.copy(photoUri = uploaded))
+        }
+        for (expense in database.expenseDao().getAll().filter { it.vehicleId == vehicleId }) {
+            val uploaded = uploadLocalPhotos(vehicleId, expense.id, expense.photoUri) ?: continue
+            database.expenseDao().upsert(expense.copy(photoUri = uploaded))
+        }
+    }
+
+    // Returns a re-joined photoUri with every local ("/"-prefixed) path replaced by its Storage
+    // download URL, or null if nothing needed uploading. Each file's upload is best-effort: a
+    // failed upload (offline, etc.) just leaves that one path local for retry on the next sync.
+    private suspend fun uploadLocalPhotos(vehicleId: String, recordId: String, photoUri: String?): String? {
+        val paths = PhotoUris.split(photoUri)
+        if (paths.none { it.startsWith("/") }) return null
+        val resolved = paths.map { path ->
+            if (!path.startsWith("/")) return@map path
+            runCatching {
+                val file = File(path)
+                val ref = storage.reference.child("vehicles/$vehicleId/photos/$recordId/${file.name}")
+                ref.putFile(Uri.fromFile(file)).await()
+                ref.downloadUrl.await().toString()
+            }.getOrDefault(path)
+        }
+        return PhotoUris.join(resolved)
     }
 
     private suspend fun discoverVehicles(uid: String): Map<String, DocumentSnapshot> {
@@ -525,6 +569,7 @@ private fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "total" to item.amount,
     "full" to item.fullTank,
     "station" to item.station,
+    "photoUri" to item.photoUri,
 )
 
 private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
@@ -539,6 +584,7 @@ private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
     "income" to item.income,
     "recurrence" to if (item.recurring) "recurring" else "once",
     "reminderDate" to item.reminderDate,
+    "photoUri" to item.photoUri,
 )
 
 private fun maintenanceCloudMap(item: MaintenanceEntity): Map<String, Any?> = mapOf(
@@ -598,6 +644,7 @@ private fun parseFuel(vehicleId: String, document: DocumentSnapshot) = FuelEntry
     amount = document.number("total", "amount"),
     fullTank = document.getBoolean("full") ?: document.getBoolean("fullTank") ?: true,
     station = document.getString("station").orEmpty(),
+    photoUri = document.getString("photoUri"),
     createdAt = document.timestampMillis("createdAt"),
 )
 
@@ -613,6 +660,7 @@ private fun parseExpense(vehicleId: String, document: DocumentSnapshot) = Expens
     income = document.getBoolean("income") ?: false,
     recurring = document.getString("recurrence") == "recurring" || document.getBoolean("recurring") == true,
     reminderDate = document.getString("reminderDate")?.takeIf(String::isNotBlank),
+    photoUri = document.getString("photoUri"),
     createdAt = document.timestampMillis("createdAt"),
 )
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 BANGCHAK_URL = "https://oil-price.bangchak.co.th/ApiOilPrice2/th"
 PTT_URL = "https://orapiweb.pttor.com/oilservice/OilPrice.asmx"
-SHELL_URL = "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH"
+SHELL_URL = "https://www.pcauto.com/th/fuel-price/shell"
 # PT (พีที) official price endpoint – documented at https://ptmax.th
 PT_URL = "https://www.ptmaxoil.com/th/oil-price"
 # Caltex (คาลเท็กซ์) – Chevron Thailand official price page
@@ -90,29 +90,39 @@ def fetch_ptt():
 
 
 def fetch_shell():
+    # find.shell.com's station finder only reports the specific fuel types that one
+    # physical station happens to sell (a real Bangkok station scrape returned just 2 of 7
+    # grades) — not representative of Shell's nationwide standard price list. pcauto.com
+    # publishes Shell's full nationwide grade lineup (95/E20/91/V-Power 95/B7/B20) in a
+    # single stable `og:description` meta tag, e.g. "แก๊สโซฮอล์ 95 37.95 THB ... เชลล์
+    # วี-เพาเวอร์ แก๊สโซฮอล์ 95 49.84 THB ... ดีเซล B7 37.5 THB ดีเซล B20 32.5 THB" — the
+    # V-Power (premium) grade repeats the same "แก๊สโซฮอล์ 95" label as the standard grade
+    # earlier in the string, so the standard-95 pattern excludes anything preceded by
+    # "วี-เพาเวอร์ " to avoid picking up the premium price instead.
     page = read_url(SHELL_URL).decode("utf-8", "replace")
-    match = re.search(r'<script[^>]+data-page="app"[^>]*>(.*?)</script>', page, re.S)
+    match = re.search(r'property="og:description"\s+content="([^"]*)"', page)
     if not match:
-        raise ValueError("Shell station data missing")
-    data = json.loads(html.unescape(match.group(1)))
-    location = data["props"]["location"]
-    pricing = location.get("fuel_pricing") or {}
-    prices = pricing.get("prices") or {}
+        raise ValueError("Shell price description missing")
+    text = html.unescape(match.group(1))
+
+    def find(pattern):
+        m = re.search(pattern, text)
+        return positive(m.group(1)) if m else None
+
     grades = {
-        "gasohol_95": positive(prices.get("midgrade_gasoline")),
-        "gasohol_91": positive(prices.get("low_octane_gasoline")),
-        "e20": positive(prices.get("e20") or prices.get("e20_gasoline")),
-        "e85": positive(prices.get("e85") or prices.get("e85_gasoline")),
-        "diesel_b7": positive(prices.get("fuelsave_regular_diesel") or prices.get("regular_diesel")),
-        "diesel_b20": positive(prices.get("b20") or prices.get("b20_diesel")),
-        "premium_95": positive(prices.get("premium_gasoline")),
+        "gasohol_95": find(r"(?<!วี-เพาเวอร์ )แก๊สโซฮอล์\s*95\s*(\d{2,3}\.\d{1,2})"),
+        "gasohol_91": find(r"แก๊สโซฮอล์\s*91\s*(\d{2,3}\.\d{1,2})"),
+        "e20": find(r"E20\s*(\d{2,3}\.\d{1,2})"),
+        "e85": find(r"E85\s*(\d{2,3}\.\d{1,2})"),
+        "diesel_b7": find(r"ดีเซล\s*B7\s*(\d{2,3}\.\d{1,2})"),
+        "diesel_b20": find(r"ดีเซล\s*B20\s*(\d{2,3}\.\d{1,2})"),
+        "premium_95": find(r"วี-เพาเวอร์\s*แก๊สโซฮอล์\s*95\s*(\d{2,3}\.\d{1,2})"),
     }
     if not any(grades.values()):
-        raise ValueError("Shell station returned no recognized prices")
+        raise ValueError("Shell price page returned no recognized prices")
     return {
         "source": SHELL_URL,
-        "updatedAt": pricing.get("updated"),
-        "station": location.get("name"),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
         "grades": grades,
     }
 

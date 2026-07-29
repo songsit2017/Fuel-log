@@ -10,6 +10,7 @@ import java.util.UUID
 
 class LocalVehicleRepository(
     private val dao: VehicleDao,
+    private val deletionRecorder: LocalDeletionRecorder,
 ) {
     fun observe(): Flow<List<Vehicle>> =
         dao.observeAll().map { vehicles -> vehicles.map(VehicleEntity::toDomain) }
@@ -25,7 +26,17 @@ class LocalVehicleRepository(
         dao.upsert(values.toEntity(id, createdAt))
     }
 
-    suspend fun delete(id: String) = dao.deleteById(id)
+    // Tombstoned like every other record type (see LocalDeletionRecorder) — the vehicle IS its
+    // own "parent", so vehicleId and recordId are the same id. Without this, a deleted vehicle
+    // was only removed from the local Room row; the next sync() still found it in Firestore
+    // (untouched) and re-downloaded it as a "cloud-only" vehicle, resurrecting it after every
+    // app restart.
+    suspend fun delete(id: String) = deletionRecorder.delete(
+        collectionName = "vehicles",
+        recordId = id,
+        vehicleId = { id },
+        deleteLocal = { dao.deleteById(id) },
+    )
 }
 
 private fun VehicleFormValues.toEntity(id: String, createdAt: Long) = VehicleEntity(

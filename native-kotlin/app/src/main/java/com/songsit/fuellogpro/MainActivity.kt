@@ -412,7 +412,7 @@ class MainActivity : ComponentActivity() {
         val deletionRecorder = LocalDeletionRecorder(database)
         val fuelRepository = LocalFuelRepository(database.fuelEntryDao(), deletionRecorder)
         val expenseRepository = LocalExpenseRepository(database.expenseDao(), deletionRecorder)
-        val vehicleRepository = LocalVehicleRepository(database.vehicleDao())
+        val vehicleRepository = LocalVehicleRepository(database.vehicleDao(), deletionRecorder)
         val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao(), deletionRecorder)
         val tripRepository = LocalTripRepository(database.tripDao(), deletionRecorder)
         val oilPriceRepository = OilPriceRepository()

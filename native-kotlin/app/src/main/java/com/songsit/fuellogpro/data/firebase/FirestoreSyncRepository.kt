@@ -42,6 +42,7 @@ class FirestoreSyncRepository(
 
     suspend fun sync(uid: String, email: String?, displayName: String?, photoUrl: String? = null): CloudSyncResult = syncMutex.withLock {
         normalizeLegacyVehicleId()
+        val deletedVehicleIds = applyVehicleDeletionTombstones(uid)
         val cloudVehicles = discoverVehicles(uid)
         val localVehicles = database.vehicleDao().getAll().associateBy(VehicleEntity::id)
         var uploaded = 0
@@ -93,7 +94,7 @@ class FirestoreSyncRepository(
         }
 
         val cloudOnlyVehicles = cloudVehicles
-            .filterKeys { it !in localVehicles }
+            .filterKeys { it !in localVehicles && it !in deletedVehicleIds }
             .values
             .map(::parseVehicle)
         if (cloudOnlyVehicles.isNotEmpty()) {
@@ -269,6 +270,34 @@ class FirestoreSyncRepository(
             )
             database.vehicleDao().deleteById(LEGACY_VEHICLE_ID)
         }
+    }
+
+    // Applies any local "vehicles"-collection tombstones (see LocalVehicleRepository.delete) to
+    // Firestore, deleting the vehicle doc and its known subcollections when the caller is its
+    // owner (the only party firestore.rules lets delete a vehicle doc). Always returns every
+    // tombstoned id regardless of whether the remote delete actually succeeded — offline or
+    // non-owner "delete" (removing a shared vehicle from just this device) still must not let
+    // discoverVehicles() below resurrect it locally as a "cloud-only" vehicle.
+    private suspend fun applyVehicleDeletionTombstones(uid: String): Set<String> {
+        val tombstones = database.deletionTombstoneDao().getByCollection("vehicles")
+        for (tombstone in tombstones) {
+            val vehicleId = tombstone.recordId
+            try {
+                val doc = firestore.collection(VEHICLES_COLLECTION).document(vehicleId).get().await()
+                if (doc.exists() && doc.getString("ownerUid") == uid) {
+                    for (subcollection in RECORD_COLLECTIONS + DELETIONS_COLLECTION) {
+                        firestore.collection(VEHICLES_COLLECTION).document(vehicleId)
+                            .collection(subcollection).get().await().documents
+                            .forEach { it.reference.delete().await() }
+                    }
+                    firestore.collection(VEHICLES_COLLECTION).document(vehicleId).delete().await()
+                }
+            } catch (_: Exception) {
+                // Best-effort — offline or a permission error (non-owner) just means this
+                // device retries next sync; the returned id set still keeps it from coming back.
+            }
+        }
+        return tombstones.map { it.recordId }.toSet()
     }
 
     private suspend fun discoverVehicles(uid: String): Map<String, DocumentSnapshot> {

@@ -106,6 +106,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.songsit.fuellogpro.BuildConfig
 import com.songsit.fuellogpro.settings.DisplaySettings
 import com.songsit.fuellogpro.data.BackupImportResult
 import com.songsit.fuellogpro.data.NearbyStation
@@ -2265,7 +2266,7 @@ private fun SettingsScreen(
             item { PreferenceCategoryHeader("ข้อมูล") }
             item {
                 PreferenceListItem(
-                    title = "FuelLog Pro v1.0.0",
+                    title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     subtitle = "แอปบันทึกการเติมน้ำมัน ค่าใช้จ่ายรถ และแชร์ข้อมูลกับสมาชิกในครอบครัว " +
                         "พัฒนาต่อยอดจากแนวคิดของ Fuelio",
                 )

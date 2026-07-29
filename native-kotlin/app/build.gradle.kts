@@ -108,6 +108,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-maps:19.1.0")
     implementation("com.google.maps.android:maps-compose:6.4.1")
+    // Reports charts (monthly cost bar, station-cost donut, odometer line) on StatsScreen.
+    implementation("com.patrykandpatrick.vico:compose:3.2.3")
+    implementation("com.patrykandpatrick.vico:compose-m3:3.2.3")
     implementation("androidx.core:core-ktx:1.15.0")
     // Vehicle photo loading (VehicleListScreen/VehicleEditScreen background images from imageUri).
     implementation("io.coil-kt:coil-compose:2.7.0")

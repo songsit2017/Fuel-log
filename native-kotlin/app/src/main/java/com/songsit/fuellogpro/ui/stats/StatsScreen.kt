@@ -3,6 +3,7 @@ package com.songsit.fuellogpro.ui.stats
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,11 +16,32 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
+import com.patrykandpatrick.vico.compose.cartesian.data.columnModel
+import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.ProvideVicoTheme
+import com.patrykandpatrick.vico.compose.m3.common.rememberM3VicoTheme
+import com.patrykandpatrick.vico.compose.pie.PieChart
+import com.patrykandpatrick.vico.compose.pie.PieChartHost
+import com.patrykandpatrick.vico.compose.pie.PieSize
+import com.patrykandpatrick.vico.compose.pie.rememberPieChart
+import com.patrykandpatrick.vico.compose.pie.data.PieChartModelProducer
+import com.patrykandpatrick.vico.compose.pie.data.PieValueFormatter
+import com.patrykandpatrick.vico.compose.pie.data.pieSeries
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.NativeAppState
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.max
@@ -277,9 +299,151 @@ private fun computeFuelioStats(entries: List<FuelEntry>): FuelioStats {
     )
 }
 
+private val monthLabelFormatter = DateTimeFormatter.ofPattern("MM/yyyy")
+private val dayLabelFormatter = DateTimeFormatter.ofPattern("dd/MM")
+
+private fun monthlyCostSeries(entries: List<FuelEntry>): List<Pair<YearMonth, Double>> =
+    entries
+        .mapNotNull { entry -> runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { YearMonth.from(it) to entry.amount } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, amounts) -> amounts.sum() }
+        .toSortedMap()
+        .map { it.key to it.value }
+
+// Fuelio's own reports donut caps at a handful of slices before folding the rest into a
+// residual bucket — an unbounded number of distinct stations would otherwise need an
+// unbounded number of categorical hues, which this app's per-user theme palette doesn't have.
+private fun stationCostBreakdown(entries: List<FuelEntry>, maxSlices: Int = 4): List<Pair<String, Double>> {
+    val byStation = entries
+        .groupBy { it.station.ifBlank { "ไม่ระบุสถานี" } }
+        .mapValues { (_, list) -> list.sumOf(FuelEntry::amount) }
+        .toList()
+        .sortedByDescending { it.second }
+    if (byStation.size <= maxSlices) return byStation
+    val otherTotal = byStation.drop(maxSlices).sumOf { it.second }
+    return byStation.take(maxSlices) + ("อื่นๆ" to otherTotal)
+}
+
+private fun odometerSeries(entries: List<FuelEntry>): List<Pair<LocalDate, Double>> =
+    entries
+        .mapNotNull { entry -> runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { it to entry.odometerKm } }
+        .filter { it.second > 0 }
+        .sortedBy { it.first }
+
+@Composable
+private fun MonthlyCostChart(monthlyCosts: List<Pair<YearMonth, Double>>) {
+    if (monthlyCosts.size < 2) return
+    val modelProducer = remember { CartesianChartModelProducer() }
+    val labels = remember(monthlyCosts) { monthlyCosts.map { it.first.format(monthLabelFormatter) } }
+    LaunchedEffect(monthlyCosts) {
+        modelProducer.runTransaction { columnModel { series(monthlyCosts.map { it.second }) } }
+    }
+    val bottomFormatter = remember(labels) {
+        CartesianValueFormatter { _, value, _ -> labels.getOrElse(value.toInt()) { "" } }
+    }
+    val startFormatter = remember { CartesianValueFormatter.decimal(decimalCount = 0, thousandsSeparator = ",", prefix = "฿") }
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("ค่าใช้จ่ายรายเดือน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberColumnCartesianLayer(),
+                    startAxis = VerticalAxis.rememberStart(valueFormatter = startFormatter),
+                    bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = bottomFormatter),
+                ),
+                modelProducer = modelProducer,
+                modifier = Modifier.fillMaxWidth().height(220.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>) {
+    if (breakdown.isEmpty()) return
+    val modelProducer = remember { PieChartModelProducer() }
+    LaunchedEffect(breakdown) {
+        modelProducer.runTransaction { pieSeries { series(breakdown.map { it.second }) } }
+    }
+    val total = remember(breakdown) { breakdown.sumOf { it.second } }
+    // Fixed categorical order (primary/tertiary/secondary/primaryContainer), never cycled, so a
+    // station keeps its color across recompositions; the residual "อื่นๆ" bucket always gets a
+    // neutral tone rather than competing for a "real" hue.
+    val sliceColors = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.primaryContainer,
+    )
+    val otherColor = MaterialTheme.colorScheme.outlineVariant
+    val colors = remember(breakdown, sliceColors, otherColor) {
+        breakdown.mapIndexed { index, (label, _) ->
+            if (label == "อื่นๆ") otherColor else sliceColors.getOrElse(index) { otherColor }
+        }
+    }
+    val pieChart = rememberPieChart(
+        sliceProvider = PieChart.SliceProvider.series(colors.map { PieChart.Slice(fill = Fill(it)) }),
+        spacing = 2.dp,
+        innerSize = PieSize.Inner.fixed(56.dp),
+        valueFormatter = PieValueFormatter { _, value, _ -> "${(value / total.toFloat() * 100).toInt()}%" },
+    )
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("แผนภูมิสถานีบริการ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            PieChartHost(chart = pieChart, modelProducer = modelProducer, modifier = Modifier.fillMaxWidth().height(200.dp))
+            Spacer(Modifier.height(12.dp))
+            breakdown.forEachIndexed { index, (label, amount) ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(colors.getOrElse(index) { otherColor }, CircleShape),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("$label - ${statsCurrency.format(amount)}", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OdometerLineChart(odometerPoints: List<Pair<LocalDate, Double>>) {
+    if (odometerPoints.size < 2) return
+    val modelProducer = remember { CartesianChartModelProducer() }
+    val labels = remember(odometerPoints) { odometerPoints.map { it.first.format(dayLabelFormatter) } }
+    LaunchedEffect(odometerPoints) {
+        modelProducer.runTransaction { lineModel { series(odometerPoints.map { it.second }) } }
+    }
+    val bottomFormatter = remember(labels) {
+        CartesianValueFormatter { _, value, _ -> labels.getOrElse(value.toInt()) { "" } }
+    }
+    val startFormatter = remember { CartesianValueFormatter.decimal(decimalCount = 0, thousandsSeparator = ",", suffix = " km") }
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("แผนภูมิระยะทาง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(),
+                    startAxis = VerticalAxis.rememberStart(valueFormatter = startFormatter),
+                    bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = bottomFormatter),
+                ),
+                modelProducer = modelProducer,
+                modifier = Modifier.fillMaxWidth().height(220.dp),
+            )
+        }
+    }
+}
+
 @Composable
 fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     val stats = remember(state.entries) { computeFuelioStats(state.entries) }
+    val monthlyCosts = remember(state.entries) { monthlyCostSeries(state.entries) }
+    val stationBreakdown = remember(state.entries) { stationCostBreakdown(state.entries) }
+    val odometerPoints = remember(state.entries) { odometerSeries(state.entries) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("เติม-เพิ่ม", "ค่าใช้จ่าย", "ระยะทาง")
 
@@ -293,7 +457,8 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 )
             }
         }
-        
+
+        ProvideVicoTheme(rememberM3VicoTheme()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -409,6 +574,8 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             }
                         }
                     }
+                    item { MonthlyCostChart(monthlyCosts) }
+                    item { StationCostDonutChart(stationBreakdown) }
                 }
                 2 -> {
                     // Distance Tab
@@ -442,8 +609,10 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             }
                         }
                     }
+                    item { OdometerLineChart(odometerPoints) }
                 }
             }
+        }
         }
     }
 }

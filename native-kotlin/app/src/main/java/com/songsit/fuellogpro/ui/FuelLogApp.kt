@@ -3069,10 +3069,15 @@ private fun AddFuelScreen(
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
     // Photo pick + OCR scan is one round trip (see MainActivity.scanFirstPhoto) that can take a
     // few seconds over the network — without this the "สแกนบิล/ใบเสร็จด้วย AI" button and camera
-    // icons looked like they'd done nothing until the fields suddenly populated.
-    var isScanning by remember { mutableStateOf(false) }
+    // icons looked like they'd done nothing until the fields suddenly populated. Kept as two
+    // separate flags (not one shared "isScanning") since the receipt-scan button and the
+    // odometer camera icon are independent actions — a single shared flag made the odometer
+    // icon spin while a receipt scan was in flight, and vice versa.
+    var isScanningReceipt by remember { mutableStateOf(false) }
+    var isScanningOdometer by remember { mutableStateOf(false) }
     val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
-        isScanning = false
+        isScanningReceipt = false
+        isScanningOdometer = false
         photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
         // Claude OCR (functions/index.js scanReceipt) fills these when signed
         // in and reachable; falls back to on-device amount-only OCR otherwise.
@@ -3273,9 +3278,9 @@ private fun AddFuelScreen(
                             onModeChange = { odometerIsTripMeter = it },
                             latestOdometer = latestOdometer,
                             modifier = Modifier.weight(1f),
-                            onScanClick = onPickCameraPhoto?.takeIf { !isScanning }
-                                ?.let { pick -> { isScanning = true; pick("odometer", handlePicked) } },
-                            isScanning = isScanning,
+                            onScanClick = onPickCameraPhoto?.takeIf { !isScanningOdometer }
+                                ?.let { pick -> { isScanningOdometer = true; pick("odometer", handlePicked) } },
+                            isScanning = isScanningOdometer,
                         )
                     }
                 }
@@ -3337,8 +3342,8 @@ private fun AddFuelScreen(
                     item {
                         PhotoAttachmentRow(
                             photoUris = photoUris,
-                            onPickGallery = { isScanning = true; onPickPhoto("fuel", handlePicked) },
-                            onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick("fuel", handlePicked) } },
+                            onPickGallery = { isScanningReceipt = true; onPickPhoto("fuel", handlePicked) },
+                            onPickCamera = onPickCameraPhoto?.let { pick -> { isScanningReceipt = true; pick("fuel", handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
                     }
@@ -3346,13 +3351,13 @@ private fun AddFuelScreen(
                         Button(
                             onClick = {
                                 val scanPicker = onPickCameraPhoto ?: onPickPhoto
-                                isScanning = true
+                                isScanningReceipt = true
                                 scanPicker.invoke("fuel", handlePicked)
                             },
-                            enabled = !isScanning,
+                            enabled = !isScanningReceipt,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            if (isScanning) {
+                            if (isScanningReceipt) {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(8.dp))
                                 Text("กำลังสแกน...")

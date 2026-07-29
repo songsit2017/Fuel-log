@@ -3023,16 +3023,18 @@ private fun AddFuelScreen(
         )
     }
     var fuelType by remember { mutableStateOf(vehicleFuelType.ifBlank { "เบนซิน" }) }
-    // Any 2 of {liters, price/L, total} determine the 3rd (total = liters × price). Each
-    // handler prefers to recompute the field it historically recomputed (kept for backward
-    // compatibility with existing behavior/tests) and only falls back to solving for the
-    // *other* missing field — e.g. onTotalChange used to require liters to already be filled
-    // in to do anything at all, so entering price/L + total (the common real-world order: read
-    // both off the receipt, let the app work out how many liters that bought) silently computed
-    // nothing.
-    val onLitersChange: (String) -> Unit = { value ->
-        liters = value
-        val l = value.toDoubleOrNull()
+    // Any 2 of {liters, price/L, total} determine the 3rd (total = liters × price). The 3
+    // onXCommit functions below carry the actual calculation; TextField onValueChange only ever
+    // does a plain `liters = it`-style assignment, and onXCommit runs on focus-loss (see the
+    // OutlinedTextFields below), not per keystroke. It used to run on every keystroke — typing
+    // "1200" digit by digit into total while liters was still blank recalculated liters after
+    // *each* digit (e.g. "1" ÷ price ≈ a tiny fraction), and once liters held that leftover
+    // fractional value from an early digit, every later digit's commit re-derived price from
+    // that now-stale near-zero liters instead — e.g. price/L ended up as 40000 after typing
+    // total "1200" with liters frozen at "0.03" from the "1". Deferring to blur means every
+    // commit sees the *finished* value of whichever field the user just left, never a partial one.
+    val onLitersCommit: () -> Unit = {
+        val l = liters.toDoubleOrNull()
         val p = price.toDoubleOrNull()
         val t = total.toDoubleOrNull()
         when {
@@ -3040,21 +3042,19 @@ private fun AddFuelScreen(
             l != null && l > 0 && t != null -> price = "%.2f".format(Locale.US, t / l)
         }
     }
-    val onPriceChange: (String) -> Unit = { value ->
-        price = value
+    val onPriceCommit: () -> Unit = {
         val l = liters.toDoubleOrNull()
-        val p = value.toDoubleOrNull()
+        val p = price.toDoubleOrNull()
         val t = total.toDoubleOrNull()
         when {
             l != null && p != null -> total = "%.2f".format(Locale.US, l * p)
             p != null && p > 0 && t != null -> liters = "%.2f".format(Locale.US, t / p)
         }
     }
-    val onTotalChange: (String) -> Unit = { value ->
-        total = value
+    val onTotalCommit: () -> Unit = {
         val l = liters.toDoubleOrNull()
         val p = price.toDoubleOrNull()
-        val t = value.toDoubleOrNull()
+        val t = total.toDoubleOrNull()
         when {
             l != null && l > 0 && t != null -> price = "%.2f".format(Locale.US, t / l)
             p != null && p > 0 && t != null -> liters = "%.2f".format(Locale.US, t / p)
@@ -3078,11 +3078,11 @@ private fun AddFuelScreen(
         // in and reachable; falls back to on-device amount-only OCR otherwise.
         scanResult?.date?.let { date = it }
         scanResult?.station?.let { station = it }
-        scanResult?.liters?.let { onLitersChange("%.2f".format(Locale.US, it)) }
-        scanResult?.pricePerLiter?.let { onPriceChange("%.2f".format(Locale.US, it)) }
-        scanResult?.total?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+        scanResult?.liters?.let { liters = "%.2f".format(Locale.US, it); onLitersCommit() }
+        scanResult?.pricePerLiter?.let { price = "%.2f".format(Locale.US, it); onPriceCommit() }
+        scanResult?.total?.let { total = "%.2f".format(Locale.US, it); onTotalCommit() }
         if (scanResult?.total == null) {
-            scanResult?.amount?.takeIf { total.isBlank() }?.let { onTotalChange("%.2f".format(Locale.US, it)) }
+            scanResult?.amount?.takeIf { total.isBlank() }?.let { total = "%.2f".format(Locale.US, it); onTotalCommit() }
         }
         if (scanResult?.odometer != null) odometer = "%.0f".format(Locale.US, scanResult.odometer)
     }
@@ -3283,10 +3283,10 @@ private fun AddFuelScreen(
                     FormRow(Icons.Filled.LocalGasStation) {
                         OutlinedTextField(
                             liters,
-                            onLitersChange,
+                            { liters = it },
                             label = { Text("เชื้อเพลิง (L)") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onLitersCommit() },
                         )
                         val availableFuelTypes = remember(vehicleFuelType) { getFuelTypeOptionsForVehicle(vehicleFuelType) }
                         UnitDropdownField(
@@ -3301,17 +3301,17 @@ private fun AddFuelScreen(
                     FormRow(Icons.Filled.AttachMoney) {
                         OutlinedTextField(
                             price,
-                            onPriceChange,
+                            { price = it },
                             label = { Text("ราคา/L") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onPriceCommit() },
                         )
                         OutlinedTextField(
                             total,
-                            onTotalChange,
+                            { total = it },
                             label = { Text("ราคารวม") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onTotalCommit() },
                         )
                     }
                 }

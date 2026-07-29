@@ -73,6 +73,68 @@ class FuelioImportRepositoryTest {
         assertEquals(listOf("cost_204.jpg"), result.pictureMap["2:204"])
     }
 
+    @Test
+    fun `a Costs row's picture living in a different vehicle's csv file still resolves after combining`() {
+        // Real excerpt from a user's two-vehicle .fuelio export: V-Cross's own csv has the
+        // ##Costs row (UniqueId 3) but its ##Pictures table has no Type=2 entry for it — the
+        // actual photo entry sits in the *other* vehicle's csv (Toyota-CHR). importFuelioZip()
+        // is supposed to combine every parsed entry's pictureMap before resolving any row's
+        // photo (see combinedPictureMap in importFuelioZip) — this reproduces that combine step
+        // exactly to check the Costs path really benefits from it the same way Log rows do.
+        val vCrossResult = parseFuelioCsv(V_CROSS_COSTS_CSV)
+        val toyotaResult = parseFuelioCsv(TOYOTA_PICTURES_ONLY_CSV)
+
+        val combinedPictureMap = mutableMapOf<String, MutableList<String>>()
+        for (parsed in listOf(vCrossResult, toyotaResult)) {
+            for ((targetId, filenames) in parsed.pictureMap) {
+                combinedPictureMap.getOrPut(targetId) { mutableListOf() } += filenames
+            }
+        }
+
+        val costRow = vCrossResult.costRows.single { it.uniqueId == "3" }
+        assertEquals("2024-09-11", costRow.date)
+        assertEquals(91677.0, costRow.odometerKm)
+
+        // This is exactly what resolvePhotoUri() looks up for a Costs row (rowType "2").
+        val filenames = combinedPictureMap["2:${costRow.uniqueId}"]
+        assertEquals(listOf("JPEG_20250607_005106_3533775571852396777.jpg"), filenames)
+    }
+
+    @Test
+    fun `full real two-vehicle export resolves a Costs row's photo the same way importFuelioZip would`() {
+        // Unlike every other test above (trimmed excerpts), this parses the *complete*,
+        // unmodified two-vehicle .fuelio export a user reported missing Costs photos from
+        // (src/test/resources/fuelio/vehicle1local.csv + vehicle2local.csv — 273 and 149 real
+        // lines respectively, full ##Log history included) and replicates importFuelioZip's
+        // exact combine-then-resolve pipeline, to rule out anything the trimmed fixtures above
+        // might have accidentally not reproduced (a full ##Log section ahead of ##Costs, the
+        // *same* Type=2 picture rows appearing in *both* files' own ##Pictures tables, etc.).
+        val vehicle1 = parseFuelioCsv(readFuelioFixture("vehicle1local.csv"))
+        val vehicle2 = parseFuelioCsv(readFuelioFixture("vehicle2local.csv"))
+
+        assertEquals("V-Cross M/AT 2022", vehicle1.vehicleName)
+        assertEquals("Toyota​-CHR​ Hybrid", vehicle2.vehicleName)
+
+        val combinedPictureMap = mutableMapOf<String, MutableList<String>>()
+        for (parsed in listOf(vehicle1, vehicle2)) {
+            for ((targetId, filenames) in parsed.pictureMap) {
+                combinedPictureMap.getOrPut(targetId) { mutableListOf() } += filenames
+            }
+        }
+
+        val costRow = vehicle1.costRows.single { it.uniqueId == "3" }
+        assertEquals("2024-09-11", costRow.date)
+        assertEquals("10:49", costRow.time)
+        assertEquals(91677.0, costRow.odometerKm)
+
+        val resolved = combinedPictureMap["2:${costRow.uniqueId}"] ?: combinedPictureMap[costRow.uniqueId]
+        assertEquals(listOf("JPEG_20250607_005106_3533775571852396777.jpg"), resolved)
+    }
+
+    private fun readFuelioFixture(name: String): String =
+        checkNotNull(javaClass.classLoader?.getResourceAsStream("fuelio/$name")) { "Missing fixture $name" }
+            .bufferedReader(Charsets.UTF_8).readText()
+
     companion object {
         private val VEHICLE_AND_LOG_CSV = """
             "## Vehicle"
@@ -107,6 +169,32 @@ class FuelioImportRepositoryTest {
             "Filename","Note","Type","target_id","guid","lastupdated"
             "log_204.jpg",,"1","204",,"0"
             "cost_204.jpg",,"2","204",,"0"
+        """.trimIndent()
+
+        private val V_CROSS_COSTS_CSV = """
+            "## Vehicle"
+            "Name","Description","DistUnit","FuelUnit","ConsumptionUnit","ImportCSVDateFormat","VIN","Insurance","Plate","Make","Model","Year","TankCount","Tank1Type","Tank2Type","Active","Tank1Capacity","Tank2Capacity","FuelUnitTank2","FuelConsumptionTank2","guid","lastupdated"
+            "V-Cross M/AT 2022","","0","0","3","yyyy-MM-dd","","","","","",,"1","200","0","1","76.0","0.0","0","0","0a424bdc-e62d-4728-87be-15a06c94ca90","1784993917098"
+            "## CostCategories"
+            "CostTypeID","Name","priority","color","guid","lastupdated"
+            "2","บำรุงรักษา","0","","4d2f86cc-2699-43b0-b46c-296a5379fd26","1784993917111"
+            "## Costs"
+            "CostTitle","Date","Odo","CostTypeID","Notes","Cost","flag","idR","read","RemindOdo","RemindDate","isTemplate","RepeatOdo","RepeatMonths","isIncome","UniqueId","guid","lastupdated"
+            "เช็คระยะและบำรุงรักษา","2024-09-11 10:49","91677","2","","3053.78","0","0","1","0","2011-01-01","0","0","0","0","3","bf736484-a38b-4467-9db4-91199af64021","1784993917111"
+            "## Pictures"
+            "Filename","Note","Type","target_id","guid","lastupdated"
+            "JPEG_20260213_110934_7073527851478726632.jpg",,"1","2",,"0"
+        """.trimIndent()
+
+        private val TOYOTA_PICTURES_ONLY_CSV = """
+            "## Vehicle"
+            "Name","Description","DistUnit","FuelUnit","ConsumptionUnit","ImportCSVDateFormat","VIN","Insurance","Plate","Make","Model","Year","TankCount","Tank1Type","Tank2Type","Active","Tank1Capacity","Tank2Capacity","FuelUnitTank2","FuelConsumptionTank2","guid","lastupdated"
+            "Toyota​-CHR​ Hybrid","","0","0","3","yyyy-MM-dd","","","","","","2019","1","700","0","1","43.0","0.0","0","0","785aef7f-5aee-4638-bc64-e8ecaeb69058","1784993917118"
+            "## Pictures"
+            "Filename","Note","Type","target_id","guid","lastupdated"
+            "JPEG_20250607_004736_3086824833622562963.jpg",,"2","2",,"0"
+            "JPEG_20250607_005106_3533775571852396777.jpg",,"2","3",,"0"
+            "JPEG_20250607_005335_8766199239411375876.jpg",,"2","4",,"0"
         """.trimIndent()
     }
 }

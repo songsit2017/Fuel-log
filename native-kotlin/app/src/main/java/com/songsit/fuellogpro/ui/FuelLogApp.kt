@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
@@ -642,6 +643,7 @@ fun FuelLogApp(
                 editing = editingFuel,
                 vehicleFuelType = state.selectedVehicle?.fuelType ?: "",
                 vehicleTankCapacity = state.selectedVehicle?.tankCapacity,
+                stationVisitCounts = remember(state.entries) { state.entries.groupingBy { it.station.trim() }.eachCount() },
                 onFindNearbyStations = onFindNearbyStations,
                 onFetchWeather = onFetchWeather,
                 onPickPhoto = onPickPhoto,
@@ -1193,7 +1195,7 @@ internal fun IconBadge(icon: ImageVector, modifier: Modifier = Modifier, size: a
 // Gas station brand detection from a free-text station name, so the fuel log list can show the
 // real brand logo instead of a generic pump icon. PTT is checked before the bare "PT" keyword so
 // a PTT station name (which contains "pt") never gets misclassified as the PT brand.
-private enum class StationBrand(val logoRes: Int, val keywords: List<String>) {
+internal enum class StationBrand(val logoRes: Int, val keywords: List<String>) {
     PTT(com.songsit.fuellogpro.R.drawable.ic_logo_ptt, listOf("ptt", "ปตท")),
     BANGCHAK(com.songsit.fuellogpro.R.drawable.ic_logo_bangchak, listOf("bangchak", "บางจาก")),
     CALTEX(com.songsit.fuellogpro.R.drawable.ic_logo_caltex, listOf("caltex", "คาลเท็กซ์")),
@@ -1201,7 +1203,7 @@ private enum class StationBrand(val logoRes: Int, val keywords: List<String>) {
     PT(com.songsit.fuellogpro.R.drawable.ic_logo_pt, listOf("pt", "พีที")),
 }
 
-private fun detectStationBrand(stationName: String): StationBrand? {
+internal fun detectStationBrand(stationName: String): StationBrand? {
     if (stationName.isBlank()) return null
     val normalized = stationName.lowercase()
     val tokens = normalized.split(Regex("[^a-z0-9ก-๙]+")).filter(String::isNotBlank)
@@ -1211,7 +1213,7 @@ private fun detectStationBrand(stationName: String): StationBrand? {
 }
 
 @Composable
-private fun StationBadge(stationName: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 32.dp) {
+internal fun StationBadge(stationName: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 32.dp) {
     val brand = remember(stationName) { detectStationBrand(stationName) }
     Box(
         modifier = modifier.size(size).clip(CircleShape).background(Color.White),
@@ -2890,6 +2892,7 @@ private fun AddFuelScreen(
     editing: FuelEntry? = null,
     vehicleFuelType: String = "",
     vehicleTankCapacity: Double? = null,
+    stationVisitCounts: Map<String, Int> = emptyMap(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
@@ -2936,7 +2939,7 @@ private fun AddFuelScreen(
     }
     var station by remember { mutableStateOf(editing?.station ?: "") }
     var fullTank by remember { mutableStateOf(editing?.fullTank ?: true) }
-    var stationMenuExpanded by remember { mutableStateOf(false) }
+    var showStationSelection by remember { mutableStateOf(false) }
     var nearbyStations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
@@ -2975,15 +2978,6 @@ private fun AddFuelScreen(
     var weatherLongitude by remember { mutableStateOf(editing?.weatherLongitude) }
     var weatherFetching by remember { mutableStateOf(false) }
     var weatherError by remember { mutableStateOf<String?>(null) }
-    val stationOptions = nearbyStations.map { it.name }.distinct()
-        .filter { station.isBlank() || it.contains(station, ignoreCase = true) }
-    // Nearby Search doesn't return distance itself (computed locally in NearbyStationRepository),
-    // so the dropdown shows "name • X.X กม." while the field/onSave still only ever gets the
-    // plain station name via AutocompleteTextField's optionLabels indirection.
-    val stationOptionLabels = nearbyStations
-        .sortedBy { it.distanceMeters }
-        .distinctBy { it.name }
-        .associate { it.name to "${it.name} • ${"%.1f".format(Locale.US, it.distanceMeters / 1000.0)} กม." }
     val runNearbySearch = {
         nearbySearching = true
         nearbyError = null
@@ -2991,7 +2985,6 @@ private fun AddFuelScreen(
             { results ->
                 nearbySearching = false
                 nearbyStations = results
-                stationMenuExpanded = true
                 if (results.isEmpty()) nearbyError = "ไม่พบปั๊มใกล้ฉัน"
             },
             { message ->
@@ -3063,6 +3056,19 @@ private fun AddFuelScreen(
         }
     }
 
+    if (showStationSelection) {
+        StationSelectionScreen(
+            onDismiss = { showStationSelection = false },
+            onStationSelected = { station = it },
+            nearbyStations = nearbyStations,
+            stationVisitCounts = stationVisitCounts,
+            isSearching = nearbySearching,
+            onRunSearch = { if (onFindNearbyStations != null && !nearbySearching) runNearbySearch() },
+            errorMessage = nearbyError
+        )
+        return
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -3096,29 +3102,35 @@ private fun AddFuelScreen(
         contentPadding = PaddingValues(vertical = 12.dp),
     ) {
                 item {
-                    AutocompleteTextField(
-                        value = station,
-                        onValueChange = { station = it },
-                        label = "สถานีบริการ",
-                        options = stationOptions,
-                        optionLabels = stationOptionLabels,
-                        expanded = stationMenuExpanded,
-                        onExpandedChange = { stationMenuExpanded = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        onFocus = {
-                            if (onFindNearbyStations != null && !nearbySearching && nearbyStations.isEmpty()) runNearbySearch()
-                        },
-                    )
-                }
-                if (onFindNearbyStations != null) {
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(
-                                enabled = !nearbySearching,
-                                onClick = { runNearbySearch() },
-                            ) { Text(if (nearbySearching) "กำลังค้นหา GPS..." else "หาปั๊มใกล้ฉัน") }
-                            nearbyError?.let {
-                                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("สถานีบริการน้ำมัน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = station.ifBlank { "เลือกตำแหน่งปัจจุบัน" },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { showStationSelection = true }) {
+                                Text("เลือก")
                             }
                         }
                     }

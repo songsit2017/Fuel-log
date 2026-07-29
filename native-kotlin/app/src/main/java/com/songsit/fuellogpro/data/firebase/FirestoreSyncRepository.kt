@@ -1,6 +1,9 @@
 package com.songsit.fuellogpro.data.firebase
 
-import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import androidx.room.withTransaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -24,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import com.songsit.fuellogpro.domain.SyncDecision
 import com.songsit.fuellogpro.domain.decideSync
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 
@@ -337,11 +341,63 @@ class FirestoreSyncRepository(
             runCatching {
                 val file = File(path)
                 val ref = storage.reference.child("vehicles/$vehicleId/photos/$recordId/${file.name}")
-                ref.putFile(Uri.fromFile(file)).await()
+                val bytes = compressForUpload(file) ?: file.readBytes()
+                ref.putBytes(bytes).await()
                 ref.downloadUrl.await().toString()
             }.getOrDefault(path)
         }
         return PhotoUris.join(resolved)
+    }
+
+    // Downscales to at most 1600px on the longest edge and re-encodes as JPEG q80 — these are
+    // receipt/odometer photos viewed at phone-screen size on other members' devices, not
+    // archival copies (the uploading device's own local file stays original-quality). Bakes the
+    // EXIF orientation into the pixels before compressing, since the re-encoded bytes carry no
+    // EXIF header of their own and would otherwise render sideways for whoever downloads them.
+    // Falls back to null (caller uploads the raw file) if the file isn't a decodable image.
+    private fun compressForUpload(file: File): ByteArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sampleSize = 1
+        while (bounds.outWidth / (sampleSize * 2) >= MAX_UPLOAD_DIMENSION ||
+            bounds.outHeight / (sampleSize * 2) >= MAX_UPLOAD_DIMENSION
+        ) {
+            sampleSize *= 2
+        }
+        var bitmap = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sampleSize })
+            ?: return null
+
+        val longestEdge = maxOf(bitmap.width, bitmap.height)
+        if (longestEdge > MAX_UPLOAD_DIMENSION) {
+            val scale = MAX_UPLOAD_DIMENSION.toFloat() / longestEdge
+            val scaled = Bitmap.createScaledBitmap(
+                bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true,
+            )
+            if (scaled !== bitmap) bitmap.recycle()
+            bitmap = scaled
+        }
+
+        val rotationDegrees = when (
+            ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        ) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        if (rotationDegrees != 0f) {
+            val matrix = Matrix().apply { postRotate(rotationDegrees) }
+            val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (rotated !== bitmap) bitmap.recycle()
+            bitmap = rotated
+        }
+
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, UPLOAD_JPEG_QUALITY, output)
+        bitmap.recycle()
+        return output.toByteArray()
     }
 
     private suspend fun discoverVehicles(uid: String): Map<String, DocumentSnapshot> {
@@ -366,6 +422,8 @@ class FirestoreSyncRepository(
         private const val VEHICLES_COLLECTION = "vehicles"
         private const val DELETIONS_COLLECTION = "_deletions"
         private val RECORD_COLLECTIONS = setOf("entries", "expenses", "reminders", "trips")
+        private const val MAX_UPLOAD_DIMENSION = 1600
+        private const val UPLOAD_JPEG_QUALITY = 80
     }
 
     private suspend fun <T> syncCollection(

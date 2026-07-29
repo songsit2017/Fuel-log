@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,9 +163,13 @@ fun VehicleMakeSelectionScreen(
                     headlineContent = { Text(make.name, fontWeight = FontWeight.SemiBold) },
                     leadingContent = {
                         SubcomposeAsyncImage(
-                            model = "https://logo.clearbit.com/${make.domain}",
+                            model = "https://www.carlogos.org/logo/${make.name.replace(" ", "-")}-logo.png",
                             contentDescription = make.name,
-                            modifier = Modifier.size(40.dp).clip(CircleShape),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .padding(4.dp),
                             contentScale = ContentScale.Fit,
                             loading = {
                                 Surface(

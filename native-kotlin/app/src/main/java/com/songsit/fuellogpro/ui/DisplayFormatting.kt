@@ -5,7 +5,7 @@ import com.songsit.fuellogpro.settings.DisplaySettings
 import java.text.NumberFormat
 import java.util.Locale
 
-/** Currency code -> (display symbol/label, format locale). Mirrors modules/settings.js CURRENCIES. */
+/** Currency code -> (display symbol/label, format locale). */
 data class CurrencyOption(val code: String, val label: String, val locale: Locale)
 
 val CURRENCY_OPTIONS: List<CurrencyOption> = listOf(

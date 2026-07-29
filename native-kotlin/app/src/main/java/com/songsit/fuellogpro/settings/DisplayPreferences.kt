@@ -3,9 +3,9 @@ package com.songsit.fuellogpro.settings
 import android.content.Context
 
 /**
- * Ported from the web app's display-settings panel (see modules/settings.js in the repo root):
- * currency, decimal places, distance/volume unit, and theme mode. Values are stored locally
- * only — they affect formatting/appearance, never the underlying stored numbers (always km/L).
+ * Display settings: currency, decimal places, distance/volume unit, and theme mode. Values are
+ * stored locally only — they affect formatting/appearance, never the underlying stored numbers
+ * (always km/L).
  */
 data class DisplaySettings(
     val currency: String = "THB",

@@ -20,11 +20,9 @@ data class InviteResult(
 )
 
 /**
- * Ports V8's family-sharing UI (app.js: invite() at ~1508, join() at 1509-1575,
- * loadMembers() at 1507) which app.js's own comments never touched for role
- * changes/removal — V8 only supports: owner generates an invite code for an email+role,
- * and any signed-in user with a matching invite redeems it to become a member. This is
- * a UI-layer port only; firestore.rules (repo root, unmodified) already defines and
+ * Family-sharing: owner generates an invite code for an email+role, and any signed-in user
+ * with a matching invite redeems it to become a member. There's no support for role
+ * changes/removal yet. firestore.rules (repo root, unmodified) already defines and
  * enforces the exact /invites/{code} and /vehicles/{vid}.members shape this file writes.
  *
  * Deliberately kept separate from FirestoreSyncRepository.kt (which is being worked on

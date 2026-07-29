@@ -28,4 +28,3 @@
 - [ ] OCR, weather and oil prices.
 - [x] Minimal report summary with complete JSON/CSV export.
 - [ ] Global search and printable/PDF reports.
-- [ ] Signed APK parity test before replacing Capacitor.

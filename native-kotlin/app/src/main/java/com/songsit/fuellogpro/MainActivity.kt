@@ -754,8 +754,7 @@ class MainActivity : ComponentActivity() {
             coarse == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
-    // Item 1: ports V8's fetchNearbyStations()/autoNearby() (app.js:675-691) — get device
-    // location, then query the Overpass API for nearby amenity=fuel points.
+    // Gets the device location, then queries the Overpass API for nearby amenity=fuel points.
     private fun performNearbyStationLookup() {
         val onResult = pendingNearbyResult
         val onError = pendingNearbyError

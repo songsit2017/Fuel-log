@@ -153,8 +153,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
-        // Item 2 (photo attachments): store a single local file path per fuel entry / expense
-        // record, mirroring V8's per-record photo attachment (app.js uploadAttachedPhotos()).
+        // Photo attachments: store a single local file path per fuel entry / expense record.
         private val migration8To9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE fuel_entries ADD COLUMN photoUri TEXT")

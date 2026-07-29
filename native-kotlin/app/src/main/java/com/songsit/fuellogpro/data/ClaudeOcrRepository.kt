@@ -19,8 +19,8 @@ data class ReceiptScanResult(
 )
 
 /**
- * Calls the `scanReceipt` Cloud Function (functions/index.js) — the same Claude/Anthropic-backed
- * receipt OCR V8's web app used (scanReceiptWithClaude(), app.js:508). The Anthropic API key is
+ * Calls the `scanReceipt` Cloud Function (functions/index.js), Claude/Anthropic-backed receipt
+ * OCR. The Anthropic API key is
  * a server-side Secret the function reads via defineSecret('ANTHROPIC_API_KEY'); the app only
  * ever sends a base64 image to an authenticated callable and gets structured JSON back — no key
  * ever reaches the client. Requires the user to be signed in (the function itself rejects

@@ -15,9 +15,9 @@ data class WeatherInfo(
 )
 
 /**
- * Ports the legacy web app's modules/weather.js captureWeather(): calls Open-Meteo's free
- * forecast endpoint (no API key) with the device's current GPS position and reads back the
- * current weather code + temperature, so a fill-up can be tagged with conditions at fill time.
+ * Calls Open-Meteo's free forecast endpoint (no API key) with the device's current GPS position
+ * and reads back the current weather code + temperature, so a fill-up can be tagged with
+ * conditions at fill time.
  */
 class WeatherRepository {
 

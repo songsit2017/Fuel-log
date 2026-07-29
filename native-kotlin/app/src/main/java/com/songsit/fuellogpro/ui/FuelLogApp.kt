@@ -3707,10 +3707,9 @@ private fun TankLevelDialog(
     )
 }
 
-// Item C (multi-photo): shows up to MAX_PHOTOS thumbnails of attached receipts/photos (each
-// decoded from its local file path), each individually removable, plus a pick button that's
-// hidden once the cap is reached. Ported from V8's per-record photo attachment UI (app.js
-// loadExistingLogPhotos()/photo-pick buttons), extended from the original single-photo version.
+// Shows up to MAX_PHOTOS thumbnails of attached receipts/photos (each decoded from its local
+// file path), each individually removable, plus a pick button that's hidden once the cap is
+// reached.
 private const val MAX_PHOTOS = 3
 
 @Composable

@@ -8,8 +8,4 @@ FuelLog Pro Native application code is Kotlin-first and Kotlin-only.
   not provide Kotlin source; this does not make our application code Java.
 - Firebase uses the supported main Android modules, not the retired `-ktx`
   artifacts.
-- The current Capacitor APK remains a temporary compatibility shell. Generated
-  Capacitor Java bridge files are not copied into the native project.
-- A feature replaces its Capacitor counterpart only after data-parity,
-  offline, authentication and UI tests pass.
 

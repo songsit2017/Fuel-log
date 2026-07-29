@@ -16,8 +16,7 @@ import java.util.zip.ZipInputStream
 import kotlin.math.abs
 
 /**
- * Ports V8's Fuelio importer (app.js:1612-1945, "Fuelio import (CSV / .fuelio / .zip —
- * multi-vehicle ... )"). A .fuelio backup is a zip archive containing one quoted
+ * Imports a Fuelio backup. A .fuelio backup is a zip archive containing one quoted
  * pseudo-CSV per vehicle. Sections inside each CSV are marked by lines starting with
  * (quote-stripped) "##", e.g. "##Log" for the fuel-log rows, "##Costs" for
  * maintenance/expense rows, and "##Pictures" linking a row's unique id to photo
@@ -573,8 +572,7 @@ internal fun parseFuelioCsv(text: String, defaultSection: String = ""): FuelioPa
                 }
             }
             "costs" -> {
-                // Matched against Fuelio's real ##Costs column names (per the legacy web
-                // importer's costIndex() ported from app.js:1716-1717): the money column is
+                // Matched against Fuelio's real ##Costs column names: the money column is
                 // literally named "Cost", not "Price"/"Amount" — normalizeHeader() strips
                 // separators so "Cost_Title"/"Cost Title"/"CostTitle" all resolve the same way,
                 // and the amount column is matched *exactly* against "cost"/"amount"/"price" so

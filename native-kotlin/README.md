@@ -1,8 +1,6 @@
-# FuelLog Pro Native (Kotlin) — migration workspace
+# FuelLog Pro Native (Kotlin)
 
-This directory is the parallel native Android implementation. The current
-Capacitor APK remains the production fallback until each native feature passes
-data-parity tests.
+This directory is the FuelLog Pro Android app: native Kotlin, Jetpack Compose.
 
 All application-owned native source is Kotlin. See `KOTLIN-POLICY.md`.
 

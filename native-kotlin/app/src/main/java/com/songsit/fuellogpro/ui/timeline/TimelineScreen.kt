@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
@@ -242,7 +243,7 @@ private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -
 // screens are toggled boolean/state like the rest of FuelLogApp.kt). dismissOnBackPress is the
 // Dialog default, so the system Back button already closes this without extra wiring.
 @Composable
-fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
+fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -256,11 +257,15 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
             IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
             }
-            IconButton(
-                onClick = { scope.launch { shareTimelineImage(context, imagePath) } },
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-            ) {
-                Icon(Icons.Filled.Share, contentDescription = "แชร์", tint = Color.White)
+            Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                if (onDelete != null) {
+                    IconButton(onClick = { onDelete(); onDismiss() }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "ลบรูป", tint = Color.White)
+                    }
+                }
+                IconButton(onClick = { scope.launch { shareTimelineImage(context, imagePath) } }) {
+                    Icon(Icons.Filled.Share, contentDescription = "แชร์", tint = Color.White)
+                }
             }
         }
     }

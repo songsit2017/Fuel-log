@@ -3724,33 +3724,17 @@ private fun PhotoAttachmentRow(
     
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         photoUris.forEach { uri ->
-            Box(contentAlignment = Alignment.TopEnd) {
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.size(64.dp).clickable { fullScreenImageUri = uri },
-                ) {
-                    AsyncImage(
-                        model = if (uri.startsWith("/")) java.io.File(uri) else uri,
-                        contentDescription = "รูปที่แนบ",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                IconButton(
-                    onClick = { onRemove(uri) },
-                    modifier = Modifier
-                        .padding(2.dp)
-                        .size(20.dp)
-                        .background(Color.Black.copy(alpha = 0.55f), CircleShape),
-                ) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = "ลบ",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp),
-                    )
-                }
+            Card(
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                modifier = Modifier.size(64.dp).clickable { fullScreenImageUri = uri },
+            ) {
+                AsyncImage(
+                    model = if (uri.startsWith("/")) java.io.File(uri) else uri,
+                    contentDescription = "รูปที่แนบ",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
             }
         }
         if (photoUris.size < MAX_PHOTOS) {
@@ -3781,7 +3765,11 @@ private fun PhotoAttachmentRow(
     }
 
     fullScreenImageUri?.let { uri ->
-        FullScreenImageViewer(imagePath = uri, onDismiss = { fullScreenImageUri = null })
+        FullScreenImageViewer(
+            imagePath = uri,
+            onDismiss = { fullScreenImageUri = null },
+            onDelete = { onRemove(uri) },
+        )
     }
 }
 

@@ -58,7 +58,10 @@ exports.scanReceipt = onCall({
       : '{"date":"YYYY-MM-DD or null","title":string|null,"amount":number|null}';
   const prompt = isOdometer
     ? `Read the odometer (total distance / mileage) display on this car instrument cluster photo. Return JSON only using ${schema}. Ignore speed, RPM, fuel gauge, clock, and warning lights — only the cumulative odometer reading. If there's a smaller trip/tenths digit shown in a different color or box, include it as a decimal. Use null if no odometer digits are legible.`
-    : `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable, convert Buddhist years to Gregorian${isFuel ? ', and normalize fuel volume to liters and unit price to price per liter' : ''}.`;
+    : `Extract this ${isFuel ? 'fuel ' : ''}receipt. Return JSON only using ${schema}. Use null when unreadable, convert Buddhist years to Gregorian${isFuel ? ', and normalize fuel volume to liters and unit price to price per liter' : ''}.` +
+      (isFuel
+        ? ' Thai fuel receipts always use "." as the decimal point, never as a thousands separator — e.g. "36.500L" means 36.5 liters and "36.71" is 36.71 baht per liter, not thirty-six thousand of anything. The product line is often one compact line like "<fuel name> <liters>L,<currency symbol><price per liter>" (e.g. "GASOHOL 95/36.500L,฿36.71"); the grand total is a separate line usually labeled "Total" or "รวม" near the bottom, and is typically in the hundreds to low thousands of baht for a single fill-up — sanity-check that "total" is not accidentally the liters or price-per-liter value with extra zeros appended.'
+        : '');
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {

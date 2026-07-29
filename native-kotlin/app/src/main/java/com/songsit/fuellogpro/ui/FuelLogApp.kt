@@ -67,6 +67,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -3022,23 +3023,42 @@ private fun AddFuelScreen(
         )
     }
     var fuelType by remember { mutableStateOf(vehicleFuelType.ifBlank { "เบนซิน" }) }
+    // Any 2 of {liters, price/L, total} determine the 3rd (total = liters × price). Each
+    // handler prefers to recompute the field it historically recomputed (kept for backward
+    // compatibility with existing behavior/tests) and only falls back to solving for the
+    // *other* missing field — e.g. onTotalChange used to require liters to already be filled
+    // in to do anything at all, so entering price/L + total (the common real-world order: read
+    // both off the receipt, let the app work out how many liters that bought) silently computed
+    // nothing.
     val onLitersChange: (String) -> Unit = { value ->
         liters = value
         val l = value.toDoubleOrNull()
         val p = price.toDoubleOrNull()
-        if (l != null && p != null) total = "%.2f".format(Locale.US, l * p)
+        val t = total.toDoubleOrNull()
+        when {
+            l != null && p != null -> total = "%.2f".format(Locale.US, l * p)
+            l != null && l > 0 && t != null -> price = "%.2f".format(Locale.US, t / l)
+        }
     }
     val onPriceChange: (String) -> Unit = { value ->
         price = value
         val l = liters.toDoubleOrNull()
         val p = value.toDoubleOrNull()
-        if (l != null && p != null) total = "%.2f".format(Locale.US, l * p)
+        val t = total.toDoubleOrNull()
+        when {
+            l != null && p != null -> total = "%.2f".format(Locale.US, l * p)
+            p != null && p > 0 && t != null -> liters = "%.2f".format(Locale.US, t / p)
+        }
     }
     val onTotalChange: (String) -> Unit = { value ->
         total = value
         val l = liters.toDoubleOrNull()
+        val p = price.toDoubleOrNull()
         val t = value.toDoubleOrNull()
-        if (l != null && l > 0 && t != null) price = "%.2f".format(Locale.US, t / l)
+        when {
+            l != null && l > 0 && t != null -> price = "%.2f".format(Locale.US, t / l)
+            p != null && p > 0 && t != null -> liters = "%.2f".format(Locale.US, t / p)
+        }
     }
     var station by remember { mutableStateOf(editing?.station ?: "") }
     var fullTank by remember { mutableStateOf(editing?.fullTank ?: true) }
@@ -3047,7 +3067,12 @@ private fun AddFuelScreen(
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    // Photo pick + OCR scan is one round trip (see MainActivity.scanFirstPhoto) that can take a
+    // few seconds over the network — without this the "สแกนบิล/ใบเสร็จด้วย AI" button and camera
+    // icons looked like they'd done nothing until the fields suddenly populated.
+    var isScanning by remember { mutableStateOf(false) }
     val handlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+        isScanning = false
         photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
         // Claude OCR (functions/index.js scanReceipt) fills these when signed
         // in and reachable; falls back to on-device amount-only OCR otherwise.
@@ -3248,7 +3273,9 @@ private fun AddFuelScreen(
                             onModeChange = { odometerIsTripMeter = it },
                             latestOdometer = latestOdometer,
                             modifier = Modifier.weight(1f),
-                            onScanClick = onPickCameraPhoto?.let { pick -> { pick("odometer", handlePicked) } },
+                            onScanClick = onPickCameraPhoto?.takeIf { !isScanning }
+                                ?.let { pick -> { isScanning = true; pick("odometer", handlePicked) } },
+                            isScanning = isScanning,
                         )
                     }
                 }
@@ -3310,8 +3337,8 @@ private fun AddFuelScreen(
                     item {
                         PhotoAttachmentRow(
                             photoUris = photoUris,
-                            onPickGallery = { onPickPhoto("fuel", handlePicked) },
-                            onPickCamera = onPickCameraPhoto?.let { pick -> { pick("fuel", handlePicked) } },
+                            onPickGallery = { isScanning = true; onPickPhoto("fuel", handlePicked) },
+                            onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick("fuel", handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
                     }
@@ -3319,13 +3346,21 @@ private fun AddFuelScreen(
                         Button(
                             onClick = {
                                 val scanPicker = onPickCameraPhoto ?: onPickPhoto
+                                isScanning = true
                                 scanPicker.invoke("fuel", handlePicked)
                             },
+                            enabled = !isScanning,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("สแกนบิล/ใบเสร็จด้วย AI")
+                            if (isScanning) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("กำลังสแกน...")
+                            } else {
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("สแกนบิล/ใบเสร็จด้วย AI")
+                            }
                         }
                     }
                 }
@@ -3450,6 +3485,7 @@ private fun OdometerField(
     latestOdometer: Double?,
     modifier: Modifier = Modifier,
     onScanClick: (() -> Unit)? = null,
+    isScanning: Boolean = false,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -3461,7 +3497,9 @@ private fun OdometerField(
                 singleLine = true,
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (onScanClick != null) {
+                        if (isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                        } else if (onScanClick != null) {
                             IconButton(onClick = onScanClick) {
                                 Icon(Icons.Filled.PhotoCamera, contentDescription = "สแกนเลขไมล์")
                             }
@@ -3669,6 +3707,7 @@ private fun AddExpenseScreen(
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
     var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var isScanning by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(editing?.category ?: expenseCategories.first()) }
     var description by remember { mutableStateOf(editing?.description ?: "") }
     var amount by remember { mutableStateOf(editing?.amount?.let { "%.2f".format(Locale.US, it) } ?: "") }
@@ -3695,6 +3734,7 @@ private fun AddExpenseScreen(
     }
 
     val expenseHandlePicked = { picked: List<String>, scanResult: ReceiptScanResult? ->
+        isScanning = false
         photoUris = (photoUris + picked).distinct().take(MAX_PHOTOS)
         // Claude Vision OCR (functions/index.js scanReceipt) fills these when signed in and
         // reachable; falls back to on-device amount-only OCR otherwise.
@@ -3857,8 +3897,8 @@ private fun AddExpenseScreen(
                 item {
                     PhotoAttachmentRow(
                         photoUris = photoUris,
-                        onPickGallery = { onPickPhoto("expense", expenseHandlePicked) },
-                        onPickCamera = onPickCameraPhoto?.let { pick -> { pick("expense", expenseHandlePicked) } },
+                        onPickGallery = { isScanning = true; onPickPhoto("expense", expenseHandlePicked) },
+                        onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick("expense", expenseHandlePicked) } },
                         onRemove = { uri -> photoUris = photoUris - uri },
                     )
                 }
@@ -3866,13 +3906,21 @@ private fun AddExpenseScreen(
                     Button(
                         onClick = {
                             val scanPicker = onPickCameraPhoto ?: onPickPhoto
+                            isScanning = true
                             scanPicker.invoke("expense", expenseHandlePicked)
                         },
+                        enabled = !isScanning,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("สแกนบิล/ใบเสร็จด้วย AI")
+                        if (isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("กำลังสแกน...")
+                        } else {
+                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("สแกนบิล/ใบเสร็จด้วย AI")
+                        }
                     }
                 }
             }

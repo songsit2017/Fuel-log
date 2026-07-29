@@ -1919,6 +1919,7 @@ private fun SettingsScreen(
     var showThemePaletteDialog by remember { mutableStateOf(false) }
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
+    var showOpenSourceLicenses by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
 
@@ -2066,6 +2067,13 @@ private fun SettingsScreen(
                     onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
                 )
             }
+            item {
+                PreferenceListItem(
+                    title = "ใบอนุญาตเปิดแหล่งที่มา",
+                    subtitle = "ไลบรารีโอเพนซอร์สที่ใช้ในแอปพลิเคชันนี้",
+                    onClick = { showOpenSourceLicenses = true }
+                )
+            }
             item { PreferenceCategoryHeader("แหล่งที่มาข้อมูล") }
             item { PreferenceListItem(title = "ราคาน้ำมันวันนี้", subtitle = "บางจาก, ปตท., เชลล์ (Bangchak Open API)") }
             item { PreferenceListItem(title = "ค้นหาปั๊มใกล้ฉัน", subtitle = "Google Places API") }
@@ -2079,6 +2087,12 @@ private fun SettingsScreen(
                 )
             }
         }
+    }
+
+    if (showOpenSourceLicenses) {
+        OpenSourceLicensesScreen(
+            onDismiss = { showOpenSourceLicenses = false }
+        )
     }
 
     if (showUnitDialog) {

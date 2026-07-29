@@ -135,23 +135,54 @@ private fun computeFuelioStats(entries: List<FuelEntry>): FuelioStats {
     var minPrice = Double.MAX_VALUE
     var maxPrice = 0.0
 
-    // Economy & Cost per km
     val kmls = mutableListOf<Double>()
     val cpks = mutableListOf<Double>()
+    var validDistanceSum = 0.0
+    var validLitersSum = 0.0
 
-    for (i in 1 until sortedOdo.size) {
-        val prev = sortedOdo[i - 1]
-        val curr = sortedOdo[i]
-        val dist = curr.odometerKm - prev.odometerKm
-        if (dist > 0 && curr.fullTank) {
-            val kml = dist / curr.liters
-            if (kml in 1.0..100.0) kmls.add(kml)
-            val cpk = curr.amount / dist
-            if (cpk > 0.0) cpks.add(cpk)
+    var lastFullOdo = -1.0
+    var accumulatedLiters = 0.0
+    var accumulatedCost = 0.0
+
+    for (entry in sortedOdo) {
+        if (entry.missedPreviousFillUp) {
+            lastFullOdo = -1.0
+            accumulatedLiters = 0.0
+            accumulatedCost = 0.0
+        }
+        
+        if (lastFullOdo >= 0) {
+            val dist = entry.odometerKm - lastFullOdo
+            accumulatedLiters += entry.liters
+            accumulatedCost += entry.amount
+            
+            if (entry.fullTank) {
+                if (dist > 0 && accumulatedLiters > 0) {
+                    val kml = dist / accumulatedLiters
+                    if (kml in 1.0..100.0) kmls.add(kml)
+                    
+                    val cpk = accumulatedCost / dist
+                    if (cpk > 0.0) cpks.add(cpk)
+                    
+                    validDistanceSum += dist
+                    validLitersSum += accumulatedLiters
+                }
+                lastFullOdo = entry.odometerKm
+                accumulatedLiters = 0.0
+                accumulatedCost = 0.0
+            }
+        } else {
+            if (entry.fullTank) {
+                lastFullOdo = entry.odometerKm
+                accumulatedLiters = 0.0
+                accumulatedCost = 0.0
+            }
         }
     }
 
-    sortedEntries.forEachIndexed { i, entry ->
+    var prevOdometer = -1.0
+
+    sortedEntries.forEach { entry ->
         val date = runCatching { LocalDate.parse(entry.date) }.getOrNull()
         if (date != null) {
             val ym = YearMonth.from(date)
@@ -160,18 +191,20 @@ private fun computeFuelioStats(entries: List<FuelEntry>): FuelioStats {
             if (date.year == prevYear) { refillsPrevYear++; litersPrevYear += entry.liters; costPrevYear += entry.amount }
             if (ym == thisMonth) { refillsThisMonth++; litersThisMonth += entry.liters; costThisMonth += entry.amount }
             if (ym == prevMonth) { refillsPrevMonth++; litersPrevMonth += entry.liters; costPrevMonth += entry.amount }
-            
-            if (i > 0) {
-                val prevOdo = sortedEntries[i-1].odometerKm
-                val currOdo = entry.odometerKm
-                if (currOdo > prevOdo) {
-                    val dist = currOdo - prevOdo
+        }
+        
+        if (entry.odometerKm > 0) {
+            if (prevOdometer >= 0) {
+                val dist = entry.odometerKm - prevOdometer
+                if (dist > 0 && date != null) {
+                    val ym = YearMonth.from(date)
                     if (date.year == thisYear) distanceThisYear += dist
                     if (date.year == prevYear) distancePrevYear += dist
                     if (ym == thisMonth) distanceThisMonth += dist
                     if (ym == prevMonth) distancePrevMonth += dist
                 }
             }
+            prevOdometer = entry.odometerKm
         }
         
         totalLiters += entry.liters
@@ -195,7 +228,7 @@ private fun computeFuelioStats(entries: List<FuelEntry>): FuelioStats {
     if (minBill == Double.MAX_VALUE) minBill = 0.0
     if (minPrice == Double.MAX_VALUE) minPrice = 0.0
 
-    val avgKml = if (kmls.isNotEmpty()) kmls.average() else 0.0
+    val avgKml = if (validLitersSum > 0) validDistanceSum / validLitersSum else 0.0
     val bestKml = if (kmls.isNotEmpty()) kmls.maxOrNull() ?: 0.0 else 0.0
     val worstKml = if (kmls.isNotEmpty()) kmls.minOrNull() ?: 0.0 else 0.0
 

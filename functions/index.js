@@ -25,8 +25,21 @@ function enforceRateLimit(uid) {
   requestWindows.set(uid, recent);
 }
 
+// Claude sometimes reasons in prose before emitting the JSON block (e.g. a "sanity check"
+// walkthrough of liters × price ≈ total), so the payload isn't always JSON from the first
+// character — earlier versions of this stripped only the ```json fences and JSON.parse'd
+// whatever prose was left in front, which threw and made a *correctly*-read receipt look
+// like a parse failure (falling back to the much cruder on-device OCR guess client-side).
+function extractJsonPayload(text) {
+  const fenced = String(text).match(/```json\s*([\s\S]*?)```/i) || String(text).match(/```\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  const braced = String(text).match(/\{[\s\S]*\}/);
+  if (braced) return braced[0];
+  return String(text).trim();
+}
+
 function safeJson(text) {
-  const parsed = JSON.parse(String(text).replace(/```json|```/gi, '').trim());
+  const parsed = JSON.parse(extractJsonPayload(text));
   const allowed = ['date', 'liters', 'pricePerLiter', 'total', 'station', 'title', 'amount', 'odometer'];
   return Object.fromEntries(allowed.filter(key => parsed[key] !== undefined).map(key => [key, parsed[key]]));
 }
@@ -118,18 +131,6 @@ async function handleScanReceipt(request) {
     throw new HttpsError('internal', 'บริการ OCR ไม่พร้อมใช้งาน');
   }
   const text = (result.content || []).find(block => block.type === 'text')?.text;
-  // TEMPORARY diagnostic logging (remove once the fuel-receipt misread reports are resolved) —
-  // logs the exact raw model output plus the payload size actually received, so a wrong result
-  // can be traced back to "the model misread this image" vs "a much-smaller/different image
-  // than expected reached the model" without guessing at prompt wording blind a 3rd/4th time.
-  console.log('scanReceipt debug', {
-    type,
-    mediaType,
-    imageBase64Length: imageBase64.length,
-    model: result?.model,
-    stopReason: result?.stop_reason,
-    rawText: text
-  });
   if (!text) throw new HttpsError('data-loss', 'OCR ไม่ส่งข้อมูลกลับมา');
   try {
     return safeJson(text);

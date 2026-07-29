@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-07-29T00:07:24.643451+00:00",
+  "fetchedAt": "2026-07-29T02:29:13.618442+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -35,17 +35,16 @@
       }
     },
     "shell": {
-      "source": "https://find.shell.com/th/fuel/10041865-co-wutthipan-b1-sai-mai-31-bkk/en_TH",
-      "updatedAt": "2026-07-29T07:07:23",
-      "station": "CO WUTTHIPAN B1 SAI MAI 31 BKK",
+      "source": "https://www.pcauto.com/th/fuel-price/shell",
+      "updatedAt": "2026-07-29T02:29:13.332841+00:00",
       "grades": {
-        "gasohol_95": null,
-        "gasohol_91": 33.19,
-        "e20": null,
+        "gasohol_95": 37.95,
+        "gasohol_91": 37.58,
+        "e20": 32.65,
         "e85": null,
-        "diesel_b7": null,
-        "diesel_b20": null,
-        "premium_95": 49.89
+        "diesel_b7": 37.5,
+        "diesel_b20": 32.5,
+        "premium_95": 49.84
       }
     },
     "pt": {

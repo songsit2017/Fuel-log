@@ -87,6 +87,18 @@ exports.scanReceipt = onCall({
     throw new HttpsError('internal', 'บริการ OCR ไม่พร้อมใช้งาน');
   }
   const text = (result.content || []).find(block => block.type === 'text')?.text;
+  // TEMPORARY diagnostic logging (remove once the fuel-receipt misread reports are resolved) —
+  // logs the exact raw model output plus the payload size actually received, so a wrong result
+  // can be traced back to "the model misread this image" vs "a much-smaller/different image
+  // than expected reached the model" without guessing at prompt wording blind a 3rd/4th time.
+  console.log('scanReceipt debug', {
+    type,
+    mediaType,
+    imageBase64Length: imageBase64.length,
+    model: result?.model,
+    stopReason: result?.stop_reason,
+    rawText: text
+  });
   if (!text) throw new HttpsError('data-loss', 'OCR ไม่ส่งข้อมูลกลับมา');
   try {
     return safeJson(text);

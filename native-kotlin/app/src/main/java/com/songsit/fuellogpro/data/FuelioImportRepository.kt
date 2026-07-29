@@ -196,10 +196,15 @@ class FuelioImportRepository(
         parsed: FuelioParseResult,
         imageMap: Map<String, String>,
     ): List<FuelEntryEntity> {
-        val existingEntries = database.fuelEntryDao().getForVehicle(vehicleId)
+        // Matches are looked up against `pool`, which grows as rows are processed — not just
+        // the pre-import DB snapshot — so two rows that are duplicates *within the same backup*
+        // (seen in real Fuelio exports) collapse into one entity instead of both getting fresh
+        // UUIDs. Without this, only one of the pair (whichever's UniqueId happened to have a
+        // ##Pictures entry) ended up with a photo, producing two near-identical rows in the UI.
+        val pool = database.fuelEntryDao().getForVehicle(vehicleId).toMutableList()
         return parsed.fuelRows.map { row ->
-            val existing = findMatchingFuelEntry(existingEntries, row)
-            FuelEntryEntity(
+            val existing = findMatchingFuelEntry(pool, row)
+            val entity = FuelEntryEntity(
                 id = existing?.id ?: UUID.randomUUID().toString(),
                 vehicleId = vehicleId,
                 date = row.date,
@@ -214,6 +219,9 @@ class FuelioImportRepository(
                 photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, "1", parsed.pictureMap, imageMap),
                 missedPreviousFillUp = row.missedPreviousFillUp,
             )
+            if (existing != null) pool.remove(existing)
+            pool.add(entity)
+            entity
         }
     }
 
@@ -222,10 +230,11 @@ class FuelioImportRepository(
         parsed: FuelioParseResult,
         imageMap: Map<String, String>,
     ): List<ExpenseEntity> {
-        val existingExpenses = database.expenseDao().getForVehicle(vehicleId)
+        // Same within-batch dedup reasoning as mergeFuelRows above.
+        val pool = database.expenseDao().getForVehicle(vehicleId).toMutableList()
         return parsed.costRows.map { row ->
-            val existing = findMatchingExpense(existingExpenses, row)
-            ExpenseEntity(
+            val existing = findMatchingExpense(pool, row)
+            val entity = ExpenseEntity(
                 id = existing?.id ?: UUID.randomUUID().toString(),
                 vehicleId = vehicleId,
                 date = row.date,
@@ -240,6 +249,9 @@ class FuelioImportRepository(
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                 photoUri = resolvePhotoUri(existing?.photoUri, row.uniqueId, "2", parsed.pictureMap, imageMap),
             )
+            if (existing != null) pool.remove(existing)
+            pool.add(entity)
+            entity
         }
     }
 

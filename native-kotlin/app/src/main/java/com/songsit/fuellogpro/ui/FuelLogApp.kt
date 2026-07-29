@@ -97,6 +97,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -114,6 +115,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -260,6 +262,7 @@ fun FuelLogApp(
     onAddTrip: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onUpdateTrip: (String, String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onDeleteTrip: (String) -> Unit,
+    onStartTripRecording: (() -> Unit)? = null,
     onExportCsv: () -> Unit,
     reminderSettings: ReminderSettings,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
@@ -305,19 +308,19 @@ fun FuelLogApp(
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var editingMaintenance by remember { mutableStateOf<MaintenanceTask?>(null) }
     var editingTrip by remember { mutableStateOf<Trip?>(null) }
+    var prefillTripDistanceKm by remember { mutableStateOf<Double?>(null) }
     var editingVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var dashboardFabExpanded by remember { mutableStateOf(false) }
     var homeTab by remember { mutableIntStateOf(0) }
-    var recordsMode by remember { mutableIntStateOf(0) }
     var viewingImagePath by remember { mutableStateOf<String?>(null) }
     // Remembers which homeTab (e.g. 1=Timeline) the user jumped FROM when tapping a record card
     // to go to the FuelList (tab=1). null means the user arrived via normal bottom-nav/drawer tap,
     // so Back should return to homeTab=0 (Overview) as usual. Set to non-null only by the
     // Timeline card click; cleared on any direct drawer navigation or after Back is consumed.
     var fuelListReturnHomeTab by remember { mutableStateOf<Int?>(null) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ")
+    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ทริป")
     val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -449,10 +452,11 @@ fun FuelLogApp(
             "บันทึกการใช้เชื้อเพลิง" to Icons.Filled.LocalGasStation,
             "สถิติ" to Icons.Filled.BarChart,
             "บันทึกค่าใช้จ่าย" to Icons.Filled.ReceiptLong,
+            "ทริป" to Icons.Filled.Route,
             "บำรุงรักษา" to Icons.Filled.Build,
             "รถของฉัน" to Icons.Filled.DirectionsCar,
         )
-        val drawerTabTargets = listOf(0, 1, 5, 2, 3, 4)
+        val drawerTabTargets = listOf(0, 1, 5, 2, 6, 3, 4)
         androidx.compose.material3.ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -612,16 +616,15 @@ fun FuelLogApp(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddFuel = true },
                     ) { Text("+") }
                     2 -> FloatingActionButton(
-                        onClick = {
-                            if (state.vehicles.isEmpty()) showAddVehicle = true
-                            else if (recordsMode == 0) showAddExpense = true
-                            else showAddTrip = true
-                        },
+                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddExpense = true },
                     ) { Text("+") }
                     3 -> FloatingActionButton(
                         onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddMaintenance = true },
                     ) { Text("+") }
                     4 -> FloatingActionButton(onClick = { showAddVehicle = true }) { Text("+") }
+                    6 -> FloatingActionButton(
+                        onClick = { if (state.vehicles.isEmpty()) showAddVehicle = true else showAddTrip = true },
+                    ) { Text("+") }
                 }
             },
         ) { padding ->
@@ -638,14 +641,13 @@ fun FuelLogApp(
                     else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
                 }
                 1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
-                2 -> RecordsPage(
-                    mode = recordsMode,
-                    onModeChange = { recordsMode = it },
-                    state = state,
-                    onDeleteExpense = onDeleteExpense,
-                    onEditExpense = { editingExpense = it },
-                    onDeleteTrip = onDeleteTrip,
-                    onEditTrip = { editingTrip = it },
+                2 -> ExpenseList(
+                    expenses = state.expenses,
+                    totalExpense = state.totalExpenses,
+                    totalIncome = state.totalIncome,
+                    netExpense = state.netExpense,
+                    onDelete = onDeleteExpense,
+                    onEdit = { editingExpense = it },
                     modifier = Modifier.padding(padding),
                 )
                 3 -> MaintenanceList(
@@ -664,7 +666,20 @@ fun FuelLogApp(
                     onDelete = onDeleteVehicle,
                     modifier = Modifier.padding(padding),
                 )
-                else -> StatsScreen(state, Modifier.padding(padding))
+                5 -> StatsScreen(state, Modifier.padding(padding))
+                else -> TripList(
+                    trips = state.trips,
+                    summary = state.tripSummary,
+                    onDelete = onDeleteTrip,
+                    onEdit = { editingTrip = it },
+                    onStartRecording = onStartTripRecording,
+                    onSaveRecordedTrip = { distanceKm ->
+                        prefillTripDistanceKm = distanceKm
+                        showAddTrip = true
+                        com.songsit.fuellogpro.trip.TripRecordingState.reset()
+                    },
+                    modifier = Modifier.padding(padding),
+                )
             }
         }
         if (showAddFuel || editingFuel != null) {
@@ -699,7 +714,8 @@ fun FuelLogApp(
             AddTripDialog(
                 saving = state.saving,
                 editing = editingTrip,
-                onDismiss = { showAddTrip = false; editingTrip = null },
+                prefillDistanceKm = prefillTripDistanceKm,
+                onDismiss = { showAddTrip = false; editingTrip = null; prefillTripDistanceKm = null },
                 onSave = onAddTrip,
                 onUpdate = onUpdateTrip,
             )
@@ -1451,7 +1467,9 @@ private fun ExpenseRow(
                     Text(notes.joinToString(" • "), style = MaterialTheme.typography.labelSmall)
                 }
                 
-                val photoCount = (if (expense.photoUri != null) 1 else 0) + expense.photoUrls.size
+                // photoUrls is just the parsed form of photoUri (PhotoUris.split), not a second
+                // set of photos — adding both here counted every attachment twice.
+                val photoCount = expense.photoUrls.size
                 if (photoCount > 0) {
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1481,61 +1499,71 @@ private fun ExpenseRow(
 }
 
 @Composable
-private fun RecordsPage(
-    mode: Int,
-    onModeChange: (Int) -> Unit,
-    state: NativeAppState,
-    onDeleteExpense: (String) -> Unit,
-    onEditExpense: ((Expense) -> Unit)? = null,
-    onDeleteTrip: (String) -> Unit,
-    onEditTrip: ((Trip) -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (mode == 0) Button(onClick = { onModeChange(0) }) { Text("ค่าใช้จ่าย") }
-            else TextButton(onClick = { onModeChange(0) }) { Text("ค่าใช้จ่าย") }
-            if (mode == 1) Button(onClick = { onModeChange(1) }) { Text("ทริป") }
-            else TextButton(onClick = { onModeChange(1) }) { Text("ทริป") }
-        }
-        if (mode == 0) {
-            ExpenseList(
-                expenses = state.expenses,
-                totalExpense = state.totalExpenses,
-                totalIncome = state.totalIncome,
-                netExpense = state.netExpense,
-                onDelete = onDeleteExpense,
-                onEdit = onEditExpense,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            TripList(
-                trips = state.trips,
-                summary = state.tripSummary,
-                onDelete = onDeleteTrip,
-                onEdit = onEditTrip,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
 private fun TripList(
     trips: List<Trip>,
     summary: com.songsit.fuellogpro.domain.TripSummary,
     onDelete: (String) -> Unit,
     onEdit: ((Trip) -> Unit)? = null,
+    onStartRecording: (() -> Unit)? = null,
+    onSaveRecordedTrip: ((Double) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val recording by com.songsit.fuellogpro.trip.TripRecordingState.status.collectAsState()
+    fun sendTripAction(action: String) {
+        context.startService(android.content.Intent(context, com.songsit.fuellogpro.trip.TripRecordingService::class.java).setAction(action))
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            when {
+                recording.active -> Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                        Text(if (recording.paused) "หยุดชั่วคราว" else "กำลังบันทึกการเดินทาง", fontWeight = FontWeight.Bold)
+                        Text(
+                            "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                sendTripAction(if (recording.paused) com.songsit.fuellogpro.trip.TripRecordingService.ACTION_RESUME else com.songsit.fuellogpro.trip.TripRecordingService.ACTION_PAUSE)
+                            }) { Text(if (recording.paused) "ดำเนินการต่อ" else "หยุด") }
+                            Button(onClick = { sendTripAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_FINISH) }) { Text("เสร็จสิ้น") }
+                        }
+                    }
+                }
+                recording.distanceKm > 0 -> Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                        Text("บันทึกการเดินทางเสร็จสิ้น", fontWeight = FontWeight.Bold)
+                        Text(
+                            "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { com.songsit.fuellogpro.trip.TripRecordingState.reset() }) { Text("ยกเลิก") }
+                            Button(onClick = { onSaveRecordedTrip?.invoke(recording.distanceKm) }) { Text("เพิ่มเป็นทริป") }
+                        }
+                    }
+                }
+                onStartRecording != null -> OutlinedButton(
+                    onClick = onStartRecording,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Route, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("เริ่มบันทึกการเดินทาง (GPS)")
+                }
+            }
+        }
         item {
             Card(
                 shape = RoundedCornerShape(22.dp),
@@ -3348,23 +3376,44 @@ private fun AddFuelScreen(
                         )
                     }
                     item {
-                        Button(
-                            onClick = {
-                                val scanPicker = onPickCameraPhoto ?: onPickPhoto
-                                isScanningReceipt = true
-                                scanPicker.invoke("fuel", handlePicked)
-                            },
-                            enabled = !isScanningReceipt,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            if (isScanningReceipt) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("กำลังสแกน...")
-                            } else {
-                                Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("สแกนบิล/ใบเสร็จด้วย AI")
+                        var showScanSourceMenu by remember { mutableStateOf(false) }
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = {
+                                    if (onPickCameraPhoto != null) {
+                                        showScanSourceMenu = true
+                                    } else {
+                                        isScanningReceipt = true
+                                        onPickPhoto("fuel", handlePicked)
+                                    }
+                                },
+                                enabled = !isScanningReceipt,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (isScanningReceipt) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("กำลังสแกน...")
+                                } else {
+                                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("สแกนบิล/ใบเสร็จด้วย AI")
+                                }
+                            }
+                            if (onPickCameraPhoto != null) {
+                                DropdownMenu(
+                                    expanded = showScanSourceMenu,
+                                    onDismissRequest = { showScanSourceMenu = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("ถ่ายรูป") },
+                                        onClick = { showScanSourceMenu = false; isScanningReceipt = true; onPickCameraPhoto("fuel", handlePicked) },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("เลือกจากแกลอรี่") },
+                                        onClick = { showScanSourceMenu = false; isScanningReceipt = true; onPickPhoto("fuel", handlePicked) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -3908,23 +3957,44 @@ private fun AddExpenseScreen(
                     )
                 }
                 item {
-                    Button(
-                        onClick = {
-                            val scanPicker = onPickCameraPhoto ?: onPickPhoto
-                            isScanning = true
-                            scanPicker.invoke("expense", expenseHandlePicked)
-                        },
-                        enabled = !isScanning,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isScanning) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text("กำลังสแกน...")
-                        } else {
-                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("สแกนบิล/ใบเสร็จด้วย AI")
+                    var showScanSourceMenu by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                if (onPickCameraPhoto != null) {
+                                    showScanSourceMenu = true
+                                } else {
+                                    isScanning = true
+                                    onPickPhoto("expense", expenseHandlePicked)
+                                }
+                            },
+                            enabled = !isScanning,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (isScanning) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("กำลังสแกน...")
+                            } else {
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("สแกนบิล/ใบเสร็จด้วย AI")
+                            }
+                        }
+                        if (onPickCameraPhoto != null) {
+                            DropdownMenu(
+                                expanded = showScanSourceMenu,
+                                onDismissRequest = { showScanSourceMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("ถ่ายรูป") },
+                                    onClick = { showScanSourceMenu = false; isScanning = true; onPickCameraPhoto("expense", expenseHandlePicked) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("เลือกจากแกลอรี่") },
+                                    onClick = { showScanSourceMenu = false; isScanning = true; onPickPhoto("expense", expenseHandlePicked) },
+                                )
+                            }
                         }
                     }
                 }
@@ -4041,13 +4111,20 @@ private fun AddMaintenanceDialog(
 private fun AddTripDialog(
     saving: Boolean,
     editing: Trip? = null,
+    prefillDistanceKm: Double? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, Double, Double, Double, Double, Double, Double, () -> Unit) -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
-    var distance by remember { mutableStateOf(editing?.distanceKm?.let { "%.0f".format(Locale.US, it) } ?: "") }
+    var distance by remember {
+        mutableStateOf(
+            editing?.distanceKm?.let { "%.0f".format(Locale.US, it) }
+                ?: prefillDistanceKm?.let { "%.2f".format(Locale.US, it) }
+                ?: "",
+        )
+    }
     var fuel by remember { mutableStateOf(editing?.fuelCost?.let { "%.2f".format(Locale.US, it) } ?: "") }
     var toll by remember { mutableStateOf(editing?.tollCost?.let { "%.2f".format(Locale.US, it) } ?: "") }
     var parking by remember { mutableStateOf(editing?.parkingCost?.let { "%.2f".format(Locale.US, it) } ?: "") }

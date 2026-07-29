@@ -2,6 +2,7 @@ package com.songsit.fuellogpro
 
 import android.os.Bundle
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -222,7 +223,11 @@ class MainActivity : ComponentActivity() {
         val onPicked = pendingPhotoResult
         val type = pendingPhotoType
         pendingPhotoResult = null
-        if (uris.isEmpty() || onPicked == null) return@registerForActivityResult
+        if (onPicked == null) return@registerForActivityResult
+        // Still call back on an empty pick (user backed out of the chooser) — the caller sets a
+        // "scanning..." flag before launching and only clears it in this callback, so skipping
+        // it here left the button spinning forever with nothing to show for it.
+        if (uris.isEmpty()) { onPicked(emptyList(), null); return@registerForActivityResult }
         lifecycleScope.launch {
             runCatching {
                 val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
@@ -259,7 +264,10 @@ class MainActivity : ComponentActivity() {
         val destFile = pendingCameraFile
         pendingCameraResult = null
         pendingCameraFile = null
-        if (!success || onCaptured == null || destFile == null) return@registerForActivityResult
+        if (onCaptured == null) return@registerForActivityResult
+        // Same reasoning as pickPhoto above: call back even on cancel so the "scanning..."
+        // flag the caller set before launching the camera always gets cleared.
+        if (!success || destFile == null) { onCaptured(emptyList(), null); return@registerForActivityResult }
         lifecycleScope.launch {
             val scanResult = scanFirstPhoto(destFile.absolutePath, type)
             onCaptured(listOf(destFile.absolutePath), scanResult)
@@ -279,6 +287,7 @@ class MainActivity : ComponentActivity() {
     // on open, both needing location permission — this flag stops the second request from calling
     // launch() on the shared registerForActivityResult launcher while the first is still pending.
     private var locationPermissionRequestInFlight = false
+    private var pendingTripRecordingStart = false
     private val locationPermission = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
@@ -287,6 +296,7 @@ class MainActivity : ComponentActivity() {
         if (hasLocation) {
             if (pendingNearbyResult != null) performNearbyStationLookup()
             if (pendingWeatherResult != null) performWeatherFetch()
+            if (pendingTripRecordingStart) { pendingTripRecordingStart = false; startTripRecordingService() }
         } else {
             pendingNearbyResult = null
             pendingNearbyError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้ฉัน")
@@ -294,7 +304,17 @@ class MainActivity : ComponentActivity() {
             pendingWeatherResult = null
             pendingWeatherError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อดึงสภาพอากาศ")
             pendingWeatherError = null
+            if (pendingTripRecordingStart) {
+                pendingTripRecordingStart = false
+                Toast.makeText(this, "กรุณาอนุญาตตำแหน่งเพื่อบันทึกการเดินทาง", Toast.LENGTH_LONG).show()
+            }
         }
+    }
+
+    private fun startTripRecordingService() {
+        val intent = Intent(this, com.songsit.fuellogpro.trip.TripRecordingService::class.java)
+            .setAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_START)
+        androidx.core.content.ContextCompat.startForegroundService(this, intent)
     }
     private val createBackup = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -563,6 +583,17 @@ class MainActivity : ComponentActivity() {
                     if (hasPermission) {
                         performWeatherFetch()
                     } else if (!locationPermissionRequestInFlight) {
+                        locationPermissionRequestInFlight = true
+                        locationPermission.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        )
+                    }
+                },
+                onStartTripRecording = {
+                    if (hasLocationPermission()) {
+                        startTripRecordingService()
+                    } else if (!locationPermissionRequestInFlight) {
+                        pendingTripRecordingStart = true
                         locationPermissionRequestInFlight = true
                         locationPermission.launch(
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),

@@ -133,7 +133,6 @@ import com.songsit.fuellogpro.notifications.ReminderSettings
 import com.songsit.fuellogpro.ui.stats.StatsScreen
 import com.songsit.fuellogpro.ui.timeline.TimelineScreen
 import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
-import com.songsit.fuellogpro.ui.timeline.RefuelDetailScreen
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -287,7 +286,6 @@ fun FuelLogApp(
     var showAddMaintenance by remember { mutableStateOf(false) }
     var showAddTrip by remember { mutableStateOf(false) }
     var editingFuel by remember { mutableStateOf<FuelEntry?>(null) }
-    var viewingFuelDetail by remember { mutableStateOf<FuelEntry?>(null) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var editingMaintenance by remember { mutableStateOf<MaintenanceTask?>(null) }
     var editingTrip by remember { mutableStateOf<Trip?>(null) }
@@ -312,14 +310,13 @@ fun FuelLogApp(
         !showSettings && !showAddVehicle && !showAddExpense && !showAddFuel &&
         !showAddMaintenance && !showAddTrip &&
         editingVehicle == null && editingExpense == null && editingFuel == null &&
-        editingMaintenance == null && editingTrip == null && viewingFuelDetail == null
+        editingMaintenance == null && editingTrip == null
     BackHandler(enabled = !atRoot) {
         when {
             showSettings -> showSettings = false
             showAddVehicle || editingVehicle != null -> { showAddVehicle = false; editingVehicle = null }
             showAddExpense || editingExpense != null -> { showAddExpense = false; editingExpense = null }
             showAddFuel || editingFuel != null -> { showAddFuel = false; editingFuel = null }
-            viewingFuelDetail != null -> viewingFuelDetail = null
             showAddMaintenance || editingMaintenance != null -> { showAddMaintenance = false; editingMaintenance = null }
             showAddTrip || editingTrip != null -> { showAddTrip = false; editingTrip = null }
             tab != 0 -> { tab = 0; homeTab = 0 }
@@ -577,7 +574,7 @@ fun FuelLogApp(
                         state,
                         Modifier.padding(padding),
                         onImageClick = { viewingImagePath = it },
-                        onFuelRecordClick = { viewingFuelDetail = it },
+                        onFuelRecordClick = { tab = 1 },
                     )
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
                     else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
@@ -626,14 +623,6 @@ fun FuelLogApp(
                 onDismiss = { showAddFuel = false; editingFuel = null },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
-            )
-        }
-        viewingFuelDetail?.let { entry ->
-            RefuelDetailScreen(
-                entry = entry,
-                onDismiss = { viewingFuelDetail = null },
-                onEdit = { editingFuel = it },
-                onImageClick = { viewingImagePath = it },
             )
         }
         if (showAddMaintenance || editingMaintenance != null) {

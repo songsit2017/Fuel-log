@@ -117,9 +117,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -177,52 +175,6 @@ private fun getFuelTypeOptionsForVehicle(vehicleFuelType: String): List<String> 
 private val thaiCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val number = NumberFormat.getNumberInstance(Locale("th", "TH")).apply {
     maximumFractionDigits = 2
-}
-
-@Composable
-private fun AutocompleteTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    options: List<String>,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    onFocus: (() -> Unit)? = null,
-    optionLabels: Map<String, String>? = null,
-) {
-    var fieldWidthPx by remember { mutableStateOf(0) }
-    val density = LocalDensity.current
-    Box(modifier = modifier) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {
-                onValueChange(it)
-                onExpandedChange(true)
-            },
-            label = { Text(label) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onGloballyPositioned { fieldWidthPx = it.size.width }
-                .onFocusChanged { if (it.isFocused) onFocus?.invoke() },
-        )
-        DropdownMenu(
-            expanded = expanded && options.isNotEmpty(),
-            onDismissRequest = { onExpandedChange(false) },
-            modifier = Modifier.width(with(density) { fieldWidthPx.toDp() }),
-        ) {
-            options.take(20).forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(optionLabels?.get(option) ?: option) },
-                    onClick = {
-                        onValueChange(option)
-                        onExpandedChange(false)
-                    },
-                )
-            }
-        }
-    }
 }
 
 // Keeps an icon and its field(s) locked to one line across the "add fuel" form — each
@@ -735,7 +687,6 @@ fun FuelLogApp(
                 saving = state.saving,
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingMaintenance,
-                categorySuggestions = state.maintenanceCategorySuggestions,
                 onDismiss = { showAddMaintenance = false; editingMaintenance = null },
                 onSave = onAddMaintenance,
                 onUpdate = onUpdateMaintenance,
@@ -770,6 +721,8 @@ fun FuelLogApp(
 
 private val calculatorModes = listOf("ค่าใช้จ่ายในการเดินทาง", "ระยะทาง", "อัตราการใช้งาน", "ปริมาณน้ำมันที่ต้องใช้")
 private val distanceQuickPicks = listOf(10, 30, 100, 200, 300, 400, 500, 700, 1000, 1200)
+private val maintenanceCategoryOptions =
+    listOf("เช็คระยะ", "เปลี่ยนถ่ายน้ำมันเครื่อง", "ประกันภัย/พ.ร.บ.", "ภาษี", "บำรุงรักษา", "อื่นๆ")
 
 @Composable
 private fun QuickPickField(
@@ -4145,7 +4098,6 @@ private fun AddMaintenanceDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: MaintenanceTask? = null,
-    categorySuggestions: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit)? = null,
@@ -4164,7 +4116,7 @@ private fun AddMaintenanceDialog(
     var repeatMonths by remember { mutableStateOf(editing?.repeatMonths?.toString() ?: "12") }
     var repeatOdometer by remember { mutableStateOf(editing?.repeatOdometerKm?.let { "%.0f".format(Locale.US, it) } ?: "10000") }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
-    val categoryOptions = categorySuggestions.filter { category.isBlank() || it.contains(category, ignoreCase = true) }
+    val selectedCategory = if (category in maintenanceCategoryOptions) category else "อื่นๆ"
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editing != null) "แก้ไขรายการดูแลรถ" else "เพิ่มรายการดูแลรถ") },
@@ -4172,15 +4124,39 @@ private fun AddMaintenanceDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { OutlinedTextField(name, { name = it }, label = { Text("รายการ") }, singleLine = true) }
                 item {
-                    AutocompleteTextField(
-                        value = category,
-                        onValueChange = { category = it },
-                        label = "ประเภท",
-                        options = categoryOptions,
-                        expanded = categoryMenuExpanded,
-                        onExpandedChange = { categoryMenuExpanded = it },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    Box(Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = selectedCategory,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("ประเภท") },
+                            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Box(Modifier.matchParentSize().clickable { categoryMenuExpanded = true })
+                        DropdownMenu(expanded = categoryMenuExpanded, onDismissRequest = { categoryMenuExpanded = false }) {
+                            maintenanceCategoryOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        categoryMenuExpanded = false
+                                        category = if (option == "อื่นๆ") "" else option
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                if (selectedCategory == "อื่นๆ") {
+                    item {
+                        OutlinedTextField(
+                            value = category,
+                            onValueChange = { category = it },
+                            label = { Text("ระบุประเภท") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
                 item { OutlinedTextField(nextDate, { nextDate = it }, label = { Text("กำหนดวันที่ (ไม่บังคับ)") }, singleLine = true) }
                 item { OutlinedTextField(nextOdometer, { nextOdometer = it }, label = { Text("กำหนดเลขไมล์ (ไม่บังคับ)") }, singleLine = true) }

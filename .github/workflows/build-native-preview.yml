@@ -109,13 +109,9 @@ jobs:
       actions: write
     steps:
       - name: Keep only latest 3 runs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow "${{ github.workflow }}" \
-            --limit 100 \
-            --json databaseId \
-            --jq '.[3:][].databaseId' | \
-          xargs -r -I {} gh run delete {} --repo "$GITHUB_REPOSITORY"
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 3

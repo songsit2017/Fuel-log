@@ -90,6 +90,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -300,6 +303,7 @@ fun FuelLogApp(
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
+    var addFuelAutoScan by remember { mutableStateOf(false) }
     var showAddVehicle by remember { mutableStateOf(false) }
     var showAddExpense by remember { mutableStateOf(false) }
     var showAddMaintenance by remember { mutableStateOf(false) }
@@ -610,6 +614,32 @@ fun FuelLogApp(
                                 leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
                                 onClick = { dashboardFabExpanded = false; showAddExpense = true },
                             )
+                            DropdownMenuItem(
+                                text = { Text("สแกนใบเสร็จ") },
+                                leadingIcon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
+                                onClick = {
+                                    dashboardFabExpanded = false
+                                    addFuelAutoScan = true
+                                    showAddFuel = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("เพิ่มงานบำรุงรักษา") },
+                                leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) },
+                                onClick = {
+                                    dashboardFabExpanded = false
+                                    if (state.vehicles.isEmpty()) showAddVehicle = true else showAddMaintenance = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("บันทึกการเดินทาง") },
+                                leadingIcon = { Icon(Icons.Filled.Route, contentDescription = null) },
+                                onClick = {
+                                    dashboardFabExpanded = false
+                                    onStartTripRecording?.invoke()
+                                    tab = 6
+                                },
+                            )
                         }
                     }
                     1 -> FloatingActionButton(
@@ -638,7 +668,7 @@ fun FuelLogApp(
                         onFuelRecordClick = { fuelListReturnHomeTab = homeTab; tab = 1 },
                     )
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
-                    else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))
+                    else -> NearbyStationsMapScreen(onFindNearbyStations, oilPriceInfo, Modifier.padding(padding))
                 }
                 1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
                 2 -> ExpenseList(
@@ -694,7 +724,8 @@ fun FuelLogApp(
                 onFetchWeather = onFetchWeather,
                 onPickPhoto = onPickPhoto,
                 onPickCameraPhoto = onPickCameraPhoto,
-                onDismiss = { showAddFuel = false; editingFuel = null },
+                autoOpenScan = addFuelAutoScan,
+                onDismiss = { showAddFuel = false; editingFuel = null; addFuelAutoScan = false },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
             )
@@ -887,14 +918,30 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
     }
 }
 
+private fun matchOilPrice(brand: StationBrand, oilPriceInfo: OilPriceInfo?): Double? {
+    val label = when (brand) {
+        StationBrand.PTT -> "ปตท."
+        StationBrand.SHELL -> "เชลล์"
+        StationBrand.PT -> "พีที"
+        StationBrand.CALTEX -> "คาลเท็กซ์"
+        StationBrand.BANGCHAK -> return null
+    }
+    val prices = oilPriceInfo?.brands?.firstOrNull { it.brand == label } ?: return null
+    return prices.gasohol95 ?: prices.dieselB7 ?: prices.gasohol91 ?: prices.e20
+        ?: prices.premium95 ?: prices.e85 ?: prices.dieselB20
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NearbyStationsMapScreen(
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    oilPriceInfo: OilPriceInfo?,
     modifier: Modifier = Modifier,
 ) {
     var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showList by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         searching = true
         onFindNearbyStations?.invoke(
@@ -911,50 +958,107 @@ private fun NearbyStationsMapScreen(
             )
         }
     }
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         com.google.maps.android.compose.GoogleMap(
-            modifier = Modifier.fillMaxWidth().height(280.dp),
+            modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = com.google.maps.android.compose.MapProperties(isMyLocationEnabled = true),
             uiSettings = com.google.maps.android.compose.MapUiSettings(myLocationButtonEnabled = true),
         ) {
             stations.forEach { station ->
-                com.google.maps.android.compose.Marker(
+                val brand = remember(station.name) { detectStationBrand(station.name) }
+                val price = remember(station.name, oilPriceInfo) {
+                    brand?.let { matchOilPrice(it, oilPriceInfo) }
+                }
+                com.google.maps.android.compose.MarkerComposable(
                     state = com.google.maps.android.compose.rememberMarkerState(
                         position = com.google.android.gms.maps.model.LatLng(station.lat, station.lon),
                     ),
                     title = station.name,
-                )
-            }
-        }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-        item {
-            SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
-        }
-        if (searching) {
-            item { Text("กำลังค้นหา...") }
-        } else if (error != null) {
-            item { Text(error ?: "") }
-        } else if (stations.isEmpty()) {
-            item { Text("ไม่พบปั๊มใกล้ฉัน") }
-        } else {
-            items(stations) { station ->
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(station.name, fontWeight = FontWeight.SemiBold)
-                        Text("${(station.distanceMeters / 1000).let { "%.1f".format(it) }} km")
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (price != null) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.primary,
+                                shadowElevation = 3.dp,
+                            ) {
+                                Text(
+                                    text = "฿" + "%.2f".format(Locale.US, price),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                        StationBadge(stationName = station.name, size = 36.dp)
                     }
                 }
             }
         }
+
+        if (searching) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                shape = RoundedCornerShape(50),
+                shadowElevation = 4.dp,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("กำลังค้นหาปั๊มใกล้เคียง...", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        } else if (error != null) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                shadowElevation = 4.dp,
+            ) {
+                Text(error ?: "", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp))
+            }
+        }
+
+        ExtendedFloatingActionButton(
+            onClick = { showList = true },
+            icon = { Icon(Icons.Filled.ListAlt, contentDescription = null) },
+            text = { Text("ปั๊มใกล้เคียง (${stations.size})") },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+        )
+    }
+
+    if (showList) {
+        ModalBottomSheet(onDismissRequest = { showList = false }) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item {
+                    SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
+                }
+                if (stations.isEmpty()) {
+                    item { Text("ไม่พบปั๊มใกล้ฉัน") }
+                } else {
+                    items(stations) { station ->
+                        Card(shape = RoundedCornerShape(16.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(station.name, fontWeight = FontWeight.SemiBold)
+                                Text("${(station.distanceMeters / 1000).let { "%.1f".format(it) }} km")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -3029,6 +3133,7 @@ private fun AddFuelScreen(
     onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    autoOpenScan: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdate: ((String, FuelEntryFormValues, () -> Unit) -> Unit)? = null,
@@ -3118,6 +3223,12 @@ private fun AddFuelScreen(
             scanResult?.amount?.takeIf { total.isBlank() }?.let { total = "%.2f".format(Locale.US, it); onTotalCommit() }
         }
         if (scanResult?.odometer != null) odometer = "%.0f".format(Locale.US, scanResult.odometer)
+    }
+    LaunchedEffect(Unit) {
+        if (autoOpenScan && onPickCameraPhoto != null) {
+            isScanningReceipt = true
+            onPickCameraPhoto("fuel", handlePicked)
+        }
     }
     var odometerIsTripMeter by remember { mutableStateOf(editing?.odometerIsTripMeter ?: false) }
     var tankLevelEnabled by remember { mutableStateOf(editing?.tankLevelEnabled ?: false) }

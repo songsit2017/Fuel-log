@@ -2685,6 +2685,8 @@ private fun VehicleEditScreen(
     onSave: (VehicleFormValues, () -> Unit) -> Unit,
     onUpdate: (String, VehicleFormValues, () -> Unit) -> Unit,
 ) {
+    var showMakeSelection by remember { mutableStateOf(false) }
+
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var brand by remember { mutableStateOf(editing?.brand ?: "") }
     var model by remember { mutableStateOf(editing?.model ?: "") }
@@ -2701,6 +2703,14 @@ private fun VehicleEditScreen(
     var insurance by remember { mutableStateOf(editing?.insurance ?: "") }
     var isActive by remember { mutableStateOf(editing?.isActive ?: true) }
     var photoSourceMenuExpanded by remember { mutableStateOf(false) }
+
+    if (showMakeSelection) {
+        VehicleMakeSelectionScreen(
+            onDismiss = { showMakeSelection = false },
+            onMakeSelected = { brand = it }
+        )
+        return
+    }
 
     fun handleSave() {
         val values = VehicleFormValues(
@@ -2796,7 +2806,14 @@ private fun VehicleEditScreen(
             item { Text("ข้อมูลรถ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(brand, { brand = it }, label = { Text("แบรนด์รถ") }, singleLine = true, modifier = Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(brand, { brand = it }, label = { Text("แบรนด์รถ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showMakeSelection = true }
+                        )
+                    }
                     OutlinedTextField(model, { model = it }, label = { Text("รุ่นรถ") }, singleLine = true, modifier = Modifier.weight(1f))
                 }
             }

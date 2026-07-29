@@ -506,6 +506,15 @@ fun FuelLogApp(
                                         modifier = Modifier.clickable { showVehicleMenu = true },
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
+                                        if (!state.selectedVehicle?.brandLogoUrl.isNullOrBlank()) {
+                                            SubcomposeAsyncImage(
+                                                model = state.selectedVehicle?.brandLogoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                        }
                                         Text(
                                             state.selectedVehicle?.name ?: "เลือกรถ",
                                             style = MaterialTheme.typography.labelSmall,
@@ -519,6 +528,16 @@ fun FuelLogApp(
                                         state.vehicles.forEach { vehicle ->
                                             DropdownMenuItem(
                                                 text = { Text(vehicle.name) },
+                                                leadingIcon = if (!vehicle.brandLogoUrl.isNullOrBlank()) {
+                                                    {
+                                                        SubcomposeAsyncImage(
+                                                            model = vehicle.brandLogoUrl,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(24.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                                                            contentScale = ContentScale.Fit
+                                                        )
+                                                    }
+                                                } else null,
                                                 onClick = {
                                                     onSelectVehicle(vehicle.id)
                                                     showVehicleMenu = false
@@ -529,7 +548,18 @@ fun FuelLogApp(
                                 }
                             } else {
                                 state.selectedVehicle?.let {
-                                    Text(it.name, style = MaterialTheme.typography.labelSmall)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (!it.brandLogoUrl.isNullOrBlank()) {
+                                            SubcomposeAsyncImage(
+                                                model = it.brandLogoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                        }
+                                        Text(it.name, style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
                             }
                         }
@@ -1781,6 +1811,20 @@ private fun VehiclesListScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
                         )
+                    } else if (!vehicle.brandLogoUrl.isNullOrBlank()) {
+                        Box(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = vehicle.brandLogoUrl,
+                                contentDescription = vehicle.brand,
+                                modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White).padding(12.dp),
+                                contentScale = ContentScale.Fit,
+                                loading = { Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                error = { Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            )
+                        }
                     } else {
                         Box(
                             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -2714,6 +2758,7 @@ private fun VehicleEditScreen(
 
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var brand by remember { mutableStateOf(editing?.brand ?: "") }
+    var brandLogoUrl by remember { mutableStateOf(editing?.brandLogoUrl) }
     var model by remember { mutableStateOf(editing?.model ?: "") }
     var modelYear by remember { mutableStateOf(editing?.modelYear?.toString() ?: "") }
     var registration by remember { mutableStateOf(editing?.registration ?: "") }
@@ -2732,7 +2777,10 @@ private fun VehicleEditScreen(
     if (showMakeSelection) {
         VehicleMakeSelectionScreen(
             onDismiss = { showMakeSelection = false },
-            onMakeSelected = { brand = it }
+            onMakeSelected = { selectedMake -> 
+                brand = selectedMake
+                brandLogoUrl = "https://www.carlogos.org/logo/${selectedMake.replace(" ", "-")}-logo.png"
+            }
         )
         return
     }
@@ -2743,6 +2791,7 @@ private fun VehicleEditScreen(
             brand = brand,
             model = model,
             modelYear = modelYear.toIntOrNull(),
+            brandLogoUrl = brandLogoUrl,
             registration = registration,
             fuelType = fuelType,
             imageUri = imageUri,
@@ -2787,6 +2836,20 @@ private fun VehicleEditScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
                         )
+                    } else if (!brandLogoUrl.isNullOrBlank()) {
+                        Box(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = brandLogoUrl,
+                                contentDescription = brand,
+                                modifier = Modifier.size(100.dp).clip(CircleShape).background(Color.White).padding(16.dp),
+                                contentScale = ContentScale.Fit,
+                                loading = { Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(72.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                error = { Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(72.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            )
+                        }
                     } else {
                         Box(
                             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -2832,7 +2895,23 @@ private fun VehicleEditScreen(
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(brand, { brand = it }, label = { Text("แบรนด์รถ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(
+                            value = brand, 
+                            onValueChange = { brand = it }, 
+                            label = { Text("แบรนด์รถ") }, 
+                            singleLine = true, 
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = if (!brandLogoUrl.isNullOrBlank()) {
+                                {
+                                    SubcomposeAsyncImage(
+                                        model = brandLogoUrl,
+                                        contentDescription = brand,
+                                        modifier = Modifier.size(24.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                            } else null
+                        )
                         Box(
                             modifier = Modifier
                                 .matchParentSize()

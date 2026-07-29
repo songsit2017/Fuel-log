@@ -22,4 +22,5 @@ data class VehicleEntity(
     val brand: String = "",
     val model: String = "",
     val modelYear: Int? = null,
+    val brandLogoUrl: String? = null,
 )

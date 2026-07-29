@@ -17,6 +17,7 @@ data class Vehicle(
     val brand: String = "",
     val model: String = "",
     val modelYear: Int? = null,
+    val brandLogoUrl: String? = null,
 )
 
 // Bundles the vehicle form's editable fields into one value so add/update calls don't need
@@ -37,4 +38,5 @@ data class VehicleFormValues(
     val brand: String = "",
     val model: String = "",
     val modelYear: Int? = null,
+    val brandLogoUrl: String? = null,
 )

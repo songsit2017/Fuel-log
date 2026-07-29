@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncConflictEntity::class,
         DeletionTombstoneEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -209,6 +209,12 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
+        private val migration12To13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN brandLogoUrl TEXT")
+            }
+        }
+
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -227,6 +233,7 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration9To10,
                     migration10To11,
                     migration11To12,
+                    migration12To13,
                 )
                     .build()
                     .also { instance = it }

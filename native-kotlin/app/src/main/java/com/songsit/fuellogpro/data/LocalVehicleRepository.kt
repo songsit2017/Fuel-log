@@ -57,6 +57,7 @@ private fun VehicleFormValues.toEntity(id: String, createdAt: Long) = VehicleEnt
     brand = brand.trim(),
     model = model.trim(),
     modelYear = modelYear,
+    brandLogoUrl = brandLogoUrl,
 )
 
 private fun VehicleEntity.toDomain() = Vehicle(
@@ -76,4 +77,5 @@ private fun VehicleEntity.toDomain() = Vehicle(
     brand = brand,
     model = model,
     modelYear = modelYear,
+    brandLogoUrl = brandLogoUrl,
 )

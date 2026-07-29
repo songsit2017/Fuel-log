@@ -1107,13 +1107,16 @@ private fun Dashboard(
         item {
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
             ) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("อัตราสิ้นเปลืองเฉลี่ย", color = MaterialTheme.colorScheme.onPrimary)
+                    Text("อัตราสิ้นเปลืองเฉลี่ย", color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text(
                         state.summary.averageKmPerLiter?.let { formatEconomyKmPerLiter(it, displaySettings) } ?: "—",
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -1139,7 +1142,10 @@ private fun Dashboard(
         }
         item {
             val operatingCost = state.summary.totalSpent + state.totalExpenses + state.tripSummary.totalCost
-            Card(shape = RoundedCornerShape(20.dp)) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            ) {
                 Column(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1411,7 +1417,11 @@ private fun SectionHeader(icon: ImageVector, title: String) {
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    Card(modifier, shape = RoundedCornerShape(18.dp)) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
         Column(Modifier.padding(16.dp)) {
             if (icon != null) {
                 IconBadge(icon, size = 26.dp)

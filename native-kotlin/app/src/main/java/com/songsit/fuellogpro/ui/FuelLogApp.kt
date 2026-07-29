@@ -1449,6 +1449,16 @@ private fun ExpenseRow(
                 if (notes.isNotEmpty()) {
                     Text(notes.joinToString(" • "), style = MaterialTheme.typography.labelSmall)
                 }
+                
+                val photoCount = (if (expense.photoUri != null) 1 else 0) + expense.photoUrls.size
+                if (photoCount > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(4.dp))
+                        Text("รูปภาพ: $photoCount", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -3544,13 +3554,15 @@ private fun PhotoAttachmentRow(
     onRemove: (String) -> Unit,
     onPickCamera: (() -> Unit)? = null,
 ) {
+    var fullScreenImageUri by remember { mutableStateOf<String?>(null) }
+    
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         photoUris.forEach { uri ->
             Box(contentAlignment = Alignment.TopEnd) {
                 Card(
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.size(64.dp),
+                    modifier = Modifier.size(64.dp).clickable { fullScreenImageUri = uri },
                 ) {
                     AsyncImage(
                         model = if (uri.startsWith("/")) java.io.File(uri) else uri,
@@ -3597,6 +3609,28 @@ private fun PhotoAttachmentRow(
                             onClick = { showSourceMenu = false; onPickGallery() },
                         )
                     }
+                }
+            }
+        }
+    }
+
+    if (fullScreenImageUri != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { fullScreenImageUri = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                AsyncImage(
+                    model = if (fullScreenImageUri!!.startsWith("/")) java.io.File(fullScreenImageUri!!) else fullScreenImageUri,
+                    contentDescription = "รูปขยาย",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+                IconButton(
+                    onClick = { fullScreenImageUri = null },
+                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp).padding(top = 24.dp)
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
                 }
             }
         }

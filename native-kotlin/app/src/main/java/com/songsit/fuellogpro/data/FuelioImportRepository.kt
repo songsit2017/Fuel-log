@@ -188,36 +188,8 @@ class FuelioImportRepository(
     // stream — safe because a nested ZipInputStream naturally stops at its entry's data
     // boundary — with close() on that inner wrapper intercepted so it doesn't take down the
     // outer stream before pass 1 finishes walking the rest of the top-level entries.
-    private fun extractPictures(source: InputStream, onBytesRead: (Int) -> Unit): Map<String, String> {
-        val imageMap = mutableMapOf<String, String>()
-        val photosDir = File(context.filesDir, "fuelio_images").apply { mkdirs() }
-        CountingInputStream(source, onBytesRead).use { counting ->
-            ZipInputStream(counting).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    val baseName = entry.name.substringAfterLast('/').substringAfterLast('\\')
-                    if (!entry.isDirectory && baseName.equals("pictures.data", ignoreCase = true)) {
-                        ZipInputStream(NonClosingInputStream(zip)).use { inner ->
-                            var innerEntry = inner.nextEntry
-                            while (innerEntry != null) {
-                                if (!innerEntry.isDirectory) {
-                                    val innerBase = innerEntry.name.substringAfterLast('/').substringAfterLast('\\').lowercase()
-                                    val destFile = File(photosDir, "${UUID.randomUUID()}.jpg")
-                                    destFile.outputStream().use { output -> inner.copyTo(output) }
-                                    imageMap[innerBase] = destFile.absolutePath
-                                }
-                                inner.closeEntry()
-                                innerEntry = inner.nextEntry
-                            }
-                        }
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-        }
-        return imageMap
-    }
+    private fun extractPictures(source: InputStream, onBytesRead: (Int) -> Unit): Map<String, String> =
+        extractPicturesToDir(source, File(context.filesDir, "fuelio_images"), onBytesRead)
 
     private suspend fun mergeFuelRows(
         vehicleId: String,
@@ -315,6 +287,44 @@ class FuelioImportRepository(
         }
         return PhotoUris.join(savedPaths) ?: existingPhotoUri
     }
+}
+
+// Streams the backup once, looking only for the nested pictures.data entry (itself a zip).
+// Its contents are read via a second ZipInputStream wrapped around the *outer* stream — safe
+// because a nested ZipInputStream naturally stops at its entry's data boundary — with close()
+// on that inner wrapper intercepted so it doesn't take down the outer stream before pass 1
+// finishes walking the rest of the top-level entries. Pulled out of FuelioImportRepository
+// (which otherwise needs an Android Context just for filesDir) so it's directly unit-testable
+// against a real nested zip-in-zip fixture.
+internal fun extractPicturesToDir(source: InputStream, photosDir: File, onBytesRead: (Int) -> Unit = {}): Map<String, String> {
+    val imageMap = mutableMapOf<String, String>()
+    photosDir.mkdirs()
+    CountingInputStream(source, onBytesRead).use { counting ->
+        ZipInputStream(counting).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                val baseName = entry.name.substringAfterLast('/').substringAfterLast('\\')
+                if (!entry.isDirectory && baseName.equals("pictures.data", ignoreCase = true)) {
+                    ZipInputStream(NonClosingInputStream(zip)).use { inner ->
+                        var innerEntry = inner.nextEntry
+                        while (innerEntry != null) {
+                            if (!innerEntry.isDirectory) {
+                                val innerBase = innerEntry.name.substringAfterLast('/').substringAfterLast('\\').lowercase()
+                                val destFile = File(photosDir, "${UUID.randomUUID()}.jpg")
+                                destFile.outputStream().use { output -> inner.copyTo(output) }
+                                imageMap[innerBase] = destFile.absolutePath
+                            }
+                            inner.closeEntry()
+                            innerEntry = inner.nextEntry
+                        }
+                    }
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+    }
+    return imageMap
 }
 
 // Tracks cumulative bytes read from the delegate stream, reporting each chunk so the

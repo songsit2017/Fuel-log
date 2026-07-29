@@ -3,6 +3,12 @@ package com.songsit.fuellogpro.data
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Regression coverage for parseFuelioCsv() against real Fuelio export quirks that broke
@@ -132,6 +138,48 @@ class FuelioImportRepositoryTest {
 
         val resolved = combinedPictureMap["2:${costRow.uniqueId}"] ?: combinedPictureMap[costRow.uniqueId]
         assertEquals(listOf("JPEG_20250607_005106_3533775571852396777.jpg"), resolved)
+    }
+
+    @Test
+    fun `extractPicturesToDir finds a target file nested deep inside a realistic many-entry pictures data zip`() {
+        // Reproduces a report where a photo confirmed present (by hand) in a real 100MB+
+        // .fuelio export's pictures.data never showed up in the app after import, even though
+        // the earlier tests above prove the csv-parsing/photo-linking logic finds the right
+        // filename for the right record. This builds a structurally equivalent fixture — an
+        // outer zip containing a nested pictures.data zip with many entries — to check
+        // extractPicturesToDir() (the actual zip-in-zip byte extraction) in isolation.
+        val targetName = "JPEG_20250607_005106_3533775571852396777.jpg"
+        val innerBytes = ByteArrayOutputStream().use { innerBuf ->
+            ZipOutputStream(innerBuf).use { innerZip ->
+                repeat(60) { i ->
+                    innerZip.putNextEntry(ZipEntry("JPEG_filler_$i.jpg"))
+                    innerZip.write(ByteArray(500) { it.toByte() })
+                    innerZip.closeEntry()
+                }
+                innerZip.putNextEntry(ZipEntry(targetName))
+                innerZip.write("real-photo-bytes".toByteArray(Charsets.UTF_8))
+                innerZip.closeEntry()
+            }
+            innerBuf.toByteArray()
+        }
+        val outerBytes = ByteArrayOutputStream().use { outerBuf ->
+            ZipOutputStream(outerBuf).use { outerZip ->
+                outerZip.putNextEntry(ZipEntry("vehicle1local.csv"))
+                outerZip.write("\"## Vehicle\"\n".toByteArray(Charsets.UTF_8))
+                outerZip.closeEntry()
+                outerZip.putNextEntry(ZipEntry("pictures.data"))
+                outerZip.write(innerBytes)
+                outerZip.closeEntry()
+            }
+            outerBuf.toByteArray()
+        }
+
+        val photosDir = Files.createTempDirectory("fuelio-test-photos").toFile()
+        val imageMap = extractPicturesToDir(ByteArrayInputStream(outerBytes), photosDir)
+
+        assertTrue(targetName.lowercase() in imageMap)
+        val savedPath = imageMap.getValue(targetName.lowercase())
+        assertEquals("real-photo-bytes", File(savedPath).readText(Charsets.UTF_8))
     }
 
     private fun readFuelioFixture(name: String): String =

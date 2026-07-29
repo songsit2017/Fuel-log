@@ -396,6 +396,7 @@ fun FuelLogApp(
         SettingsScreen(
             onDismiss = { showSettings = false },
             onExportBackup = onExportBackup,
+            onExportCsv = onExportCsv,
             onImportBackup = onImportBackup,
             cloudState = cloudState,
             onGoogleSignIn = onGoogleSignIn,
@@ -1015,9 +1016,6 @@ private fun Dashboard(
                             Modifier.weight(1f),
                             Icons.Filled.ListAlt,
                         )
-                    }
-                    Button(onClick = onExportCsv, modifier = Modifier.fillMaxWidth()) {
-                        Text("ส่งออกรายงาน CSV")
                     }
                 }
             }
@@ -1889,6 +1887,7 @@ private fun PreferenceListItem(
 private fun SettingsScreen(
     onDismiss: () -> Unit,
     onExportBackup: () -> Unit,
+    onExportCsv: () -> Unit,
     onImportBackup: () -> Unit,
     cloudState: CloudUiState,
     onGoogleSignIn: () -> Unit,
@@ -1925,6 +1924,7 @@ private fun SettingsScreen(
         ImportExportScreen(
             onDismiss = { showImportExport = false },
             onExportBackup = onExportBackup,
+            onExportCsv = onExportCsv,
             onImportBackup = onImportBackup,
             cloudState = cloudState,
             onGoogleSignIn = onGoogleSignIn,
@@ -2254,6 +2254,7 @@ private fun SettingsScreen(
 private fun ImportExportScreen(
     onDismiss: () -> Unit,
     onExportBackup: () -> Unit,
+    onExportCsv: () -> Unit,
     onImportBackup: () -> Unit,
     cloudState: CloudUiState,
     onGoogleSignIn: () -> Unit,
@@ -2288,6 +2289,14 @@ private fun ImportExportScreen(
                     subtitle = "ส่งออกข้อมูลรถทั้งหมดเก็บไว้ในเครื่องหรือแชร์ต่อ",
                     leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = onExportBackup,
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "ส่งออกรายงาน CSV",
+                    subtitle = "ส่งออกข้อมูลรายงานเป็นไฟล์ CSV เพื่อนำไปใช้ต่อใน Excel",
+                    leading = { Icon(Icons.Filled.ListAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    onClick = onExportCsv,
                 )
             }
             item {

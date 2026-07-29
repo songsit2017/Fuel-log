@@ -3780,26 +3780,8 @@ private fun PhotoAttachmentRow(
         }
     }
 
-    if (fullScreenImageUri != null) {
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { fullScreenImageUri = null },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                AsyncImage(
-                    model = if (fullScreenImageUri!!.startsWith("/")) java.io.File(fullScreenImageUri!!) else fullScreenImageUri,
-                    contentDescription = "รูปขยาย",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                )
-                IconButton(
-                    onClick = { fullScreenImageUri = null },
-                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp).padding(top = 24.dp)
-                ) {
-                    Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
-                }
-            }
-        }
+    fullScreenImageUri?.let { uri ->
+        FullScreenImageViewer(imagePath = uri, onDismiss = { fullScreenImageUri = null })
     }
 }
 

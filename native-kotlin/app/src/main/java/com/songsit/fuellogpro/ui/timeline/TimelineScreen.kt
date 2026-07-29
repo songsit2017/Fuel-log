@@ -2,6 +2,7 @@ package com.songsit.fuellogpro.ui.timeline
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +54,9 @@ import androidx.compose.ui.layout.ContentScale
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.NativeAppState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.util.Locale
@@ -239,6 +244,7 @@ private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -
 @Composable
 fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AsyncImage(
@@ -251,7 +257,7 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
                 Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
             }
             IconButton(
-                onClick = { shareTimelineImage(context, imagePath) },
+                onClick = { scope.launch { shareTimelineImage(context, imagePath) } },
                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
             ) {
                 Icon(Icons.Filled.Share, contentDescription = "แชร์", tint = Color.White)
@@ -261,24 +267,35 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit) {
 }
 
 // Local photos share as the actual image via FileProvider (same authority the camera capture
-// flow already registers in the manifest). Remote URLs (family-synced entries) share as a link
-// instead of fetching bytes just to attach them.
-private fun shareTimelineImage(context: android.content.Context, imagePath: String) {
-    val intent = if (imagePath.startsWith("/")) {
+// flow already registers in the manifest). Remote URLs are downloaded to a cache file first so
+// every share target still gets a real image attachment instead of a bare link. Wrapped
+// end-to-end in try/catch: a bad/missing file or unreachable URL should show an error toast,
+// not crash the app mid-share.
+private suspend fun shareTimelineImage(context: android.content.Context, imagePath: String) {
+    try {
+        val file = if (imagePath.startsWith("/")) {
+            java.io.File(imagePath)
+        } else {
+            withContext(Dispatchers.IO) {
+                val cacheDir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+                val dest = java.io.File(cacheDir, "${System.currentTimeMillis()}.jpg")
+                java.net.URL(imagePath).openStream().use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                dest
+            }
+        }
         val uri = androidx.core.content.FileProvider.getUriForFile(
-            context, "${context.packageName}.fileprovider", java.io.File(imagePath),
+            context, "${context.packageName}.fileprovider", file,
         )
-        Intent(Intent.ACTION_SEND).apply {
+        val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/jpeg"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-    } else {
-        Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, imagePath)
-        }
+        context.startActivity(Intent.createChooser(intent, "แชร์รูปภาพ"))
+    } catch (e: Exception) {
+        Toast.makeText(context, "แชร์รูปไม่สำเร็จ", Toast.LENGTH_SHORT).show()
     }
-    context.startActivity(Intent.createChooser(intent, "แชร์รูปภาพ"))
 }
 

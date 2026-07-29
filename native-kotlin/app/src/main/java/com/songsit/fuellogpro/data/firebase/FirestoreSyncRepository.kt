@@ -71,6 +71,30 @@ class FirestoreSyncRepository(
                 throw Exception("Sync failed on vehicle doc '$id' (${local.name}): ${e.message}", e)
             }
         }
+        // Keeps the owner's own name/photo fresh in every vehicle they own even when nothing
+        // about the vehicle itself changed (the UPLOAD branch above only fires on content
+        // diffs, so without this an owner's Google photo added after their first sync would
+        // never reach Firestore). Non-owner members can't self-update here — firestore.rules
+        // only allows a vehicle doc update from its owner or a fresh joinByCode, so editors/
+        // viewers only pick up a new photo by rejoining until that's relaxed.
+        for ((id, cloudDoc) in cloudVehicles) {
+            if (cloudDoc.getString("ownerUid") != uid) continue
+            val ownerMember = cloudDoc.get("members.$uid") as? Map<*, *>
+            val upToDate = ownerMember != null &&
+                ownerMember["photoUrl"] == photoUrl &&
+                ownerMember["displayName"] == displayName.orEmpty() &&
+                ownerMember["email"] == email.orEmpty()
+            if (!upToDate) {
+                firestore.collection("vehicles").document(id).update(
+                    mapOf(
+                        "members.$uid.photoUrl" to photoUrl,
+                        "members.$uid.displayName" to displayName.orEmpty(),
+                        "members.$uid.email" to email.orEmpty(),
+                    ),
+                ).await()
+            }
+        }
+
         val cloudOnlyVehicles = cloudVehicles
             .filterKeys { it !in localVehicles }
             .values

@@ -296,6 +296,11 @@ fun FuelLogApp(
     var homeTab by remember { mutableIntStateOf(0) }
     var recordsMode by remember { mutableIntStateOf(0) }
     var viewingImagePath by remember { mutableStateOf<String?>(null) }
+    // Remembers which homeTab (e.g. 1=Timeline) the user jumped FROM when tapping a record card
+    // to go to the FuelList (tab=1). null means the user arrived via normal bottom-nav/drawer tap,
+    // so Back should return to homeTab=0 (Overview) as usual. Set to non-null only by the
+    // Timeline card click; cleared on any direct drawer navigation or after Back is consumed.
+    var fuelListReturnHomeTab by remember { mutableStateOf<Int?>(null) }
     val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ")
     val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
@@ -319,7 +324,12 @@ fun FuelLogApp(
             showAddFuel || editingFuel != null -> { showAddFuel = false; editingFuel = null }
             showAddMaintenance || editingMaintenance != null -> { showAddMaintenance = false; editingMaintenance = null }
             showAddTrip || editingTrip != null -> { showAddTrip = false; editingTrip = null }
-            tab != 0 -> { tab = 0; homeTab = 0 }
+            tab != 0 -> {
+                val returnTo = fuelListReturnHomeTab
+                tab = 0
+                homeTab = returnTo ?: 0
+                fuelListReturnHomeTab = null
+            }
             homeTab != 0 -> homeTab = 0
         }
     }
@@ -442,6 +452,7 @@ fun FuelLogApp(
                             icon = { Icon(icon, contentDescription = label) },
                             selected = tab == drawerTabTargets[index],
                             onClick = {
+                                fuelListReturnHomeTab = null
                                 tab = drawerTabTargets[index]
                                 if (tab == 0) homeTab = 0
                                 drawerScope.launch { drawerState.close() }
@@ -574,7 +585,7 @@ fun FuelLogApp(
                         state,
                         Modifier.padding(padding),
                         onImageClick = { viewingImagePath = it },
-                        onFuelRecordClick = { tab = 1 },
+                        onFuelRecordClick = { fuelListReturnHomeTab = homeTab; tab = 1 },
                     )
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
                     else -> NearbyStationsMapScreen(onFindNearbyStations, Modifier.padding(padding))

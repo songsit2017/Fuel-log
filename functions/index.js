@@ -39,6 +39,18 @@ exports.scanReceipt = onCall({
   maxInstances: 5,
   cors: true
 }, async request => {
+  try {
+    return await handleScanReceipt(request);
+  } catch (err) {
+    // Guarantees a log line for every rejection path (rate limit, bad input, auth), not just
+    // network failures — earlier versions of this function threw several of these silently,
+    // which made "wrong scan result" reports look like the request never reached the server.
+    console.warn('scanReceipt rejected', err?.code || 'unknown', err?.message || String(err));
+    throw err;
+  }
+});
+
+async function handleScanReceipt(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'กรุณาเข้าสู่ระบบก่อนใช้ OCR');
   enforceRateLimit(request.auth.uid);
 
@@ -62,26 +74,45 @@ exports.scanReceipt = onCall({
       (isFuel
         ? ' Thai fuel receipts always use "." as the decimal point, never as a thousands separator — e.g. "36.500L" means 36.5 liters and "36.71" is 36.71 baht per liter, not thirty-six thousand of anything. The product line is often one compact line like "<fuel name> <liters>L,<currency symbol><price per liter>" (e.g. "GASOHOL 95/36.500L,฿36.71"); the grand total is a separate line usually labeled "Total" or "รวม" near the bottom, and is typically in the hundreds to low thousands of baht for a single fill-up — sanity-check that "total" is not accidentally the liters or price-per-liter value with extra zeros appended. Before answering, verify liters × pricePerLiter ≈ total (within normal rounding); if your three readings don\'t roughly agree, re-read the receipt image rather than reporting numbers that don\'t reconcile, and set a field to null instead of guessing if you cannot read it with confidence — a missing value the user fills in by hand is far less harmful than a wrong one.'
         : '');
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': anthropicApiKey.value(),
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: process.env.CLAUDE_OCR_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 600,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
-  });
-  const result = await response.json();
+  let response;
+  let rawBody;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': anthropicApiKey.value(),
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: process.env.CLAUDE_OCR_MODEL || 'claude-sonnet-4-6',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+    rawBody = await response.text();
+  } catch (err) {
+    // fetch()/response.text() can throw (network error, hang past the client's own timeout,
+    // connection reset) — without this catch, the request dies here with no log line at all,
+    // which is what made earlier "wrong scan result" reports look like silent no-ops.
+    console.error('Anthropic OCR network error', err?.message || String(err));
+    throw new HttpsError('internal', 'บริการ OCR ไม่พร้อมใช้งาน (เครือข่าย)');
+  }
+  let result;
+  try {
+    result = JSON.parse(rawBody);
+  } catch {
+    // A non-JSON body (e.g. an upstream gateway/HTML error page) would otherwise throw here
+    // uncaught, again with no log line pointing at the cause.
+    console.error('Anthropic OCR non-JSON response', response.status, rawBody?.slice(0, 500));
+    throw new HttpsError('internal', 'บริการ OCR ไม่พร้อมใช้งาน (รูปแบบข้อมูล)');
+  }
   if (!response.ok) {
     console.error('Anthropic OCR failed', response.status, result?.error?.type);
     throw new HttpsError('internal', 'บริการ OCR ไม่พร้อมใช้งาน');
@@ -105,4 +136,4 @@ exports.scanReceipt = onCall({
   } catch {
     throw new HttpsError('data-loss', 'OCR ส่งรูปแบบข้อมูลไม่ถูกต้อง');
   }
-});
+}

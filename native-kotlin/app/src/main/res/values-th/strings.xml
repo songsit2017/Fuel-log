@@ -586,6 +586,10 @@
 
     <!-- FuelioImportRepository -->
     <string name="imported_vehicle_default_name">รถนำเข้า</string>
+
+    <!-- TripRecordingService -->
+    <string name="notification_channel_trip_name">บันทึกการเดินทาง</string>
+    <string name="notification_channel_trip_desc">แจ้งเตือนระหว่างบันทึกระยะทางการเดินทางด้วย GPS</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

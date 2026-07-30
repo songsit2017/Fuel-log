@@ -608,6 +608,10 @@
 
     <!-- FuelioImportRepository -->
     <string name="imported_vehicle_default_name">Imported vehicle</string>
+
+    <!-- TripRecordingService -->
+    <string name="notification_channel_trip_name">Trip recording</string>
+    <string name="notification_channel_trip_desc">Alerts while recording a GPS trip distance</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

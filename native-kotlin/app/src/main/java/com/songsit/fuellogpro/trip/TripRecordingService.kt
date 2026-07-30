@@ -163,18 +163,18 @@ class TripRecordingService : Service() {
         val distanceText = "%.2fkm".format(Locale.US, distanceMeters / 1000.0)
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_fuel)
-            .setContentTitle(if (paused) "หยุดชั่วคราว" else "กำลังบันทึกการเดินทาง")
+            .setContentTitle(if (paused) getString(R.string.trip_recording_paused) else getString(R.string.trip_recording_active))
             .setContentText("$distanceText · ${formatElapsed(elapsedMs() / 1000)}")
             .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
         if (paused) {
-            builder.addAction(0, "ดำเนินการต่อ", servicePendingIntent(ACTION_RESUME))
+            builder.addAction(0, getString(R.string.trip_resume), servicePendingIntent(ACTION_RESUME))
         } else {
-            builder.addAction(0, "หยุด", servicePendingIntent(ACTION_PAUSE))
+            builder.addAction(0, getString(R.string.trip_pause), servicePendingIntent(ACTION_PAUSE))
         }
-        builder.addAction(0, "เสร็จสิ้น", servicePendingIntent(ACTION_FINISH))
+        builder.addAction(0, getString(R.string.trip_finish), servicePendingIntent(ACTION_FINISH))
         return builder.build()
     }
 
@@ -186,8 +186,8 @@ class TripRecordingService : Service() {
     private fun ensureChannel() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "บันทึกการเดินทาง", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "แจ้งเตือนระหว่างบันทึกระยะทางการเดินทางด้วย GPS"
+            NotificationChannel(CHANNEL_ID, getString(R.string.notification_channel_trip_name), NotificationManager.IMPORTANCE_LOW).apply {
+                description = getString(R.string.notification_channel_trip_desc)
             },
         )
     }

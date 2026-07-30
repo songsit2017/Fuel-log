@@ -551,6 +551,38 @@
     <string name="error_invite_invalid_role">สิทธิ์ในรหัสเชิญไม่ถูกต้อง</string>
     <string name="error_invite_missing_vehicle">รหัสเชิญไม่มีข้อมูลรถ</string>
     <string name="shared_vehicle_default_name">รถที่แชร์</string>
+
+    <!-- WeatherRepository (WMO weather codes) -->
+    <string name="error_weather_fetch_http">เรียกข้อมูลสภาพอากาศไม่สำเร็จ (HTTP %1$d)</string>
+    <string name="weather_unknown">ไม่ทราบสภาพอากาศ</string>
+    <string name="weather_code_0">ท้องฟ้าแจ่มใส</string>
+    <string name="weather_code_1">แจ่มใสเป็นส่วนใหญ่</string>
+    <string name="weather_code_2">มีเมฆบางส่วน</string>
+    <string name="weather_code_3">ครึ้ม</string>
+    <string name="weather_code_45">มีหมอก</string>
+    <string name="weather_code_48">มีหมอกน้ำค้างแข็ง</string>
+    <string name="weather_code_51">ฝนปรอยเบา</string>
+    <string name="weather_code_53">ฝนปรอย</string>
+    <string name="weather_code_55">ฝนปรอยหนัก</string>
+    <string name="weather_code_56">ฝนปรอยเยือกแข็งเบา</string>
+    <string name="weather_code_57">ฝนปรอยเยือกแข็งหนัก</string>
+    <string name="weather_code_61">ฝนเบา</string>
+    <string name="weather_code_63">ฝนปานกลาง</string>
+    <string name="weather_code_65">ฝนหนัก</string>
+    <string name="weather_code_66">ฝนเยือกแข็งเบา</string>
+    <string name="weather_code_67">ฝนเยือกแข็งหนัก</string>
+    <string name="weather_code_71">หิมะเบา</string>
+    <string name="weather_code_73">หิมะปานกลาง</string>
+    <string name="weather_code_75">หิมะหนัก</string>
+    <string name="weather_code_77">เกล็ดหิมะ</string>
+    <string name="weather_code_80">ฝนซู่เบา</string>
+    <string name="weather_code_81">ฝนซู่ปานกลาง</string>
+    <string name="weather_code_82">ฝนซู่หนัก</string>
+    <string name="weather_code_85">หิมะซู่เบา</string>
+    <string name="weather_code_86">หิมะซู่หนัก</string>
+    <string name="weather_code_95">พายุฝนฟ้าคะนอง</string>
+    <string name="weather_code_96">พายุฝนฟ้าคะนองและลูกเห็บเล็ก</string>
+    <string name="weather_code_99">พายุฝนฟ้าคะนองและลูกเห็บหนัก</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

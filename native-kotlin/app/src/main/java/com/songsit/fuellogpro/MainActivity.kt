@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
     // Same permission gate, for the "capture weather at fill-up" lookup.
     private var pendingWeatherResult: ((com.songsit.fuellogpro.data.WeatherInfo) -> Unit)? = null
     private var pendingWeatherError: ((String) -> Unit)? = null
-    private val weatherRepository = WeatherRepository()
+    private val weatherRepository = WeatherRepository(this)
 
     // Item 2/3/C (photo attachment + OCR + multi-photo): each picked image is copied into
     // app-private storage (context.filesDir/photos) so it survives even if the source

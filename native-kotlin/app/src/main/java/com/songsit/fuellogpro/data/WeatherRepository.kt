@@ -1,5 +1,7 @@
 package com.songsit.fuellogpro.data
 
+import android.content.Context
+import com.songsit.fuellogpro.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -19,7 +21,7 @@ data class WeatherInfo(
  * and reads back the current weather code + temperature, so a fill-up can be tagged with
  * conditions at fill time.
  */
-class WeatherRepository {
+class WeatherRepository(private val context: Context) {
 
     suspend fun fetchCurrent(lat: Double, lon: Double): WeatherInfo = withContext(Dispatchers.IO) {
         val url = "https://api.open-meteo.com/v1/forecast" +
@@ -34,14 +36,15 @@ class WeatherRepository {
         try {
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
-                error("เรียกข้อมูลสภาพอากาศไม่สำเร็จ (HTTP $responseCode)")
+                error(context.getString(R.string.error_weather_fetch_http, responseCode))
             }
             val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val current = JSONObject(body).optJSONObject("current") ?: JSONObject()
             val weatherCode = if (current.has("weather_code")) current.optInt("weather_code") else null
             val temperature = if (current.has("temperature_2m")) current.optDouble("temperature_2m") else null
             WeatherInfo(
-                description = WEATHER_CODES[weatherCode] ?: "ไม่ทราบสภาพอากาศ",
+                description = weatherCode?.let { WEATHER_CODE_RES[it] }?.let { context.getString(it) }
+                    ?: context.getString(R.string.weather_unknown),
                 temperatureC = temperature?.takeIf { !it.isNaN() },
                 latitude = lat,
                 longitude = lon,
@@ -52,15 +55,15 @@ class WeatherRepository {
     }
 
     companion object {
-        private val WEATHER_CODES = mapOf(
-            0 to "ท้องฟ้าแจ่มใส", 1 to "แจ่มใสเป็นส่วนใหญ่", 2 to "มีเมฆบางส่วน", 3 to "ครึ้ม",
-            45 to "มีหมอก", 48 to "มีหมอกน้ำค้างแข็ง", 51 to "ฝนปรอยเบา", 53 to "ฝนปรอย",
-            55 to "ฝนปรอยหนัก", 56 to "ฝนปรอยเยือกแข็งเบา", 57 to "ฝนปรอยเยือกแข็งหนัก",
-            61 to "ฝนเบา", 63 to "ฝนปานกลาง", 65 to "ฝนหนัก", 66 to "ฝนเยือกแข็งเบา",
-            67 to "ฝนเยือกแข็งหนัก", 71 to "หิมะเบา", 73 to "หิมะปานกลาง", 75 to "หิมะหนัก",
-            77 to "เกล็ดหิมะ", 80 to "ฝนซู่เบา", 81 to "ฝนซู่ปานกลาง", 82 to "ฝนซู่หนัก",
-            85 to "หิมะซู่เบา", 86 to "หิมะซู่หนัก", 95 to "พายุฝนฟ้าคะนอง",
-            96 to "พายุฝนฟ้าคะนองและลูกเห็บเล็ก", 99 to "พายุฝนฟ้าคะนองและลูกเห็บหนัก",
+        private val WEATHER_CODE_RES = mapOf(
+            0 to R.string.weather_code_0, 1 to R.string.weather_code_1, 2 to R.string.weather_code_2, 3 to R.string.weather_code_3,
+            45 to R.string.weather_code_45, 48 to R.string.weather_code_48, 51 to R.string.weather_code_51, 53 to R.string.weather_code_53,
+            55 to R.string.weather_code_55, 56 to R.string.weather_code_56, 57 to R.string.weather_code_57,
+            61 to R.string.weather_code_61, 63 to R.string.weather_code_63, 65 to R.string.weather_code_65, 66 to R.string.weather_code_66,
+            67 to R.string.weather_code_67, 71 to R.string.weather_code_71, 73 to R.string.weather_code_73, 75 to R.string.weather_code_75,
+            77 to R.string.weather_code_77, 80 to R.string.weather_code_80, 81 to R.string.weather_code_81, 82 to R.string.weather_code_82,
+            85 to R.string.weather_code_85, 86 to R.string.weather_code_86, 95 to R.string.weather_code_95,
+            96 to R.string.weather_code_96, 99 to R.string.weather_code_99,
         )
     }
 }

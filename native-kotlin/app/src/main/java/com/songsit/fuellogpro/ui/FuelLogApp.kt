@@ -144,6 +144,7 @@ import com.songsit.fuellogpro.notifications.ReminderSettings
 import com.songsit.fuellogpro.ui.stats.StatsScreen
 import com.songsit.fuellogpro.ui.timeline.TimelineScreen
 import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
+import com.songsit.fuellogpro.ui.timeline.TimelineThumbnails
 import com.songsit.fuellogpro.ui.timeline.openPdfExternally
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -645,7 +646,7 @@ fun FuelLogApp(
         ) { padding ->
             when (tab) {
                 0 -> when (homeTab) {
-                    0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding))
+                    0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding), onImageClick = { viewingImagePath = it })
                     1 -> TimelineScreen(
                         state,
                         Modifier.padding(padding),
@@ -660,6 +661,7 @@ fun FuelLogApp(
                     { id -> requestDelete { onDeleteFuel(id) } },
                     { editingFuel = it },
                     Modifier.padding(padding),
+                    onImageClick = { viewingImagePath = it },
                 )
                 2 -> ExpenseList(
                     expenses = state.expenses,
@@ -1082,6 +1084,7 @@ private fun Dashboard(
     onExportCsv: () -> Unit,
     oilPriceInfo: OilPriceInfo? = null,
     modifier: Modifier = Modifier,
+    onImageClick: ((String) -> Unit)? = null,
 ) {
     val displaySettings = LocalDisplaySettings.current
     val kmPerLiterByEntry = remember(state.entries) { calculatePerEntryKmPerLiter(state.entries) }
@@ -1208,7 +1211,7 @@ private fun Dashboard(
         if (state.entries.isEmpty()) {
             item { EmptyFuelState() }
         } else {
-            items(state.entries.take(3), key = { it.id }) { FuelRow(it, kmPerLiter = kmPerLiterByEntry[it.id]) }
+            items(state.entries.take(3), key = { it.id }) { FuelRow(it, kmPerLiter = kmPerLiterByEntry[it.id], onImageClick = onImageClick) }
         }
     }
 }
@@ -1449,6 +1452,7 @@ private fun FuelList(
     onDelete: (String) -> Unit,
     onEdit: ((FuelEntry) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onImageClick: ((String) -> Unit)? = null,
 ) {
     val kmPerLiterByEntry = remember(entries) { calculatePerEntryKmPerLiter(entries) }
     // Grouped by month like the Timeline screen, so a long fuel history reads in the same
@@ -1477,7 +1481,7 @@ private fun FuelList(
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )
             }
-            items(groupEntries, key = { it.id }) { FuelRow(it, onDelete, onEdit, kmPerLiterByEntry[it.id]) }
+            items(groupEntries, key = { it.id }) { FuelRow(it, onDelete, onEdit, kmPerLiterByEntry[it.id], onImageClick) }
         }
     }
 }
@@ -1865,6 +1869,7 @@ private fun FuelRow(
     // calculatePerEntryKmPerLiter() (domain/FuelSummary.kt) — the same formula the dashboard's
     // overall average uses, just keyed per entry instead of summed.
     kmPerLiter: Double? = null,
+    onImageClick: ((String) -> Unit)? = null,
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -1875,21 +1880,13 @@ private fun FuelRow(
                 StationBadge(entry.station)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.fuel_default_label) }, fontWeight = FontWeight.SemiBold)
-                        if (!entry.photoUri.isNullOrBlank()) {
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                Icons.Filled.Image,
-                                contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_has_photo),
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    Text(entry.station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.fuel_default_label) }, fontWeight = FontWeight.SemiBold)
                     Text("${entry.date} • ${number.format(entry.odometerKm)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}", style = MaterialTheme.typography.bodySmall)
                 }
                 Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
+            }
+            if (entry.photoUrls.isNotEmpty()) {
+                TimelineThumbnails(entry.photoUrls, onImageClick ?: {})
             }
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()

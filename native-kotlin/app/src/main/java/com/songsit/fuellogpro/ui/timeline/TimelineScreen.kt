@@ -219,7 +219,7 @@ private fun ExpenseTimelineContent(expense: Expense, onImageClick: (String) -> U
 // Reuses the same decode-a-local-file-path pattern as PhotoAttachmentRow in FuelLogApp.kt,
 // but read-only and capped at 3 thumbnails per Item C/E.
 @Composable
-private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -> Unit) {
+internal fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -> Unit) {
     val context = LocalContext.current
     Row(
         modifier = Modifier.padding(top = 4.dp),

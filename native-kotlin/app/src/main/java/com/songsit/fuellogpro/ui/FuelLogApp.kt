@@ -1007,11 +1007,14 @@ private fun NearbyStationsMapScreen(
             }
         }
 
+        // Bottom-start, not bottom-center/end — Google Maps' own "open in Google Maps" button
+        // auto-appears bottom-end whenever a marker's info window is showing, and this FAB's
+        // width (name + count) was reaching far enough right to cover it.
         ExtendedFloatingActionButton(
             onClick = { showList = true },
             icon = { Icon(Icons.Filled.ListAlt, contentDescription = null) },
             text = { Text("ปั๊มใกล้เคียง (${stations.size})") },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 16.dp),
         )
     }
 

@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.data.NearbyStation
@@ -32,7 +34,7 @@ fun StationSelectionScreen(
     errorMessage: String?,
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf("บริเวณใกล้เคียง", "ชื่นชอบ", "แผนที่")
+    val tabs = stringArrayResource(com.songsit.fuellogpro.R.array.station_selection_tabs)
 
     LaunchedEffect(Unit) {
         if (nearbyStations.isEmpty() && !isSearching) {
@@ -45,11 +47,11 @@ fun StationSelectionScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
                     }
                 },
                 title = {
-                    Text("เลือกสถานีบริการน้ำมัน", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.station_selection_title), fontWeight = FontWeight.SemiBold)
                 }
             )
         }
@@ -78,8 +80,8 @@ fun StationSelectionScreen(
                     ) {
                         item {
                             ListItem(
-                                headlineContent = { Text("เลือกตำแหน่งปัจจุบัน") },
-                                supportingContent = { Text("ระบุพิกัด GPS", style = MaterialTheme.typography.bodyMedium) },
+                                headlineContent = { Text(stringResource(com.songsit.fuellogpro.R.string.station_use_current_location)) },
+                                supportingContent = { Text(stringResource(com.songsit.fuellogpro.R.string.station_use_gps_coordinates), style = MaterialTheme.typography.bodyMedium) },
                                 leadingContent = {
                                     Box(
                                         modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
@@ -111,7 +113,7 @@ fun StationSelectionScreen(
                         } else {
                             item {
                                 Text(
-                                    text = "Nearby Stations",
+                                    text = stringResource(com.songsit.fuellogpro.R.string.section_nearby_stations),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -131,7 +133,7 @@ fun StationSelectionScreen(
                                                     modifier = Modifier.padding(top = 4.dp)
                                                 ) {
                                                     Text(
-                                                        text = "การเยี่ยมชมของคุณ: x$visits",
+                                                        text = stringResource(com.songsit.fuellogpro.R.string.station_your_visits, visits),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                                     )
@@ -155,13 +157,13 @@ fun StationSelectionScreen(
                 1 -> {
                     // Favorites (Placeholder)
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("ยังไม่มีรายการโปรด", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.station_favorites_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 2 -> {
                     // Map (Placeholder)
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("ฟังก์ชันแผนที่กำลังมาเร็วๆ นี้", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.station_map_coming_soon), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

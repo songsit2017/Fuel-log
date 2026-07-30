@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -125,10 +126,10 @@ fun VehicleMakeSelectionScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("เลือกยี่ห้อรถ") },
+                    title = { Text(stringResource(com.songsit.fuellogpro.R.string.vehicle_make_selection_title)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "กลับ")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
                         }
                     }
                 )
@@ -136,12 +137,12 @@ fun VehicleMakeSelectionScreen(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    placeholder = { Text("ค้นหายี่ห้อรถ...") },
+                    placeholder = { Text(stringResource(com.songsit.fuellogpro.R.string.vehicle_make_search_placeholder)) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Filled.Close, contentDescription = "ล้างการค้นหา")
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_clear_search))
                             }
                         }
                     },

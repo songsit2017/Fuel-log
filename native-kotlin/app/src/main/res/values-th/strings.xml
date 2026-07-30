@@ -414,6 +414,28 @@
     <string name="stats_monthly_cost_chart_title">ค่าใช้จ่ายรายเดือน</string>
     <string name="stats_station_chart_title">แผนภูมิสถานีบริการ</string>
     <string name="stats_distance_chart_title">แผนภูมิระยะทาง</string>
+
+    <!-- VehiclesScreen (unused legacy composable, kept for parity) -->
+    <string name="title_vehicles">ยานพาหนะ</string>
+    <string name="vehicles_none_found">ยังไม่พบรถในบัญชีนี้</string>
+
+    <!-- VehicleMakeSelectionScreen -->
+    <string name="vehicle_make_selection_title">เลือกยี่ห้อรถ</string>
+    <string name="vehicle_make_search_placeholder">ค้นหายี่ห้อรถ...</string>
+    <string name="content_desc_clear_search">ล้างการค้นหา</string>
+
+    <!-- StationSelectionScreen -->
+    <string-array name="station_selection_tabs">
+        <item>บริเวณใกล้เคียง</item>
+        <item>ชื่นชอบ</item>
+        <item>แผนที่</item>
+    </string-array>
+    <string name="station_selection_title">เลือกสถานีบริการน้ำมัน</string>
+    <string name="station_use_current_location">เลือกตำแหน่งปัจจุบัน</string>
+    <string name="station_use_gps_coordinates">ระบุพิกัด GPS</string>
+    <string name="station_your_visits">การเยี่ยมชมของคุณ: x%1$d</string>
+    <string name="station_favorites_empty">ยังไม่มีรายการโปรด</string>
+    <string name="station_map_coming_soon">ฟังก์ชันแผนที่กำลังมาเร็วๆ นี้</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

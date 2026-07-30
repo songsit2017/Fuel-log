@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -23,13 +24,13 @@ fun VehiclesScreen(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("ยานพาหนะ", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(com.songsit.fuellogpro.R.string.title_vehicles), style = MaterialTheme.typography.headlineMedium)
         if (state.loading) CircularProgressIndicator()
         state.errorMessage?.let {
             Text(it, color = MaterialTheme.colorScheme.error)
         }
         if (!state.loading && state.vehicles.isEmpty()) {
-            Text("ยังไม่พบรถในบัญชีนี้")
+            Text(stringResource(com.songsit.fuellogpro.R.string.vehicles_none_found))
         }
         LazyColumn {
             items(state.vehicles, key = { it.id }) { vehicle ->

@@ -436,6 +436,28 @@
     <string name="stats_monthly_cost_chart_title">Monthly cost</string>
     <string name="stats_station_chart_title">Cost by station</string>
     <string name="stats_distance_chart_title">Distance chart</string>
+
+    <!-- VehiclesScreen (unused legacy composable, kept for parity) -->
+    <string name="title_vehicles">Vehicles</string>
+    <string name="vehicles_none_found">No vehicles found in this account</string>
+
+    <!-- VehicleMakeSelectionScreen -->
+    <string name="vehicle_make_selection_title">Select brand</string>
+    <string name="vehicle_make_search_placeholder">Search brands…</string>
+    <string name="content_desc_clear_search">Clear search</string>
+
+    <!-- StationSelectionScreen -->
+    <string-array name="station_selection_tabs">
+        <item>Nearby</item>
+        <item>Favorites</item>
+        <item>Map</item>
+    </string-array>
+    <string name="station_selection_title">Select fuel station</string>
+    <string name="station_use_current_location">Use current location</string>
+    <string name="station_use_gps_coordinates">Uses GPS coordinates</string>
+    <string name="station_your_visits">Your visits: x%1$d</string>
+    <string name="station_favorites_empty">No favorites yet</string>
+    <string name="station_map_coming_soon">Map view is coming soon</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

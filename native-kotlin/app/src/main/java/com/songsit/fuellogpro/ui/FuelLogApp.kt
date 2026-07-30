@@ -2173,9 +2173,11 @@ private fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ตั้งค่า") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
+                    }
                 },
             )
         },
@@ -2184,14 +2186,15 @@ private fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            // ── หมวด 1: กำหนดลักษณะหลัก ──────────────────────────────────────────────
-            item { PreferenceCategoryHeader("กำหนดลักษณะหลัก") }
+            // ── Category 1: general ──────────────────────────────────────────────
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) }
 
             item {
+                // TODO(i18n): still Thai-only — needs format-string placeholders for the unit labels.
                 val volumeLabel = if (displaySettings.volumeUnit == "gal") "แกลลอน" else "ลิตร"
                 val distLabel = if (displaySettings.distanceUnit == "mi") "ไมล์" else "กิโลเมตร"
                 PreferenceListItem(
-                    title = "หน่วย",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
                     subtitle = "เชื้อเพลิง $volumeLabel, ระยะทาง $distLabel, ปริมาณการใช้หน่วย (กม./ลิตร/mpg...ฯลฯ)",
                     onClick = { showUnitDialog = true },
                 )
@@ -2200,7 +2203,7 @@ private fun SettingsScreen(
             item {
                 val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
                 PreferenceListItem(
-                    title = "สกุลเงิน",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
                     subtitle = currencyOption.label,
                     onClick = { showCurrencyDialog = true },
                 )
@@ -2208,11 +2211,11 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "ธีม",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_theme_title),
                     subtitle = when (displaySettings.themeMode) {
-                        "light" -> "สว่าง"
-                        "dark" -> "มืด"
-                        else -> "ตามระบบ"
+                        "light" -> stringResource(com.songsit.fuellogpro.R.string.theme_light)
+                        "dark" -> stringResource(com.songsit.fuellogpro.R.string.theme_dark)
+                        else -> stringResource(com.songsit.fuellogpro.R.string.theme_system)
                     },
                     onClick = { showThemeDialog = true },
                 )
@@ -2221,7 +2224,7 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "แบบอักษร",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_font_title),
                     subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
                     onClick = { showFontDialog = true },
                 )
@@ -2229,7 +2232,7 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "ชุดรูปแบบ",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title),
                     subtitle = themePaletteLabel(displaySettings.themePalette),
                     onClick = { showThemePaletteDialog = true },
                 )
@@ -2249,23 +2252,24 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "การตั้งค่าอื่น ๆ",
-                    subtitle = "ค่าเริ่มต้นการเติมน้ำมันและการยืนยันก่อนลบ",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_other_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_other_subtitle),
                     onClick = { showOtherSettings = true },
                 )
             }
 
-            // ── หมวด 2: แบ็คอัพข้อมูล (Import/Export options) ───────────────────────
+            // ── Category 2: backup (import/export) ───────────────────────
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader("แบ็คอัพข้อมูล (Import/Export options)") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) }
             item {
+                // TODO(i18n): still Thai-only — needs format-string placeholders for the counts/email.
                 val syncSubtitle = when {
                     syncConflicts.isNotEmpty() -> "พบ ${syncConflicts.size} รายการที่ต่างกันรอแก้ไข"
                     cloudState.uid != null -> "เมฆและสำรองข้อมูลท้องถิ่น • ${cloudState.email ?: "เชื่อมต่อ Google แล้ว"}"
                     else -> "เมฆและสำรองข้อมูลท้องถิ่น"
                 }
                 PreferenceListItem(
-                    title = "สร้าง/กู้คืน",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
                     subtitle = syncSubtitle,
                     leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = { showImportExport = true },
@@ -2275,7 +2279,8 @@ private fun SettingsScreen(
             if (canShareVehicle) {
                 item {
                     PreferenceListItem(
-                        title = "แชร์รถกับสมาชิกครอบครัว",
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
+                        // TODO(i18n): still Thai-only — needs format-string placeholder for the count.
                         subtitle = if (vehicleMembers.isEmpty()) "ยังไม่มีสมาชิกร่วมดูแลรถคันนี้" else "${vehicleMembers.size} สมาชิก",
                         leading = { Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = { showFamilySharing = true },
@@ -2283,38 +2288,42 @@ private fun SettingsScreen(
                 }
             }
 
-            // ── หมวด 3: ข้อมูล ───────────────────────────────────────────────────────
+            // ── Category 3: about ───────────────────────────────────────────────
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader("ข้อมูล") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) }
             item {
                 PreferenceListItem(
                     title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    subtitle = "แอปบันทึกการเติมน้ำมัน ค่าใช้จ่ายรถ และแชร์ข้อมูลกับสมาชิกในครอบครัว " +
-                        "พัฒนาต่อยอดจากแนวคิดของ Fuelio",
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_about_subtitle),
                 )
             }
             item {
                 PreferenceListItem(
-                    title = "ผู้พัฒนา",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
                     subtitle = "songsit2017 • songsit2017@gmail.com",
                     onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
                 )
             }
             item {
                 PreferenceListItem(
-                    title = "ใบอนุญาตเปิดแหล่งที่มา",
-                    subtitle = "ไลบรารีโอเพนซอร์สที่ใช้ในแอปพลิเคชันนี้",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_subtitle),
                     onClick = { showOpenSourceLicenses = true }
                 )
             }
-            item { PreferenceCategoryHeader("แหล่งที่มาข้อมูล") }
-            item { PreferenceListItem(title = "ราคาน้ำมันวันนี้", subtitle = "บางจาก, ปตท., เชลล์ (Bangchak Open API)") }
-            item { PreferenceListItem(title = "ค้นหาปั๊มใกล้ฉัน", subtitle = "Google Places API") }
-            item { PreferenceListItem(title = "สภาพอากาศขณะเติมน้ำมัน", subtitle = "Open-Meteo") }
-            item { PreferenceListItem(title = "สแกนใบเสร็จอัตโนมัติ", subtitle = "Claude (Anthropic) AI") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) }
             item {
                 PreferenceListItem(
-                    title = "ซอร์สโค้ดโปรเจกต์",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_subtitle),
+                )
+            }
+            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API") }
+            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo") }
+            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI") }
+            item {
+                PreferenceListItem(
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),
                     subtitle = "github.com/songsit2017/Fuel-log",
                     onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
                 )

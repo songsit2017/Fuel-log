@@ -10,4 +10,33 @@
     <string name="nav_timeline">ไทม์ไลน์</string>
     <string name="nav_calculator">เครื่องคิดเลข</string>
     <string name="nav_map">แผนที่</string>
+
+    <string name="action_back">ย้อนกลับ</string>
+    <string name="settings_title">ตั้งค่า</string>
+    <string name="settings_category_general">กำหนดลักษณะหลัก</string>
+    <string name="settings_units_title">หน่วย</string>
+    <string name="settings_currency_title">สกุลเงิน</string>
+    <string name="settings_theme_title">ธีม</string>
+    <string name="theme_light">สว่าง</string>
+    <string name="theme_dark">มืด</string>
+    <string name="theme_system">ตามระบบ</string>
+    <string name="settings_font_title">แบบอักษร</string>
+    <string name="settings_color_scheme_title">ชุดรูปแบบ</string>
+    <string name="settings_other_title">การตั้งค่าอื่น ๆ</string>
+    <string name="settings_other_subtitle">ค่าเริ่มต้นการเติมน้ำมันและการยืนยันก่อนลบ</string>
+    <string name="settings_category_backup">แบ็คอัพข้อมูล (Import/Export options)</string>
+    <string name="settings_backup_restore_title">สร้าง/กู้คืน</string>
+    <string name="settings_family_share_title">แชร์รถกับสมาชิกครอบครัว</string>
+    <string name="settings_category_about">ข้อมูล</string>
+    <string name="settings_about_subtitle">แอปบันทึกการเติมน้ำมัน ค่าใช้จ่ายรถ และแชร์ข้อมูลกับสมาชิกในครอบครัว พัฒนาต่อยอดจากแนวคิดของ Fuelio</string>
+    <string name="settings_developer_title">ผู้พัฒนา</string>
+    <string name="settings_licenses_title">ใบอนุญาตเปิดแหล่งที่มา</string>
+    <string name="settings_licenses_subtitle">ไลบรารีโอเพนซอร์สที่ใช้ในแอปพลิเคชันนี้</string>
+    <string name="settings_category_data_sources">แหล่งที่มาข้อมูล</string>
+    <string name="settings_oil_price_title">ราคาน้ำมันวันนี้</string>
+    <string name="settings_oil_price_subtitle">บางจาก, ปตท., เชลล์ (Bangchak Open API)</string>
+    <string name="settings_nearby_stations_title">ค้นหาปั๊มใกล้ฉัน</string>
+    <string name="settings_weather_title">สภาพอากาศขณะเติมน้ำมัน</string>
+    <string name="settings_ocr_title">สแกนใบเสร็จอัตโนมัติ</string>
+    <string name="settings_source_code_title">ซอร์สโค้ดโปรเจกต์</string>
 </resources>

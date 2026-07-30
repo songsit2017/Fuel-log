@@ -87,4 +87,20 @@
     <string name="sync_conflicts_showing_n_of">แสดง 5 จากทั้งหมด %1$d รายการ</string>
     <string name="use_local">ใช้ข้อมูลในเครื่อง</string>
     <string name="use_cloud">ใช้ข้อมูล Cloud</string>
+
+    <string name="family_share_title">แชร์รถกับสมาชิกครอบครัว</string>
+    <string name="family_current_members">สมาชิกปัจจุบัน</string>
+    <string name="family_no_members">ยังไม่มีสมาชิกร่วมดูแลรถคันนี้</string>
+    <string name="family_create_invite">สร้างคำเชิญ</string>
+    <string name="family_invite_email_label">อีเมล Google ของสมาชิก</string>
+    <string name="family_role_editor">แก้ไขได้</string>
+    <string name="family_role_viewer">ดูอย่างเดียว</string>
+    <string name="family_creating_invite">กำลังสร้าง…</string>
+    <string name="family_create_invite_code">สร้างรหัสเชิญ</string>
+    <string name="family_invite_code_result">รหัสเชิญ: %1$s (7 วัน)</string>
+    <string name="family_join_by_code">เข้าร่วมด้วยรหัสเชิญ</string>
+    <string name="family_invite_code_label">รหัสเชิญ 8 ตัว</string>
+    <string name="family_joining">กำลังตรวจสอบ…</string>
+    <string name="family_join_action">เข้าร่วม</string>
+    <string name="family_join_success">เข้าร่วม %1$s สำเร็จ</string>
 </resources>

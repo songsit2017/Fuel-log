@@ -95,4 +95,21 @@
     <string name="sync_conflicts_showing_n_of">Showing 5 of %1$d</string>
     <string name="use_local">Use local</string>
     <string name="use_cloud">Use cloud</string>
+
+    <!-- FamilySharingScreen -->
+    <string name="family_share_title">Share vehicle with family</string>
+    <string name="family_current_members">Current members</string>
+    <string name="family_no_members">No one else is helping manage this vehicle yet</string>
+    <string name="family_create_invite">Create an invite</string>
+    <string name="family_invite_email_label">Member\'s Google email</string>
+    <string name="family_role_editor">Can edit</string>
+    <string name="family_role_viewer">View only</string>
+    <string name="family_creating_invite">Creating…</string>
+    <string name="family_create_invite_code">Create invite code</string>
+    <string name="family_invite_code_result">Invite code: %1$s (valid 7 days)</string>
+    <string name="family_join_by_code">Join with an invite code</string>
+    <string name="family_invite_code_label">8-character invite code</string>
+    <string name="family_joining">Checking…</string>
+    <string name="family_join_action">Join</string>
+    <string name="family_join_success">Joined %1$s successfully</string>
 </resources>

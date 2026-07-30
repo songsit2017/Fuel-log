@@ -2850,9 +2850,9 @@ private fun FamilySharingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("แชร์รถกับสมาชิกครอบครัว") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.family_share_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back)) }
                 },
             )
         },
@@ -2862,12 +2862,12 @@ private fun FamilySharingScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { PreferenceCategoryHeader("สมาชิกปัจจุบัน") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.family_current_members)) }
             if (members.isEmpty()) {
                 item {
                     Card(shape = RoundedCornerShape(16.dp)) {
                         Text(
-                            "ยังไม่มีสมาชิกร่วมดูแลรถคันนี้",
+                            stringResource(com.songsit.fuellogpro.R.string.family_no_members),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -2917,19 +2917,23 @@ private fun FamilySharingScreen(
             }
 
             if (onCreateInvite != null) {
-                item { PreferenceCategoryHeader("สร้างคำเชิญ") }
+                item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.family_create_invite)) }
                 item {
+                    val joinedLabel = stringResource(com.songsit.fuellogpro.R.string.family_invite_code_result, inviteResult ?: "")
                     Card(shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = inviteEmail,
                                 onValueChange = { inviteEmail = it },
-                                label = { Text("อีเมล Google ของสมาชิก") },
+                                label = { Text(stringResource(com.songsit.fuellogpro.R.string.family_invite_email_label)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf("editor" to "แก้ไขได้", "viewer" to "ดูอย่างเดียว").forEach { (value, label) ->
+                                listOf(
+                                    "editor" to stringResource(com.songsit.fuellogpro.R.string.family_role_editor),
+                                    "viewer" to stringResource(com.songsit.fuellogpro.R.string.family_role_viewer),
+                                ).forEach { (value, label) ->
                                     FilterChip(
                                         selected = inviteRole == value,
                                         onClick = { inviteRole = value },
@@ -2951,8 +2955,16 @@ private fun FamilySharingScreen(
                                         { message -> inviteBusy = false; inviteError = message },
                                     )
                                 },
-                            ) { Text(if (inviteBusy) "กำลังสร้าง…" else "สร้างรหัสเชิญ") }
-                            inviteResult?.let { Text("รหัสเชิญ: $it (7 วัน)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
+                            ) {
+                                Text(
+                                    if (inviteBusy) {
+                                        stringResource(com.songsit.fuellogpro.R.string.family_creating_invite)
+                                    } else {
+                                        stringResource(com.songsit.fuellogpro.R.string.family_create_invite_code)
+                                    },
+                                )
+                            }
+                            if (inviteResult != null) Text(joinedLabel, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
@@ -2960,14 +2972,18 @@ private fun FamilySharingScreen(
             }
 
             if (onJoinByCode != null) {
-                item { PreferenceCategoryHeader("เข้าร่วมด้วยรหัสเชิญ") }
+                item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.family_join_by_code)) }
                 item {
+                    // Unformatted (no args passed) so the "%1$s" placeholder stays literal — the
+                    // vehicle name is only known once onJoinByCode's callback fires later, well
+                    // outside this composable's scope where stringResource() could be called.
+                    val joinSuccessTemplate = stringResource(com.songsit.fuellogpro.R.string.family_join_success)
                     Card(shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = joinCode,
                                 onValueChange = { joinCode = it },
-                                label = { Text("รหัสเชิญ 8 ตัว") },
+                                label = { Text(stringResource(com.songsit.fuellogpro.R.string.family_invite_code_label)) },
                                 leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
@@ -2981,11 +2997,19 @@ private fun FamilySharingScreen(
                                     joinResult = null
                                     onJoinByCode(
                                         joinCode,
-                                        { vehicleName -> joinBusy = false; joinResult = "เข้าร่วม $vehicleName สำเร็จ"; joinCode = "" },
+                                        { vehicleName -> joinBusy = false; joinResult = joinSuccessTemplate.format(vehicleName); joinCode = "" },
                                         { message -> joinBusy = false; joinError = message },
                                     )
                                 },
-                            ) { Text(if (joinBusy) "กำลังตรวจสอบ…" else "เข้าร่วม") }
+                            ) {
+                                Text(
+                                    if (joinBusy) {
+                                        stringResource(com.songsit.fuellogpro.R.string.family_joining)
+                                    } else {
+                                        stringResource(com.songsit.fuellogpro.R.string.family_join_action)
+                                    },
+                                )
+                            }
                             joinResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                             joinError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         }

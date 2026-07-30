@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -51,9 +52,9 @@ fun OpenSourceLicensesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ใบอนุญาตเปิดแหล่งที่มา") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back)) }
                 }
             )
         }

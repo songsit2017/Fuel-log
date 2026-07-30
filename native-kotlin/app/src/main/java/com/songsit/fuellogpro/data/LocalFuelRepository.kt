@@ -56,7 +56,6 @@ private fun FuelEntryFormValues.toEntity(
     createdAt: Long,
     fallbackPhotoUri: String? = null,
 ): FuelEntryEntity {
-    val grossAmount = liters * pricePerLiter
     val discountTotal = if (discountEnabled) {
         if (discountPerLiter) discountAmount * liters else discountAmount
     } else {

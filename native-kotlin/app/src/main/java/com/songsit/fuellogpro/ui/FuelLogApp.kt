@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -3368,6 +3369,7 @@ private fun AddFuelScreen(
         val odometerValue = if (odometerIsTripMeter) (latestOdometer ?: 0.0) + enteredOdometer else enteredOdometer
         val litersValue = liters.toDoubleOrNull() ?: 0.0
         val priceValue = price.toDoubleOrNull() ?: 0.0
+        val grossAmountValue = total.toDoubleOrNull() ?: (litersValue * priceValue)
         val photoUri = PhotoUris.join(photoUris)
         val values = FuelEntryFormValues(
             date = date,
@@ -3375,6 +3377,7 @@ private fun AddFuelScreen(
             odometerKm = odometerValue,
             liters = litersValue,
             pricePerLiter = priceValue,
+            grossAmount = grossAmountValue,
             fullTank = fullTank,
             station = station,
             photoUri = photoUri,
@@ -3551,8 +3554,10 @@ private fun AddFuelScreen(
                     item {
                         PhotoAttachmentRow(
                             photoUris = photoUris,
-                            onPickGallery = { isScanningReceipt = true; onPickPhoto("fuel", handlePicked) },
-                            onPickCamera = onPickCameraPhoto?.let { pick -> { isScanningReceipt = true; pick("fuel", handlePicked) } },
+                            // Plain "แนบรูป" — type = null so scanFirstPhoto() skips OCR entirely;
+                            // only the dedicated "สแกนบิล/ใบเสร็จด้วย AI" button below opts into it.
+                            onPickGallery = { isScanningReceipt = true; onPickPhoto(null, handlePicked) },
+                            onPickCamera = onPickCameraPhoto?.let { pick -> { isScanningReceipt = true; pick(null, handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
                         )
                     }
@@ -3827,7 +3832,7 @@ private fun TankLevelDialog(
 // Shows up to MAX_PHOTOS thumbnails of attached receipts/photos (each decoded from its local
 // file path), each individually removable, plus a pick button that's hidden once the cap is
 // reached.
-private const val MAX_PHOTOS = 3
+private const val MAX_PHOTOS = 8
 
 @Composable
 private fun PhotoAttachmentRow(
@@ -3837,8 +3842,12 @@ private fun PhotoAttachmentRow(
     onPickCamera: (() -> Unit)? = null,
 ) {
     var fullScreenImageUri by remember { mutableStateOf<String?>(null) }
-    
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
         photoUris.forEach { uri ->
             Card(
                 shape = RoundedCornerShape(10.dp),
@@ -4101,8 +4110,10 @@ private fun AddExpenseScreen(
                 item {
                     PhotoAttachmentRow(
                         photoUris = photoUris,
-                        onPickGallery = { isScanning = true; onPickPhoto("expense", expenseHandlePicked) },
-                        onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick("expense", expenseHandlePicked) } },
+                        // Plain "แนบรูป" — type = null so scanFirstPhoto() skips OCR entirely;
+                        // only the dedicated "สแกนบิล/ใบเสร็จด้วย AI" button below opts into it.
+                        onPickGallery = { isScanning = true; onPickPhoto(null, expenseHandlePicked) },
+                        onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick(null, expenseHandlePicked) } },
                         onRemove = { uri -> photoUris = photoUris - uri },
                     )
                 }

@@ -53,8 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 
-// Item C (multi-photo): cap matches PhotoAttachmentRow's MAX_PHOTOS in ui/FuelLogApp.kt.
-private const val MAX_PICK_PHOTOS = 3
+// Cap matches PhotoAttachmentRow's MAX_PHOTOS in ui/FuelLogApp.kt.
+private const val MAX_PICK_PHOTOS = 8
 
 class MainActivity : ComponentActivity() {
     private lateinit var backupRepository: LocalBackupRepository

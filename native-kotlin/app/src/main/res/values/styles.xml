@@ -6,5 +6,13 @@
         <item name="android:navigationBarColor">#111318</item>
         <item name="android:statusBarColor">#1E2945</item>
     </style>
+
+    <!-- Daytime splash: plain white background (same backdrop the launcher icon itself already
+         sits on), so the icon just reads as branding rather than a heavy block of color. -->
+    <style name="Theme.FuelLogPro.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/fuellog_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.FuelLogPro</item>
+    </style>
 </resources>
 

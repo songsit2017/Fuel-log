@@ -114,6 +114,7 @@ dependencies {
     implementation("com.patrykandpatrick.vico:compose:3.2.3")
     implementation("com.patrykandpatrick.vico:compose-m3:3.2.3")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-splashscreen:1.2.0")
     // Vehicle photo loading (VehicleListScreen/VehicleEditScreen background images from imageUri).
     implementation("io.coil-kt:coil-compose:2.7.0")
     // Item 3 (receipt OCR): on-device text recognition to pre-fill the expense amount field,

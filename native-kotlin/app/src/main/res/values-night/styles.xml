@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nighttime splash: matches the app's AMOLED-black dark theme (see FuelLogTheme.kt's
+         DefaultDark) instead of the daytime plain-white background. -->
+    <style name="Theme.FuelLogPro.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/fuellog_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.FuelLogPro</item>
+    </style>
+</resources>

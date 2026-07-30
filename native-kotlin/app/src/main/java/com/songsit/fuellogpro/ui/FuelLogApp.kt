@@ -1055,7 +1055,7 @@ private fun NearbyStationsMapScreen(
                     SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
                 }
                 if (stations.isEmpty()) {
-                    item { Text("ไม่พบปั๊มใกล้ฉัน") }
+                    item { Text(stringResource(com.songsit.fuellogpro.R.string.nearby_no_stations)) }
                 } else {
                     items(stations) { station ->
                         Card(shape = RoundedCornerShape(16.dp)) {
@@ -1093,8 +1093,8 @@ private fun Dashboard(
             item {
                 Card(shape = RoundedCornerShape(24.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp)) {
-                        Text("เริ่มต้นด้วยรถของคุณ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("แตะ + เพื่อเพิ่มรถ แล้วจึงบันทึกการเติมน้ำมัน")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.dashboard_empty_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.dashboard_empty_subtitle))
                     }
                 }
             }
@@ -1112,7 +1112,7 @@ private fun Dashboard(
                 ),
             ) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("อัตราสิ้นเปลืองเฉลี่ย", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.dashboard_avg_efficiency), color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text(
                         state.summary.averageKmPerLiter?.let { formatEconomyKmPerLiter(it, displaySettings) } ?: "—",
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1127,12 +1127,23 @@ private fun Dashboard(
             // below) to "ค่าน้ำมัน" — this card is fuel-only spend, the report card below is
             // the combined fuel+expense+trip total. Two distinct numbers, now two distinct labels.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("ค่าน้ำมัน", formatCurrencyAmount(state.summary.totalSpent, displaySettings), Modifier.weight(1f), Icons.Filled.LocalGasStation)
-                MetricCard("ปริมาณน้ำมัน", formatVolumeLiters(state.summary.totalLiters, displaySettings), Modifier.weight(1f), Icons.Filled.WaterDrop)
+                MetricCard(
+                    stringResource(com.songsit.fuellogpro.R.string.dashboard_fuel_cost),
+                    formatCurrencyAmount(state.summary.totalSpent, displaySettings),
+                    Modifier.weight(1f),
+                    Icons.Filled.LocalGasStation,
+                )
+                MetricCard(
+                    stringResource(com.songsit.fuellogpro.R.string.dashboard_fuel_volume),
+                    formatVolumeLiters(state.summary.totalLiters, displaySettings),
+                    Modifier.weight(1f),
+                    Icons.Filled.WaterDrop,
+                )
             }
         }
         item {
             val operatingCost = state.summary.totalSpent + state.totalExpenses + state.tripSummary.totalCost
+            val noDataLabel = stringResource(com.songsit.fuellogpro.R.string.dashboard_no_data)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -1141,16 +1152,16 @@ private fun Dashboard(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    SectionHeader(Icons.Filled.BarChart, "รายงานสรุป")
+                    SectionHeader(Icons.Filled.BarChart, stringResource(com.songsit.fuellogpro.R.string.dashboard_report_summary))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
-                            "ค่าใช้จ่ายรวมทั้งหมด",
+                            stringResource(com.songsit.fuellogpro.R.string.dashboard_total_cost),
                             formatCurrencyAmount(operatingCost, displaySettings),
                             Modifier.weight(1f),
                             Icons.Filled.Payments,
                         )
                         MetricCard(
-                            "ค่าใช้จ่ายสุทธิ",
+                            stringResource(com.songsit.fuellogpro.R.string.dashboard_net_cost),
                             formatCurrencyAmount(operatingCost - state.totalIncome, displaySettings),
                             Modifier.weight(1f),
                             Icons.Filled.AccountBalanceWallet,
@@ -1158,7 +1169,7 @@ private fun Dashboard(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetricCard(
-                            "ระยะทางสะสม",
+                            stringResource(com.songsit.fuellogpro.R.string.dashboard_cumulative_distance),
                             // Cumulative distance from the fuel log's own odometer readings
                             // (latest - earliest), not the separate business-trip tracker —
                             // most vehicles never log a "Trip" record, so that number stayed 0.
@@ -1171,14 +1182,14 @@ private fun Dashboard(
                             Icons.Filled.Route,
                         )
                         MetricCard(
-                            "เลขไมล์ล่าสุด",
-                            state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: "ยังไม่มีข้อมูล",
+                            stringResource(com.songsit.fuellogpro.R.string.dashboard_latest_odometer),
+                            state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: noDataLabel,
                             Modifier.weight(1f),
                             Icons.Filled.Speed,
                         )
                     }
                     MetricCard(
-                        "จำนวนรายการ",
+                        stringResource(com.songsit.fuellogpro.R.string.dashboard_record_count),
                         number.format(
                             state.entries.size + state.expenses.size +
                                 state.maintenanceTasks.size + state.trips.size,
@@ -1191,7 +1202,7 @@ private fun Dashboard(
         }
         item {
             Spacer(Modifier.height(4.dp))
-            SectionHeader(Icons.Filled.LocalGasStation, "รายการล่าสุด")
+            SectionHeader(Icons.Filled.LocalGasStation, stringResource(com.songsit.fuellogpro.R.string.dashboard_recent_entries))
         }
         if (state.entries.isEmpty()) {
             item { EmptyFuelState() }

@@ -103,4 +103,19 @@
     <string name="family_joining">กำลังตรวจสอบ…</string>
     <string name="family_join_action">เข้าร่วม</string>
     <string name="family_join_success">เข้าร่วม %1$s สำเร็จ</string>
+
+    <string name="nearby_no_stations">ไม่พบปั๊มใกล้ฉัน</string>
+    <string name="dashboard_empty_title">เริ่มต้นด้วยรถของคุณ</string>
+    <string name="dashboard_empty_subtitle">แตะ + เพื่อเพิ่มรถ แล้วจึงบันทึกการเติมน้ำมัน</string>
+    <string name="dashboard_avg_efficiency">อัตราสิ้นเปลืองเฉลี่ย</string>
+    <string name="dashboard_fuel_cost">ค่าน้ำมัน</string>
+    <string name="dashboard_fuel_volume">ปริมาณน้ำมัน</string>
+    <string name="dashboard_report_summary">รายงานสรุป</string>
+    <string name="dashboard_total_cost">ค่าใช้จ่ายรวมทั้งหมด</string>
+    <string name="dashboard_net_cost">ค่าใช้จ่ายสุทธิ</string>
+    <string name="dashboard_cumulative_distance">ระยะทางสะสม</string>
+    <string name="dashboard_latest_odometer">เลขไมล์ล่าสุด</string>
+    <string name="dashboard_no_data">ยังไม่มีข้อมูล</string>
+    <string name="dashboard_record_count">จำนวนรายการ</string>
+    <string name="dashboard_recent_entries">รายการล่าสุด</string>
 </resources>

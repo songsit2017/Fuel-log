@@ -112,4 +112,20 @@
     <string name="family_joining">Checking…</string>
     <string name="family_join_action">Join</string>
     <string name="family_join_success">Joined %1$s successfully</string>
+
+    <!-- Dashboard + nearby stations -->
+    <string name="nearby_no_stations">No nearby stations found</string>
+    <string name="dashboard_empty_title">Start with your vehicle</string>
+    <string name="dashboard_empty_subtitle">Tap + to add a vehicle, then log a fill-up</string>
+    <string name="dashboard_avg_efficiency">Average fuel efficiency</string>
+    <string name="dashboard_fuel_cost">Fuel cost</string>
+    <string name="dashboard_fuel_volume">Fuel volume</string>
+    <string name="dashboard_report_summary">Summary report</string>
+    <string name="dashboard_total_cost">Total cost</string>
+    <string name="dashboard_net_cost">Net cost</string>
+    <string name="dashboard_cumulative_distance">Cumulative distance</string>
+    <string name="dashboard_latest_odometer">Latest odometer</string>
+    <string name="dashboard_no_data">No data yet</string>
+    <string name="dashboard_record_count">Records</string>
+    <string name="dashboard_recent_entries">Recent entries</string>
 </resources>

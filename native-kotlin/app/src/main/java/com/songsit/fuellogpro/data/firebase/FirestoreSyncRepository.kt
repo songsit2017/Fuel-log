@@ -64,7 +64,7 @@ class FirestoreSyncRepository(
         for ((id, local) in localVehicles) {
             try {
                 val cloud = cloudVehicles[id]
-                val equal = cloud?.let(::parseVehicle)?.let(::vehicleCanonical) == vehicleCanonical(local)
+                val equal = cloud?.let { parseVehicle(it, context) }?.let(::vehicleCanonical) == vehicleCanonical(local)
                 when (decideSync(localExists = true, cloudExists = cloud != null, contentEqual = equal)) {
                     SyncDecision.UPLOAD -> {
                         firestore.collection("vehicles").document(id).set(
@@ -108,7 +108,7 @@ class FirestoreSyncRepository(
         val cloudOnlyVehicles = cloudVehicles
             .filterKeys { it !in localVehicles && it !in deletedVehicleIds }
             .values
-            .map(::parseVehicle)
+            .map { parseVehicle(it, context) }
         if (cloudOnlyVehicles.isNotEmpty()) {
             database.vehicleDao().upsertAll(cloudOnlyVehicles)
             cloudOnlyVehicles.forEach { clearConflict(VEHICLES_COLLECTION, it.id, it.id) }

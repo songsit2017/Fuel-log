@@ -270,6 +270,7 @@ fun FuelLogApp(
     var showSettings by remember { mutableStateOf(false) }
     var showVehicleMenu by remember { mutableStateOf(false) }
     var dashboardFabExpanded by remember { mutableStateOf(false) }
+    var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var homeTab by remember { mutableIntStateOf(0) }
     var viewingImagePath by remember { mutableStateOf<String?>(null) }
     // Remembers which homeTab (e.g. 1=Timeline) the user jumped FROM when tapping a record card
@@ -281,6 +282,9 @@ fun FuelLogApp(
     val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
+    val requestDelete: (() -> Unit) -> Unit = { action ->
+        if (displaySettings.confirmBeforeDelete) pendingDeleteAction = action else action()
+    }
 
     // No NavController in this app — screens/sub-screens are toggled boolean/int state, not a
     // back stack. This single handler replaces that missing back stack: it closes whichever
@@ -623,13 +627,18 @@ fun FuelLogApp(
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
                     else -> NearbyStationsMapScreen(onFindNearbyStations, oilPriceInfo, Modifier.padding(padding))
                 }
-                1 -> FuelList(state.entries, onDeleteFuel, { editingFuel = it }, Modifier.padding(padding))
+                1 -> FuelList(
+                    state.entries,
+                    { id -> requestDelete { onDeleteFuel(id) } },
+                    { editingFuel = it },
+                    Modifier.padding(padding),
+                )
                 2 -> ExpenseList(
                     expenses = state.expenses,
                     totalExpense = state.totalExpenses,
                     totalIncome = state.totalIncome,
                     netExpense = state.netExpense,
-                    onDelete = onDeleteExpense,
+                    onDelete = { id -> requestDelete { onDeleteExpense(id) } },
                     onEdit = { editingExpense = it },
                     modifier = Modifier.padding(padding),
                 )
@@ -637,7 +646,7 @@ fun FuelLogApp(
                     tasks = state.maintenanceTasks,
                     currentOdometerKm = state.summary.latestOdometerKm,
                     onComplete = onCompleteMaintenance,
-                    onDelete = onDeleteMaintenance,
+                    onDelete = { id -> requestDelete { onDeleteMaintenance(id) } },
                     onEdit = { editingMaintenance = it },
                     modifier = Modifier.padding(padding),
                 )
@@ -646,14 +655,14 @@ fun FuelLogApp(
                     selectedVehicleId = state.selectedVehicle?.id,
                     onSelect = onSelectVehicle,
                     onEdit = { editingVehicle = it },
-                    onDelete = onDeleteVehicle,
+                    onDelete = { id -> requestDelete { onDeleteVehicle(id) } },
                     modifier = Modifier.padding(padding),
                 )
                 5 -> StatsScreen(state, Modifier.padding(padding))
                 else -> TripList(
                     trips = state.trips,
                     summary = state.tripSummary,
-                    onDelete = onDeleteTrip,
+                    onDelete = { id -> requestDelete { onDeleteTrip(id) } },
                     onEdit = { editingTrip = it },
                     onStartRecording = onStartTripRecording,
                     onSaveRecordedTrip = { distanceKm ->
@@ -678,9 +687,28 @@ fun FuelLogApp(
                 onPickPhoto = onPickPhoto,
                 onPickCameraPhoto = onPickCameraPhoto,
                 autoOpenScan = addFuelAutoScan,
+                defaultFullTank = displaySettings.defaultFullTank,
                 onDismiss = { showAddFuel = false; editingFuel = null; addFuelAutoScan = false },
                 onSave = onAddFuel,
                 onUpdate = onUpdateFuel,
+            )
+        }
+        pendingDeleteAction?.let { deleteAction ->
+            AlertDialog(
+                onDismissRequest = { pendingDeleteAction = null },
+                title = { Text("ยืนยันการลบ") },
+                text = { Text("รายการที่ลบแล้วไม่สามารถกู้คืนได้") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingDeleteAction = null
+                            deleteAction()
+                        },
+                    ) { Text("ลบ", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeleteAction = null }) { Text("ยกเลิก") }
+                },
             )
         }
         if (showAddMaintenance || editingMaintenance != null) {
@@ -2071,6 +2099,7 @@ private fun SettingsScreen(
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
     var showOpenSourceLicenses by remember { mutableStateOf(false) }
+    var showOtherSettings by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
 
@@ -2100,6 +2129,14 @@ private fun SettingsScreen(
             members = vehicleMembers,
             onCreateInvite = onCreateInvite,
             onJoinByCode = onJoinByCode,
+        )
+        return
+    }
+    if (showOtherSettings) {
+        OtherSettingsScreen(
+            settings = displaySettings,
+            onSettingsChange = onDisplaySettingsChange,
+            onDismiss = { showOtherSettings = false },
         )
         return
     }
@@ -2142,15 +2179,11 @@ private fun SettingsScreen(
 
             item {
                 PreferenceListItem(
-                    title = "ธีมมืดอัตโนมัติ",
-                    subtitle = "ระบบเปิดโหมดประหยัดพลังงาน หรือตามระบบ",
-                    trailing = {
-                        Checkbox(
-                            checked = displaySettings.themeMode != "light",
-                            onCheckedChange = { checked ->
-                                onDisplaySettingsChange(displaySettings.copy(themeMode = if (checked) "dark" else "light"))
-                            },
-                        )
+                    title = "ธีม",
+                    subtitle = when (displaySettings.themeMode) {
+                        "light" -> "สว่าง"
+                        "dark" -> "มืด"
+                        else -> "ตามระบบ"
                     },
                     onClick = { showThemeDialog = true },
                 )
@@ -2170,6 +2203,13 @@ private fun SettingsScreen(
                     title = "ชุดรูปแบบ",
                     subtitle = themePaletteLabel(displaySettings.themePalette),
                     onClick = { showThemePaletteDialog = true },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "การตั้งค่าอื่น ๆ",
+                    subtitle = "ค่าเริ่มต้นการเติมน้ำมันและการยืนยันก่อนลบ",
+                    onClick = { showOtherSettings = true },
                 )
             }
 
@@ -2410,6 +2450,69 @@ private fun SettingsScreen(
             },
             confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text("ยกเลิก") } },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OtherSettingsScreen(
+    settings: DisplaySettings,
+    onSettingsChange: (DisplaySettings) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("การตั้งค่าอื่น ๆ") },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            item { PreferenceCategoryHeader("การบันทึก") }
+            item {
+                PreferenceListItem(
+                    title = "เติมเต็มถังเป็นค่าเริ่มต้น",
+                    subtitle = "เปิดตัวเลือกเต็มถังอัตโนมัติเมื่อเพิ่มรายการเติมน้ำมันใหม่",
+                    trailing = {
+                        Switch(
+                            checked = settings.defaultFullTank,
+                            onCheckedChange = {
+                                onSettingsChange(settings.copy(defaultFullTank = it))
+                            },
+                        )
+                    },
+                    onClick = {
+                        onSettingsChange(settings.copy(defaultFullTank = !settings.defaultFullTank))
+                    },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    title = "ยืนยันก่อนลบ",
+                    subtitle = "ถามยืนยันก่อนลบรถ การเติมน้ำมัน ค่าใช้จ่าย งานบำรุงรักษา และทริป",
+                    trailing = {
+                        Switch(
+                            checked = settings.confirmBeforeDelete,
+                            onCheckedChange = {
+                                onSettingsChange(settings.copy(confirmBeforeDelete = it))
+                            },
+                        )
+                    },
+                    onClick = {
+                        onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -3098,6 +3201,7 @@ private fun AddFuelScreen(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     autoOpenScan: Boolean = false,
+    defaultFullTank: Boolean = true,
     onDismiss: () -> Unit,
     onSave: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdate: ((String, FuelEntryFormValues, () -> Unit) -> Unit)? = null,
@@ -3158,7 +3262,9 @@ private fun AddFuelScreen(
         }
     }
     var station by remember { mutableStateOf(editing?.station ?: "") }
-    var fullTank by remember { mutableStateOf(editing?.fullTank ?: true) }
+    var fullTank by remember(editing, defaultFullTank) {
+        mutableStateOf(editing?.fullTank ?: defaultFullTank)
+    }
     var showStationSelection by remember { mutableStateOf(false) }
     var nearbyStations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var nearbySearching by remember { mutableStateOf(false) }

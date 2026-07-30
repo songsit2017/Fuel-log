@@ -612,6 +612,11 @@
     <!-- TripRecordingService -->
     <string name="notification_channel_trip_name">Trip recording</string>
     <string name="notification_channel_trip_desc">Alerts while recording a GPS trip distance</string>
+
+    <!-- GoogleDriveBackupRepository -->
+    <string name="error_drive_download_failed_http">Couldn\'t download the backup file (HTTP %1$d)</string>
+    <string name="error_drive_upload_failed_http">Couldn\'t upload %1$s (HTTP %2$d) %3$s</string>
+    <string name="error_drive_api_failed_http">Google Drive API call failed (HTTP %1$d) %2$s</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

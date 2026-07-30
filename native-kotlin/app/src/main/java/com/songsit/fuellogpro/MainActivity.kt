@@ -64,7 +64,7 @@ private const val MAX_PICK_PHOTOS = 8
 class MainActivity : AppCompatActivity() {
     private lateinit var backupRepository: LocalBackupRepository
     private lateinit var csvExportRepository: LocalCsvExportRepository
-    private val driveBackupRepository = com.songsit.fuellogpro.data.GoogleDriveBackupRepository()
+    private val driveBackupRepository = com.songsit.fuellogpro.data.GoogleDriveBackupRepository(this)
     private val driveBackupProgress = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
 
     private val notificationPermission = registerForActivityResult(

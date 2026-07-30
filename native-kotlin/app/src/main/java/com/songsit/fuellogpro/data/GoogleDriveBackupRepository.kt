@@ -1,5 +1,7 @@
 package com.songsit.fuellogpro.data
 
+import android.content.Context
+import com.songsit.fuellogpro.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -51,7 +53,7 @@ private const val UPLOAD_CONCURRENCY = 10
  * any local file whose name already exists in the Pictures folder is skipped, so repeat
  * backups don't re-upload everything every time.
  */
-class GoogleDriveBackupRepository {
+class GoogleDriveBackupRepository(private val context: Context) {
 
     suspend fun backup(
         accessToken: String,
@@ -153,7 +155,7 @@ class GoogleDriveBackupRepository {
             val responseCode = connection.responseCode
             val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            if (responseCode !in 200..299) error("ดาวน์โหลดไฟล์สำรองไม่สำเร็จ (HTTP $responseCode)")
+            if (responseCode !in 200..299) error(context.getString(R.string.error_drive_download_failed_http, responseCode))
             return text
         } finally {
             connection.disconnect()
@@ -212,7 +214,7 @@ class GoogleDriveBackupRepository {
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
                 val errorBody = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                error("อัปโหลดไฟล์ $filename ไม่สำเร็จ (HTTP $responseCode) $errorBody")
+                error(context.getString(R.string.error_drive_upload_failed_http, filename, responseCode, errorBody))
             }
         } finally {
             connection.disconnect()
@@ -229,7 +231,7 @@ class GoogleDriveBackupRepository {
             val responseCode = connection.responseCode
             val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
-            if (responseCode !in 200..299) error("เรียก Google Drive API ไม่สำเร็จ (HTTP $responseCode) $text")
+            if (responseCode !in 200..299) error(context.getString(R.string.error_drive_api_failed_http, responseCode, text))
             return JSONObject(text)
         } finally {
             connection.disconnect()
@@ -249,7 +251,7 @@ class GoogleDriveBackupRepository {
             val responseCode = connection.responseCode
             val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
-            if (responseCode !in 200..299) error("เรียก Google Drive API ไม่สำเร็จ (HTTP $responseCode) $text")
+            if (responseCode !in 200..299) error(context.getString(R.string.error_drive_api_failed_http, responseCode, text))
             return JSONObject(text)
         } finally {
             connection.disconnect()

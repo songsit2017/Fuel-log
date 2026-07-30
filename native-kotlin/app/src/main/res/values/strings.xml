@@ -367,6 +367,26 @@
     <string name="action_attach_photo_receipt">Attach photo/receipt</string>
     <string name="action_add_photo">Add photo</string>
     <string name="action_attach_pdf">Attach PDF</string>
+
+    <!-- AddExpenseScreen -->
+    <string name="expense_edit_title">Edit expense</string>
+    <string name="expense_add_title">Add expense</string>
+    <string name="label_category">Category</string>
+    <string name="content_desc_select_category">Select category</string>
+    <string name="section_expense_info">Expense info</string>
+    <string name="label_title_field">Title</string>
+    <string name="label_expense_as_income">Negative expense / income</string>
+    <string name="label_notes">Notes</string>
+    <string name="label_odometer_total_reading">Odometer / total reading</string>
+    <string name="label_save_as_template">Save as template</string>
+    <string name="section_recurring">Recurring</string>
+    <string name="recurring_monthly">Repeats monthly</string>
+    <string name="recurring_one_time">One-time expense</string>
+    <string name="content_desc_select_frequency">Select frequency</string>
+    <string name="section_photos_scan">Photos &amp; scan receipt</string>
+    <string name="section_payment_reminder">Payment reminder</string>
+    <string name="label_add_reminder">Add reminder</string>
+    <string name="label_reminder_date">Reminder date</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

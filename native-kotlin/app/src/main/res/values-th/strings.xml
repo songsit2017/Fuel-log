@@ -345,6 +345,26 @@
     <string name="action_attach_photo_receipt">แนบรูป/ใบเสร็จ</string>
     <string name="action_add_photo">เพิ่มรูป</string>
     <string name="action_attach_pdf">แนบ PDF</string>
+
+    <!-- AddExpenseScreen -->
+    <string name="expense_edit_title">แก้ไขค่าใช้จ่าย</string>
+    <string name="expense_add_title">เพิ่มค่าใช้จ่าย</string>
+    <string name="label_category">หมวดหมู่</string>
+    <string name="content_desc_select_category">เลือกหมวดหมู่</string>
+    <string name="section_expense_info">ข้อมูลค่าใช้จ่าย</string>
+    <string name="label_title_field">ชื่อเรื่อง</string>
+    <string name="label_expense_as_income">ค่าใช้จ่ายเชิงลบ / เป็นรายรับ</string>
+    <string name="label_notes">หมายเหตุ</string>
+    <string name="label_odometer_total_reading">เลขไมล์ / มาตรวัดระยะทางรวม</string>
+    <string name="label_save_as_template">บันทึกเป็นแม่แบบ</string>
+    <string name="section_recurring">เกิดขึ้นประจำ</string>
+    <string name="recurring_monthly">ทำซ้ำทุกเดือน</string>
+    <string name="recurring_one_time">ค่าใช้จ่ายเพียงครั้งเดียว</string>
+    <string name="content_desc_select_frequency">เลือกความถี่</string>
+    <string name="section_photos_scan">รูปภาพ &amp; สแกนบิล</string>
+    <string name="section_payment_reminder">จดหมายเตือนชำระเงิน</string>
+    <string name="label_add_reminder">เพิ่มการเตือน</string>
+    <string name="label_reminder_date">วันเตือนชำระ</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

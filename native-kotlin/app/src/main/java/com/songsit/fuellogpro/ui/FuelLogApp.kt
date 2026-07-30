@@ -4224,13 +4224,13 @@ private fun AddExpenseScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
                     }
                 },
-                title = { Text(if (editing != null) "แก้ไขค่าใช้จ่าย" else "เพิ่มค่าใช้จ่าย") },
+                title = { Text(if (editing != null) stringResource(com.songsit.fuellogpro.R.string.expense_edit_title) else stringResource(com.songsit.fuellogpro.R.string.expense_add_title)) },
                 actions = {
                     IconButton(enabled = !saving, onClick = { save() }) {
-                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                        Icon(Icons.Filled.Check, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_save))
                     }
                 },
             )
@@ -4258,11 +4258,11 @@ private fun AddExpenseScreen(
                         value = category,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("หมวดหมู่") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_category)) },
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
                         trailingIcon = {
                             IconButton(onClick = { categoryMenuExpanded = true }) {
-                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกหมวดหมู่")
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_select_category))
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -4274,11 +4274,11 @@ private fun AddExpenseScreen(
                     }
                 }
             }
-            item { Text("ข้อมูลค่าใช้จ่าย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_expense_info), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 OutlinedTextField(
                     description, { description = it },
-                    label = { Text("ชื่อเรื่อง") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_title_field)) },
                     leadingIcon = { Text("T", fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -4287,7 +4287,7 @@ private fun AddExpenseScreen(
             item {
                 OutlinedTextField(
                     amount, { amount = it },
-                    label = { Text("ราคารวม") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_total_price)) },
                     leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -4297,12 +4297,12 @@ private fun AddExpenseScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         date, { date = it },
-                        label = { Text("วันที่") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
                         leadingIcon = { Icon(Icons.Filled.CalendarToday, contentDescription = null) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
-                    OutlinedTextField(time, { time = it }, label = { Text("เวลา") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(time, { time = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) }, singleLine = true, modifier = Modifier.weight(1f))
                 }
             }
             item {
@@ -4311,15 +4311,15 @@ private fun AddExpenseScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("ค่าใช้จ่ายเชิงลบ / เป็นรายรับ")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_expense_as_income))
                     Switch(checked = income, onCheckedChange = { income = it })
                 }
             }
-            item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_optional_fields), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 OutlinedTextField(
                     reminderDate, { reminderDate = it },
-                    label = { Text("หมายเหตุ") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_notes)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -4327,7 +4327,7 @@ private fun AddExpenseScreen(
             item {
                 OutlinedTextField(
                     odometer, { odometer = it },
-                    label = { Text("เลขไมล์ / มาตรวัดระยะทางรวม") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_odometer_total_reading)) },
                     leadingIcon = { Icon(Icons.Filled.Speed, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -4339,39 +4339,41 @@ private fun AddExpenseScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("บันทึกเป็นแม่แบบ")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_save_as_template))
                     Switch(checked = saveAsTemplate, onCheckedChange = { saveAsTemplate = it })
                 }
             }
-            item { Text("เกิดขึ้นประจำ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_recurring), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 Box {
                     var recurringMenuExpanded by remember { mutableStateOf(false) }
+                    val monthlyLabel = stringResource(com.songsit.fuellogpro.R.string.recurring_monthly)
+                    val oneTimeLabel = stringResource(com.songsit.fuellogpro.R.string.recurring_one_time)
                     OutlinedTextField(
-                        value = if (recurring) "ทำซ้ำทุกเดือน" else "ค่าใช้จ่ายเพียงครั้งเดียว",
+                        value = if (recurring) monthlyLabel else oneTimeLabel,
                         onValueChange = {},
                         readOnly = true,
                         leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
                         trailingIcon = {
                             IconButton(onClick = { recurringMenuExpanded = true }) {
-                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกความถี่")
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_select_frequency))
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     DropdownMenu(expanded = recurringMenuExpanded, onDismissRequest = { recurringMenuExpanded = false }) {
-                        DropdownMenuItem(text = { Text("ค่าใช้จ่ายเพียงครั้งเดียว") }, onClick = { recurring = false; recurringMenuExpanded = false })
-                        DropdownMenuItem(text = { Text("ทำซ้ำทุกเดือน") }, onClick = { recurring = true; recurringMenuExpanded = false })
+                        DropdownMenuItem(text = { Text(oneTimeLabel) }, onClick = { recurring = false; recurringMenuExpanded = false })
+                        DropdownMenuItem(text = { Text(monthlyLabel) }, onClick = { recurring = true; recurringMenuExpanded = false })
                     }
                 }
             }
             if (onPickPhoto != null) {
-                item { Text("รูปภาพ & สแกนบิล", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item { Text(stringResource(com.songsit.fuellogpro.R.string.section_photos_scan), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 item {
                     PhotoAttachmentRow(
                         photoUris = photoUris,
-                        // Plain "แนบรูป" — type = null so scanFirstPhoto() skips OCR entirely;
-                        // only the dedicated "สแกนบิล/ใบเสร็จด้วย AI" button below opts into it.
+                        // Plain "attach photo" — type = null so scanFirstPhoto() skips OCR entirely;
+                        // only the dedicated "Scan receipt with AI" button below opts into it.
                         onPickGallery = { isScanning = true; onPickPhoto(null, expenseHandlePicked) },
                         onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick(null, expenseHandlePicked) } },
                         onPickPdf = onPickPdf?.let { pick ->
@@ -4400,11 +4402,11 @@ private fun AddExpenseScreen(
                             if (isScanning) {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(8.dp))
-                                Text("กำลังสแกน...")
+                                Text(stringResource(com.songsit.fuellogpro.R.string.action_scanning))
                             } else {
                                 Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("สแกนบิล/ใบเสร็จด้วย AI")
+                                Text(stringResource(com.songsit.fuellogpro.R.string.action_scan_receipt_ai))
                             }
                         }
                         if (onPickCameraPhoto != null) {
@@ -4413,11 +4415,11 @@ private fun AddExpenseScreen(
                                 onDismissRequest = { showScanSourceMenu = false },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("ถ่ายรูป") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_take_photo)) },
                                     onClick = { showScanSourceMenu = false; isScanning = true; onPickCameraPhoto("expense", expenseHandlePicked) },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("เลือกจากแกลอรี่") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_choose_from_gallery)) },
                                     onClick = { showScanSourceMenu = false; isScanning = true; onPickPhoto("expense", expenseHandlePicked) },
                                 )
                             }
@@ -4425,14 +4427,14 @@ private fun AddExpenseScreen(
                     }
                 }
             }
-            item { Text("จดหมายเตือนชำระเงิน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_payment_reminder), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("เพิ่มการเตือน")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_add_reminder))
                     Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
                 }
             }
@@ -4440,7 +4442,7 @@ private fun AddExpenseScreen(
                 item {
                     OutlinedTextField(
                         reminderDate, { reminderDate = it },
-                        label = { Text("วันเตือนชำระ") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_reminder_date)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -4448,7 +4450,7 @@ private fun AddExpenseScreen(
             }
             item {
                 Button(enabled = !saving, onClick = { save() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (saving) "กำลังบันทึก…" else "บันทึก")
+                    Text(if (saving) stringResource(com.songsit.fuellogpro.R.string.action_saving) else stringResource(com.songsit.fuellogpro.R.string.action_save))
                 }
             }
         }

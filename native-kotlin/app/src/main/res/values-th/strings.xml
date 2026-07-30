@@ -190,4 +190,36 @@
     <string name="import_summary_expenses">รายการค่าใช้จ่ายอื่นๆ:</string>
     <string name="import_summary_photos">รูปภาพประกอบที่นำเข้าสำเร็จ:</string>
     <string name="import_summary_photos_count">%1$d รูป</string>
+
+    <string name="fuel_screen_edit_title">แก้ไขการเติมน้ำมัน</string>
+    <string name="fuel_screen_add_title">เติมน้ำมัน</string>
+    <string name="station_section_title">สถานีบริการน้ำมัน</string>
+    <string name="station_select_current_location">เลือกตำแหน่งปัจจุบัน</string>
+    <string name="action_select">เลือก</string>
+    <string name="label_fuel_liters">เชื้อเพลิง (L)</string>
+    <string name="label_fuel_type">ชนิดเชื้อเพลิง</string>
+    <string name="label_price_per_liter">ราคา/L</string>
+    <string name="label_total_price">ราคารวม</string>
+    <string name="label_date">วันที่</string>
+    <string name="label_time">เวลา</string>
+    <string name="action_scanning">กำลังสแกน...</string>
+    <string name="action_scan_receipt_ai">สแกนบิล/ใบเสร็จด้วย AI</string>
+    <string name="action_take_photo">ถ่ายรูป</string>
+    <string name="action_choose_from_gallery">เลือกจากแกลอรี่</string>
+    <string name="label_full_tank">เติมเต็มถัง</string>
+    <string name="label_set_tank_level">ตั้งค่าระดับถัง</string>
+    <string name="tank_level_before">ก่อนเติม</string>
+    <string name="tank_level_after">หลังเติม</string>
+    <string name="tank_level_not_set">ไม่ได้ตั้งค่า</string>
+    <string name="content_desc_edit_tank_level">ตั้งค่าระดับน้ำมันเชื้อเพลิง</string>
+    <string name="section_weather">สภาพอากาศ</string>
+    <string name="weather_fetching">กำลังเรียกข้อมูลสภาพอากาศ...</string>
+    <string name="weather_no_data">ไม่มีข้อมูลสภาพอากาศ</string>
+    <string name="section_optional">ไม่จำเป็น</string>
+    <string name="label_discount">ส่วนลด</string>
+    <string name="label_discount_per_liter">ส่วนลด (บาท/ลิตร)</string>
+    <string name="label_discount_flat">ส่วนลด (บาท)</string>
+    <string name="label_discount_unit">หน่วยส่วนลด</string>
+    <string name="unit_baht">บาท</string>
+    <string name="unit_baht_per_liter">บาท/ลิตร</string>
 </resources>

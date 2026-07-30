@@ -208,4 +208,39 @@
     <string name="import_summary_expenses">Other expense entries:</string>
     <string name="import_summary_photos">Photos imported successfully:</string>
     <string name="import_summary_photos_count">%1$d photo(s)</string>
+
+    <!-- AddFuelScreen. NOTE: fuelType/vehicleFuelType default ("เบนซิน"), getFuelTypeOptionsForVehicle's
+         return values, and tankLevelTiming's stored "before"/"after" keys are NOT translated —
+         fuelType is a stored data value (FuelEntry/Vehicle.fuelType) matched elsewhere. -->
+    <string name="fuel_screen_edit_title">Edit fill-up</string>
+    <string name="fuel_screen_add_title">Add fill-up</string>
+    <string name="station_section_title">Fuel station</string>
+    <string name="station_select_current_location">Select current location</string>
+    <string name="action_select">Select</string>
+    <string name="label_fuel_liters">Fuel (L)</string>
+    <string name="label_fuel_type">Fuel type</string>
+    <string name="label_price_per_liter">Price/L</string>
+    <string name="label_total_price">Total price</string>
+    <string name="label_date">Date</string>
+    <string name="label_time">Time</string>
+    <string name="action_scanning">Scanning…</string>
+    <string name="action_scan_receipt_ai">Scan receipt with AI</string>
+    <string name="action_take_photo">Take photo</string>
+    <string name="action_choose_from_gallery">Choose from gallery</string>
+    <string name="label_full_tank">Full tank</string>
+    <string name="label_set_tank_level">Set tank level</string>
+    <string name="tank_level_before">before fill-up</string>
+    <string name="tank_level_after">after fill-up</string>
+    <string name="tank_level_not_set">Not set</string>
+    <string name="content_desc_edit_tank_level">Set fuel tank level</string>
+    <string name="section_weather">Weather</string>
+    <string name="weather_fetching">Fetching weather…</string>
+    <string name="weather_no_data">No weather data</string>
+    <string name="section_optional">Optional</string>
+    <string name="label_discount">Discount</string>
+    <string name="label_discount_per_liter">Discount (Baht/liter)</string>
+    <string name="label_discount_flat">Discount (Baht)</string>
+    <string name="label_discount_unit">Discount unit</string>
+    <string name="unit_baht">Baht</string>
+    <string name="unit_baht_per_liter">Baht/liter</string>
 </resources>

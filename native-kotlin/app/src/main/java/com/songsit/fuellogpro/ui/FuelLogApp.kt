@@ -3511,6 +3511,9 @@ private fun AddFuelScreen(
     var weatherLongitude by remember { mutableStateOf(editing?.weatherLongitude) }
     var weatherFetching by remember { mutableStateOf(false) }
     var weatherError by remember { mutableStateOf<String?>(null) }
+    // Hoisted: this callback fires from onFindNearbyStations' async result, well outside
+    // composable context, so stringResource() can't be called at the point of use below.
+    val noStationsFoundLabel = stringResource(com.songsit.fuellogpro.R.string.nearby_no_stations)
     val runNearbySearch = {
         nearbySearching = true
         nearbyError = null
@@ -3518,7 +3521,7 @@ private fun AddFuelScreen(
             { results ->
                 nearbySearching = false
                 nearbyStations = results
-                if (results.isEmpty()) nearbyError = "ไม่พบปั๊มใกล้ฉัน"
+                if (results.isEmpty()) nearbyError = noStationsFoundLabel
             },
             { message ->
                 nearbySearching = false
@@ -3614,18 +3617,22 @@ private fun AddFuelScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
                     }
                 },
                 title = {
                     Text(
-                        if (editing != null) "แก้ไขการเติมน้ำมัน" else "เติมน้ำมัน",
+                        if (editing != null) {
+                            stringResource(com.songsit.fuellogpro.R.string.fuel_screen_edit_title)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.fuel_screen_add_title)
+                        },
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
                 actions = {
                     IconButton(onClick = doSave, enabled = !saving) {
-                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                        Icon(Icons.Filled.Check, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_save))
                     }
                 },
             )
@@ -3643,7 +3650,7 @@ private fun AddFuelScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("สถานีบริการน้ำมัน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(com.songsit.fuellogpro.R.string.station_section_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
@@ -3661,11 +3668,11 @@ private fun AddFuelScreen(
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(
-                                text = station.ifBlank { "เลือกตำแหน่งปัจจุบัน" },
+                                text = station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.station_select_current_location) },
                                 modifier = Modifier.weight(1f)
                             )
                             TextButton(onClick = { showStationSelection = true }) {
-                                Text("เลือก")
+                                Text(stringResource(com.songsit.fuellogpro.R.string.action_select))
                             }
                         }
                     }
@@ -3690,7 +3697,7 @@ private fun AddFuelScreen(
                         OutlinedTextField(
                             liters,
                             { liters = it },
-                            label = { Text("เชื้อเพลิง (L)") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_fuel_liters)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f).onFocusChanged {
                                 if (it.isFocused) litersHadFocus = true else if (litersHadFocus) onLitersCommit()
@@ -3698,7 +3705,7 @@ private fun AddFuelScreen(
                         )
                         val availableFuelTypes = remember(vehicleFuelType) { getFuelTypeOptionsForVehicle(vehicleFuelType) }
                         UnitDropdownField(
-                            "ชนิดเชื้อเพลิง",
+                            stringResource(com.songsit.fuellogpro.R.string.label_fuel_type),
                             fuelType,
                             availableFuelTypes,
                             modifier = Modifier.weight(1f),
@@ -3710,7 +3717,7 @@ private fun AddFuelScreen(
                         OutlinedTextField(
                             price,
                             { price = it },
-                            label = { Text("ราคา/L") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_price_per_liter)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f).onFocusChanged {
                                 if (it.isFocused) priceHadFocus = true else if (priceHadFocus) onPriceCommit()
@@ -3719,7 +3726,7 @@ private fun AddFuelScreen(
                         OutlinedTextField(
                             total,
                             { total = it },
-                            label = { Text("ราคารวม") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_total_price)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f).onFocusChanged {
                                 if (it.isFocused) totalHadFocus = true else if (totalHadFocus) onTotalCommit()
@@ -3732,14 +3739,14 @@ private fun AddFuelScreen(
                         OutlinedTextField(
                             date,
                             { date = it },
-                            label = { Text("วันที่") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
                             time,
                             { time = it },
-                            label = { Text("เวลา") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
@@ -3774,11 +3781,11 @@ private fun AddFuelScreen(
                                 if (isScanningReceipt) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("กำลังสแกน...")
+                                    Text(stringResource(com.songsit.fuellogpro.R.string.action_scanning))
                                 } else {
                                     Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(8.dp))
-                                    Text("สแกนบิล/ใบเสร็จด้วย AI")
+                                    Text(stringResource(com.songsit.fuellogpro.R.string.action_scan_receipt_ai))
                                 }
                             }
                             if (onPickCameraPhoto != null) {
@@ -3787,11 +3794,11 @@ private fun AddFuelScreen(
                                     onDismissRequest = { showScanSourceMenu = false },
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("ถ่ายรูป") },
+                                        text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_take_photo)) },
                                         onClick = { showScanSourceMenu = false; isScanningReceipt = true; onPickCameraPhoto("fuel", handlePicked) },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("เลือกจากแกลอรี่") },
+                                        text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_choose_from_gallery)) },
                                         onClick = { showScanSourceMenu = false; isScanningReceipt = true; onPickPhoto("fuel", handlePicked) },
                                     )
                                 }
@@ -3805,7 +3812,7 @@ private fun AddFuelScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("เติมเต็มถัง")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.label_full_tank))
                         Switch(checked = fullTank, onCheckedChange = { fullTank = it })
                     }
                 }
@@ -3815,25 +3822,28 @@ private fun AddFuelScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("ตั้งค่าระดับถัง")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.label_set_tank_level))
                         Switch(checked = tankLevelEnabled, onCheckedChange = { tankLevelEnabled = it })
                     }
                 }
                 if (tankLevelEnabled) {
                     item {
+                        val beforeLabel = stringResource(com.songsit.fuellogpro.R.string.tank_level_before)
+                        val afterLabel = stringResource(com.songsit.fuellogpro.R.string.tank_level_after)
+                        val notSetLabel = stringResource(com.songsit.fuellogpro.R.string.tank_level_not_set)
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { showTankLevelDialog = true },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             val summary = tankLevelLiters?.let {
-                                val timingLabel = if (tankLevelTiming == "before") "ก่อนเติม" else "หลังเติม"
+                                val timingLabel = if (tankLevelTiming == "before") beforeLabel else afterLabel
                                 "$timingLabel ${tankLevelPercent?.toInt() ?: 0}% (${"%.1f".format(Locale.US, it)} L)"
-                            } ?: "ไม่ได้ตั้งค่า"
+                            } ?: notSetLabel
                             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             Icon(
                                 Icons.Filled.Edit,
-                                contentDescription = "ตั้งค่าระดับน้ำมันเชื้อเพลิง",
+                                contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_edit_tank_level),
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
@@ -3841,47 +3851,57 @@ private fun AddFuelScreen(
                     }
                 }
                 if (onFetchWeather != null) {
-                    item { Text("สภาพอากาศ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    item { Text(stringResource(com.songsit.fuellogpro.R.string.section_weather), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                     item {
                         FormRow(Icons.Filled.WbSunny) {
                             val description = weatherDescription
                             val summary = when {
-                                weatherFetching -> "กำลังเรียกข้อมูลสภาพอากาศ..."
+                                weatherFetching -> stringResource(com.songsit.fuellogpro.R.string.weather_fetching)
                                 description != null -> description + (weatherTemperatureC?.let { " • %.1f°C".format(Locale.US, it) } ?: "")
                                 weatherError != null -> weatherError ?: ""
-                                else -> "ไม่มีข้อมูลสภาพอากาศ"
+                                else -> stringResource(com.songsit.fuellogpro.R.string.weather_no_data)
                             }
                             Text(summary, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
-                item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item { Text(stringResource(com.songsit.fuellogpro.R.string.section_optional), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("ส่วนลด")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.label_discount))
                         Switch(checked = discountEnabled, onCheckedChange = { discountEnabled = it })
                     }
                 }
                 if (discountEnabled) {
                     item {
+                        val bahtLabel = stringResource(com.songsit.fuellogpro.R.string.unit_baht)
+                        val bahtPerLiterLabel = stringResource(com.songsit.fuellogpro.R.string.unit_baht_per_liter)
                         FormRow(Icons.Filled.Percent) {
                             OutlinedTextField(
                                 discountAmount,
                                 { discountAmount = it },
-                                label = { Text(if (discountPerLiter) "ส่วนลด (บาท/ลิตร)" else "ส่วนลด (บาท)") },
+                                label = {
+                                    Text(
+                                        if (discountPerLiter) {
+                                            stringResource(com.songsit.fuellogpro.R.string.label_discount_per_liter)
+                                        } else {
+                                            stringResource(com.songsit.fuellogpro.R.string.label_discount_flat)
+                                        },
+                                    )
+                                },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                             )
                             UnitDropdownField(
-                                "หน่วยส่วนลด",
-                                if (discountPerLiter) "บาท/ลิตร" else "บาท",
-                                listOf("บาท", "บาท/ลิตร"),
+                                stringResource(com.songsit.fuellogpro.R.string.label_discount_unit),
+                                if (discountPerLiter) bahtPerLiterLabel else bahtLabel,
+                                listOf(bahtLabel, bahtPerLiterLabel),
                                 modifier = Modifier.weight(1f),
-                            ) { discountPerLiter = it == "บาท/ลิตร" }
+                            ) { discountPerLiter = it == bahtPerLiterLabel }
                         }
                     }
                 }

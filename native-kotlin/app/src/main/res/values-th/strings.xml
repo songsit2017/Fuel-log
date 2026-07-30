@@ -275,4 +275,35 @@
     <string name="confirm_delete_title">ยืนยันการลบ</string>
     <string name="confirm_delete_message">รายการที่ลบแล้วไม่สามารถกู้คืนได้</string>
     <string name="check_data_title">ตรวจสอบข้อมูล</string>
+
+    <!-- TripCalculatorScreen -->
+    <string-array name="calculator_modes">
+        <item>ค่าใช้จ่ายในการเดินทาง</item>
+        <item>ระยะทาง</item>
+        <item>อัตราการใช้งาน</item>
+        <item>ปริมาณน้ำมันที่ต้องใช้</item>
+    </string-array>
+    <string name="content_desc_quick_pick">เลือกด่วน</string>
+    <string name="label_calculator_mode">โหมดการคำนวณ</string>
+    <string name="content_desc_select_mode">เลือกโหมด</string>
+    <string name="label_distance_km">ระยะทาง (km)</string>
+    <string name="label_fuel_efficiency_km_per_l">อัตราสิ้นเปลือง (km/L)</string>
+    <string name="label_budget">งบประมาณ ($)</string>
+    <string name="action_calculate">คำนวณ</string>
+    <string name="label_result">ผลลัพธ์</string>
+    <string name="quick_pick_latest_price">ราคาน้ำมันล่าสุด (%1$s)</string>
+    <string name="quick_pick_average_price">ราคาเชื้อเพลิงเฉลี่ย (%1$s)</string>
+    <string name="quick_pick_latest_consumption">ปริมาณการใช้น้ำมันล่าสุด (%1$s)</string>
+    <string name="quick_pick_average_consumption">ปริมาณการใช้น้ำมันเฉลี่ย (%1$s)</string>
+
+    <!-- NearbyStationsMapScreen / OilPriceCard -->
+    <string name="nearby_searching_stations">กำลังค้นหาปั๊มใกล้เคียง...</string>
+    <string name="nearby_stations_button">ปั๊มใกล้เคียง (%1$d)</string>
+    <string name="section_nearby_stations">สถานีบริการน้ำมันใกล้เคียง</string>
+    <string name="title_oil_prices_today">ราคาน้ำมันวันนี้</string>
+    <string name="fuel_grade_gasohol_95">แก๊สโซฮอล์ 95</string>
+    <string name="fuel_grade_gasohol_91">แก๊สโซฮอล์ 91</string>
+    <string name="fuel_grade_diesel_b7">ดีเซล B7</string>
+    <string name="fuel_grade_diesel_b20">ดีเซล B20</string>
+    <string name="fuel_grade_premium_95">พรีเมียม 95</string>
 </resources>

@@ -297,4 +297,35 @@
     <string name="confirm_delete_title">Confirm delete</string>
     <string name="confirm_delete_message">Deleted items cannot be recovered</string>
     <string name="check_data_title">Check your data</string>
+
+    <!-- TripCalculatorScreen -->
+    <string-array name="calculator_modes">
+        <item>Cost of a trip</item>
+        <item>Distance</item>
+        <item>Fuel efficiency</item>
+        <item>Fuel needed</item>
+    </string-array>
+    <string name="content_desc_quick_pick">Quick pick</string>
+    <string name="label_calculator_mode">Calculation mode</string>
+    <string name="content_desc_select_mode">Select mode</string>
+    <string name="label_distance_km">Distance (km)</string>
+    <string name="label_fuel_efficiency_km_per_l">Fuel efficiency (km/L)</string>
+    <string name="label_budget">Budget ($)</string>
+    <string name="action_calculate">Calculate</string>
+    <string name="label_result">Result</string>
+    <string name="quick_pick_latest_price">Latest fuel price (%1$s)</string>
+    <string name="quick_pick_average_price">Average fuel price (%1$s)</string>
+    <string name="quick_pick_latest_consumption">Latest fuel efficiency (%1$s)</string>
+    <string name="quick_pick_average_consumption">Average fuel efficiency (%1$s)</string>
+
+    <!-- NearbyStationsMapScreen / OilPriceCard -->
+    <string name="nearby_searching_stations">Searching for nearby stations…</string>
+    <string name="nearby_stations_button">Nearby stations (%1$d)</string>
+    <string name="section_nearby_stations">Nearby fuel stations</string>
+    <string name="title_oil_prices_today">Today\'s fuel prices</string>
+    <string name="fuel_grade_gasohol_95">Gasohol 95</string>
+    <string name="fuel_grade_gasohol_91">Gasohol 91</string>
+    <string name="fuel_grade_diesel_b7">Diesel B7</string>
+    <string name="fuel_grade_diesel_b20">Diesel B20</string>
+    <string name="fuel_grade_premium_95">Premium 95</string>
 </resources>

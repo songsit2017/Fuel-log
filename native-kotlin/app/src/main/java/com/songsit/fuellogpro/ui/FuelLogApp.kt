@@ -121,6 +121,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -775,7 +776,6 @@ fun FuelLogApp(
     }
 }
 
-private val calculatorModes = listOf("ค่าใช้จ่ายในการเดินทาง", "ระยะทาง", "อัตราการใช้งาน", "ปริมาณน้ำมันที่ต้องใช้")
 private val distanceQuickPicks = listOf(10, 30, 100, 200, 300, 400, 500, 700, 1000, 1200)
 private val maintenanceCategoryOptions =
     listOf("เช็คระยะ", "เปลี่ยนถ่ายน้ำมันเครื่อง", "ประกันภัย/พ.ร.บ.", "ภาษี", "บำรุงรักษา", "อื่นๆ")
@@ -796,7 +796,7 @@ private fun QuickPickField(
             label = { Text(label) },
             trailingIcon = {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกด่วน")
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_quick_pick))
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -823,18 +823,19 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
     var fuelVolumeLiters by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
 
+    val calculatorModes = stringArrayResource(com.songsit.fuellogpro.R.array.calculator_modes)
     val latestPrice = state.entries.maxByOrNull { it.date + it.time }?.pricePerLiter
     val averagePrice = state.entries.map { it.pricePerLiter }.filter { it > 0 }.let { if (it.isEmpty()) null else it.average() }
     val latestConsumption = calculatePerEntryKmPerLiter(state.entries).values.lastOrNull()
     val averageConsumption = state.summary.averageKmPerLiter
 
     val priceQuickChoices = listOfNotNull(
-        latestPrice?.let { "ราคาน้ำมันล่าสุด (%.2f)".format(it) to "%.2f".format(it) },
-        averagePrice?.let { "ราคาเชื้อเพลิงเฉลี่ย (%.2f)".format(it) to "%.2f".format(it) },
+        latestPrice?.let { stringResource(com.songsit.fuellogpro.R.string.quick_pick_latest_price, "%.2f".format(it)) to "%.2f".format(it) },
+        averagePrice?.let { stringResource(com.songsit.fuellogpro.R.string.quick_pick_average_price, "%.2f".format(it)) to "%.2f".format(it) },
     )
     val consumptionQuickChoices = listOfNotNull(
-        latestConsumption?.let { "ปริมาณการใช้น้ำมันล่าสุด (%.2f)".format(it) to "%.2f".format(it) },
-        averageConsumption?.let { "ปริมาณการใช้น้ำมันเฉลี่ย (%.2f)".format(it) to "%.2f".format(it) },
+        latestConsumption?.let { stringResource(com.songsit.fuellogpro.R.string.quick_pick_latest_consumption, "%.2f".format(it)) to "%.2f".format(it) },
+        averageConsumption?.let { stringResource(com.songsit.fuellogpro.R.string.quick_pick_average_consumption, "%.2f".format(it)) to "%.2f".format(it) },
     )
     val distanceQuickChoices = distanceQuickPicks.map { "$it km" to it.toString() }
 
@@ -842,16 +843,16 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("เครื่องคิดเลข", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(com.songsit.fuellogpro.R.string.nav_calculator), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Box {
             OutlinedTextField(
                 value = calculatorModes[mode],
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("โหมดการคำนวณ") },
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_calculator_mode)) },
                 trailingIcon = {
                     IconButton(onClick = { modeExpanded = true }) {
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกโหมด")
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_select_mode))
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -866,7 +867,7 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
             QuickPickField(
                 value = distanceKm,
                 onValueChange = { distanceKm = it },
-                label = "ระยะทาง (km)",
+                label = stringResource(com.songsit.fuellogpro.R.string.label_distance_km),
                 quickChoices = distanceQuickChoices,
             )
         }
@@ -874,7 +875,7 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
             QuickPickField(
                 value = pricePerLiter,
                 onValueChange = { pricePerLiter = it },
-                label = "ราคา/L",
+                label = stringResource(com.songsit.fuellogpro.R.string.label_price_per_liter),
                 quickChoices = priceQuickChoices,
             )
         }
@@ -882,15 +883,15 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
             QuickPickField(
                 value = consumptionKmPerLiter,
                 onValueChange = { consumptionKmPerLiter = it },
-                label = "อัตราสิ้นเปลือง (km/L)",
+                label = stringResource(com.songsit.fuellogpro.R.string.label_fuel_efficiency_km_per_l),
                 quickChoices = consumptionQuickChoices,
             )
         }
         if (mode == 1) {
-            QuickPickField(value = budgetAmount, onValueChange = { budgetAmount = it }, label = "งบประมาณ ($)")
+            QuickPickField(value = budgetAmount, onValueChange = { budgetAmount = it }, label = stringResource(com.songsit.fuellogpro.R.string.label_budget))
         }
         if (mode == 2) {
-            QuickPickField(value = fuelVolumeLiters, onValueChange = { fuelVolumeLiters = it }, label = "ปริมาณน้ำมัน (L)")
+            QuickPickField(value = fuelVolumeLiters, onValueChange = { fuelVolumeLiters = it }, label = stringResource(com.songsit.fuellogpro.R.string.label_fuel_liters))
         }
         Button(
             onClick = {
@@ -915,11 +916,11 @@ private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Mod
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("คำนวณ") }
+        ) { Text(stringResource(com.songsit.fuellogpro.R.string.action_calculate)) }
         result?.let {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("ผลลัพธ์", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_result), style = MaterialTheme.typography.titleSmall)
                     Text(it, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 }
             }
@@ -1020,7 +1021,7 @@ private fun NearbyStationsMapScreen(
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("กำลังค้นหาปั๊มใกล้เคียง...", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.nearby_searching_stations), style = MaterialTheme.typography.labelMedium)
                 }
             }
         } else if (error != null) {
@@ -1039,7 +1040,7 @@ private fun NearbyStationsMapScreen(
         ExtendedFloatingActionButton(
             onClick = { showList = true },
             icon = { Icon(Icons.Filled.ListAlt, contentDescription = null) },
-            text = { Text("ปั๊มใกล้เคียง (${stations.size})") },
+            text = { Text(stringResource(com.songsit.fuellogpro.R.string.nearby_stations_button, stations.size)) },
             modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 16.dp),
         )
     }
@@ -1052,7 +1053,7 @@ private fun NearbyStationsMapScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    SectionHeader(Icons.Filled.Route, "สถานีบริการน้ำมันใกล้เคียง")
+                    SectionHeader(Icons.Filled.Route, stringResource(com.songsit.fuellogpro.R.string.section_nearby_stations))
                 }
                 if (stations.isEmpty()) {
                     item { Text(stringResource(com.songsit.fuellogpro.R.string.nearby_no_stations)) }
@@ -1247,7 +1248,7 @@ private fun OilPriceCard(info: OilPriceInfo) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "ราคาน้ำมันวันนี้",
+                    stringResource(com.songsit.fuellogpro.R.string.title_oil_prices_today),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -1310,13 +1311,13 @@ private fun OilPriceCard(info: OilPriceInfo) {
                 modifier = Modifier.padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OilPriceRow("แก๊สโซฮอล์ 95", selected.gasohol95)
-                OilPriceRow("แก๊สโซฮอล์ 91", selected.gasohol91)
+                OilPriceRow(stringResource(com.songsit.fuellogpro.R.string.fuel_grade_gasohol_95), selected.gasohol95)
+                OilPriceRow(stringResource(com.songsit.fuellogpro.R.string.fuel_grade_gasohol_91), selected.gasohol91)
                 OilPriceRow("E20", selected.e20)
                 OilPriceRow("E85", selected.e85)
-                OilPriceRow("ดีเซล B7", selected.dieselB7)
-                OilPriceRow("ดีเซล B20", selected.dieselB20)
-                OilPriceRow("พรีเมียม 95", selected.premium95)
+                OilPriceRow(stringResource(com.songsit.fuellogpro.R.string.fuel_grade_diesel_b7), selected.dieselB7)
+                OilPriceRow(stringResource(com.songsit.fuellogpro.R.string.fuel_grade_diesel_b20), selected.dieselB20)
+                OilPriceRow(stringResource(com.songsit.fuellogpro.R.string.fuel_grade_premium_95), selected.premium95)
             }
 
             if (info.dateLabel.isNotBlank()) {

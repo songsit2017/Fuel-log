@@ -339,6 +339,23 @@
     <string name="vehicle_list_empty_subtitle">Tap + to add your first vehicle</string>
     <string name="label_in_use">In use</string>
     <string name="action_edit">Edit</string>
+
+    <!-- SettingsScreen: format-string subtitles -->
+    <string name="settings_units_subtitle">Fuel: %1$s, Distance: %2$s, Efficiency unit (km/L, mpg, etc.)</string>
+    <string name="unit_word_liters">Liters</string>
+    <string name="unit_word_gallons">Gallons</string>
+    <string name="unit_word_km">Kilometers</string>
+    <string name="unit_word_mi">Miles</string>
+    <string name="sync_conflicts_found">%1$d conflicting item(s) need review</string>
+    <string name="sync_cloud_and_local_with_detail">Cloud &amp; local backup • %1$s</string>
+    <string name="sync_cloud_and_local">Cloud &amp; local backup</string>
+    <string name="google_connected">Google connected</string>
+    <string name="family_share_no_members">No one is sharing this vehicle yet</string>
+    <string name="family_share_member_count">%1$d member(s)</string>
+    <string name="settings_language_row_label">ภาษา / Language</string>
+    <string name="language_system_default">ตามระบบ / System default</string>
+    <string name="language_name_thai">ไทย</string>
+    <string name="language_name_english">English</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

@@ -317,6 +317,23 @@
     <string name="vehicle_list_empty_subtitle">แตะ + เพื่อเพิ่มรถคันแรก</string>
     <string name="label_in_use">กำลังใช้</string>
     <string name="action_edit">แก้ไข</string>
+
+    <!-- SettingsScreen: format-string subtitles -->
+    <string name="settings_units_subtitle">เชื้อเพลิง %1$s, ระยะทาง %2$s, ปริมาณการใช้หน่วย (กม./ลิตร/mpg...ฯลฯ)</string>
+    <string name="unit_word_liters">ลิตร</string>
+    <string name="unit_word_gallons">แกลลอน</string>
+    <string name="unit_word_km">กิโลเมตร</string>
+    <string name="unit_word_mi">ไมล์</string>
+    <string name="sync_conflicts_found">พบ %1$d รายการที่ต่างกันรอแก้ไข</string>
+    <string name="sync_cloud_and_local_with_detail">เมฆและสำรองข้อมูลท้องถิ่น • %1$s</string>
+    <string name="sync_cloud_and_local">เมฆและสำรองข้อมูลท้องถิ่น</string>
+    <string name="google_connected">เชื่อมต่อ Google แล้ว</string>
+    <string name="family_share_no_members">ยังไม่มีสมาชิกร่วมดูแลรถคันนี้</string>
+    <string name="family_share_member_count">%1$d สมาชิก</string>
+    <string name="settings_language_row_label">ภาษา / Language</string>
+    <string name="language_system_default">ตามระบบ / System default</string>
+    <string name="language_name_thai">ไทย</string>
+    <string name="language_name_english">English</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

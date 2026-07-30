@@ -2246,12 +2246,11 @@ private fun SettingsScreen(
             item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) }
 
             item {
-                // TODO(i18n): still Thai-only — needs format-string placeholders for the unit labels.
-                val volumeLabel = if (displaySettings.volumeUnit == "gal") "แกลลอน" else "ลิตร"
-                val distLabel = if (displaySettings.distanceUnit == "mi") "ไมล์" else "กิโลเมตร"
+                val volumeLabel = stringResource(if (displaySettings.volumeUnit == "gal") com.songsit.fuellogpro.R.string.unit_word_gallons else com.songsit.fuellogpro.R.string.unit_word_liters)
+                val distLabel = stringResource(if (displaySettings.distanceUnit == "mi") com.songsit.fuellogpro.R.string.unit_word_mi else com.songsit.fuellogpro.R.string.unit_word_km)
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
-                    subtitle = "เชื้อเพลิง $volumeLabel, ระยะทาง $distLabel, ปริมาณการใช้หน่วย (กม./ลิตร/mpg...ฯลฯ)",
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_units_subtitle, volumeLabel, distLabel),
                     onClick = { showUnitDialog = true },
                 )
             }
@@ -2296,11 +2295,11 @@ private fun SettingsScreen(
             item {
                 val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
                 PreferenceListItem(
-                    title = "ภาษา / Language",
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label),
                     subtitle = when (currentLanguageTag) {
-                        "th" -> "ไทย"
-                        "en" -> "English"
-                        else -> "ตามระบบ / System default"
+                        "th" -> stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
+                        "en" -> stringResource(com.songsit.fuellogpro.R.string.language_name_english)
+                        else -> stringResource(com.songsit.fuellogpro.R.string.language_system_default)
                     },
                     onClick = { showLanguageDialog = true },
                 )
@@ -2318,11 +2317,11 @@ private fun SettingsScreen(
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) }
             item {
-                // TODO(i18n): still Thai-only — needs format-string placeholders for the counts/email.
+                val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
                 val syncSubtitle = when {
-                    syncConflicts.isNotEmpty() -> "พบ ${syncConflicts.size} รายการที่ต่างกันรอแก้ไข"
-                    cloudState.uid != null -> "เมฆและสำรองข้อมูลท้องถิ่น • ${cloudState.email ?: "เชื่อมต่อ Google แล้ว"}"
-                    else -> "เมฆและสำรองข้อมูลท้องถิ่น"
+                    syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size)
+                    cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
+                    else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
                 }
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
@@ -2336,8 +2335,11 @@ private fun SettingsScreen(
                 item {
                     PreferenceListItem(
                         title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
-                        // TODO(i18n): still Thai-only — needs format-string placeholder for the count.
-                        subtitle = if (vehicleMembers.isEmpty()) "ยังไม่มีสมาชิกร่วมดูแลรถคันนี้" else "${vehicleMembers.size} สมาชิก",
+                        subtitle = if (vehicleMembers.isEmpty()) {
+                            stringResource(com.songsit.fuellogpro.R.string.family_share_no_members)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
+                        },
                         leading = { Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = { showFamilySharing = true },
                     )
@@ -2508,10 +2510,13 @@ private fun SettingsScreen(
         val currentTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            title = { Text("ภาษา / Language") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label)) },
             text = {
+                val systemDefaultLabel = stringResource(com.songsit.fuellogpro.R.string.language_system_default)
+                val thaiLabel = stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
+                val englishLabel = stringResource(com.songsit.fuellogpro.R.string.language_name_english)
                 Column {
-                    listOf(null to "ตามระบบ / System default", "th" to "ไทย", "en" to "English").forEach { (tag, label) ->
+                    listOf(null to systemDefaultLabel, "th" to thaiLabel, "en" to englishLabel).forEach { (tag, label) ->
                         Row(
                             modifier = Modifier.fillMaxWidth()
                                 .clickable {
@@ -2537,14 +2542,14 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("ปิด") } },
+            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_close)) } },
         )
     }
 
     if (showFontDialog) {
         AlertDialog(
             onDismissRequest = { showFontDialog = false },
-            title = { Text("แบบอักษร") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_font_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     fontOptions.forEach { option ->
@@ -2570,14 +2575,14 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showFontDialog = false }) { Text("ยกเลิก") } },
+            confirmButton = { TextButton(onClick = { showFontDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
         )
     }
 
     if (showThemePaletteDialog) {
         AlertDialog(
             onDismissRequest = { showThemePaletteDialog = false },
-            title = { Text("ชุดรูปแบบ") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     themePaletteKeys.forEach { key ->
@@ -2603,7 +2608,7 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text("ยกเลิก") } },
+            confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
         )
     }
 }

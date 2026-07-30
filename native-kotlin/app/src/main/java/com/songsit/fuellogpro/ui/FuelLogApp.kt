@@ -346,14 +346,14 @@ fun FuelLogApp(
         AlertDialog(
             onDismissRequest = {},
             confirmButton = {},
-            title = { Text("กำลังนำเข้าข้อมูล") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.importing_data_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LinearProgressIndicator(
                         progress = { percent / 100f },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text("กำลังนำเข้าข้อมูล... $percent%")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.importing_data_progress, percent))
                 }
             },
         )
@@ -368,14 +368,14 @@ fun FuelLogApp(
         AlertDialog(
             onDismissRequest = {},
             confirmButton = {},
-            title = { Text("กำลังสำรองไป Google ไดรฟ์") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.drive_backup_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LinearProgressIndicator(
                         progress = { percent / 100f },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text("กำลังอัปโหลด... $percent%")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.drive_backup_progress, percent))
                 }
             },
         )
@@ -432,13 +432,13 @@ fun FuelLogApp(
         )
     } else {
         val drawerDestinations = listOf(
-            "บ้าน" to Icons.Filled.Home,
-            "บันทึกการใช้เชื้อเพลิง" to Icons.Filled.LocalGasStation,
-            "สถิติ" to Icons.Filled.BarChart,
-            "บันทึกค่าใช้จ่าย" to Icons.Filled.ReceiptLong,
-            "ทริป" to Icons.Filled.Route,
-            "บำรุงรักษา" to Icons.Filled.Build,
-            "รถของฉัน" to Icons.Filled.DirectionsCar,
+            titles[0] to Icons.Filled.Home,
+            titles[1] to Icons.Filled.LocalGasStation,
+            titles[5] to Icons.Filled.BarChart,
+            titles[2] to Icons.Filled.ReceiptLong,
+            titles[6] to Icons.Filled.Route,
+            titles[3] to Icons.Filled.Build,
+            titles[4] to Icons.Filled.DirectionsCar,
         )
         val drawerTabTargets = listOf(0, 1, 5, 2, 6, 3, 4)
         androidx.compose.material3.ModalNavigationDrawer(
@@ -470,8 +470,8 @@ fun FuelLogApp(
                         )
                     }
                     androidx.compose.material3.NavigationDrawerItem(
-                        label = { Text("ตั้งค่า") },
-                        icon = { Icon(Icons.Filled.Settings, contentDescription = "ตั้งค่า") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_title)) },
+                        icon = { Icon(Icons.Filled.Settings, contentDescription = stringResource(com.songsit.fuellogpro.R.string.settings_title)) },
                         selected = false,
                         onClick = {
                             showSettings = true
@@ -487,7 +487,7 @@ fun FuelLogApp(
                 TopAppBar(
                     navigationIcon = {
                         IconButton(onClick = { drawerScope.launch { drawerState.open() } }) {
-                            Icon(Icons.Filled.Menu, contentDescription = "เมนู")
+                            Icon(Icons.Filled.Menu, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_menu))
                         }
                     },
                     title = {
@@ -509,7 +509,7 @@ fun FuelLogApp(
                                             Spacer(Modifier.width(4.dp))
                                         }
                                         Text(
-                                            state.selectedVehicle?.name ?: "เลือกรถ",
+                                            state.selectedVehicle?.name ?: stringResource(com.songsit.fuellogpro.R.string.label_select_vehicle),
                                             style = MaterialTheme.typography.labelSmall,
                                         )
                                         Text(" ▾", style = MaterialTheme.typography.labelSmall)
@@ -589,17 +589,17 @@ fun FuelLogApp(
                         ) { Text("+") }
                         DropdownMenu(expanded = dashboardFabExpanded, onDismissRequest = { dashboardFabExpanded = false }) {
                             DropdownMenuItem(
-                                text = { Text("เพิ่มการเติมน้ำมัน") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.fab_add_fuel)) },
                                 leadingIcon = { Icon(Icons.Filled.LocalGasStation, contentDescription = null) },
                                 onClick = { dashboardFabExpanded = false; showAddFuel = true },
                             )
                             DropdownMenuItem(
-                                text = { Text("เพิ่มค่าใช้จ่าย") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.fab_add_expense)) },
                                 leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
                                 onClick = { dashboardFabExpanded = false; showAddExpense = true },
                             )
                             DropdownMenuItem(
-                                text = { Text("สแกนใบเสร็จ") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.fab_scan_receipt)) },
                                 leadingIcon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
                                 onClick = {
                                     dashboardFabExpanded = false
@@ -608,7 +608,7 @@ fun FuelLogApp(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("เพิ่มงานบำรุงรักษา") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.fab_add_maintenance)) },
                                 leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) },
                                 onClick = {
                                     dashboardFabExpanded = false
@@ -616,7 +616,7 @@ fun FuelLogApp(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("บันทึกการเดินทาง") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.fab_record_trip)) },
                                 leadingIcon = { Icon(Icons.Filled.Route, contentDescription = null) },
                                 onClick = {
                                     dashboardFabExpanded = false
@@ -723,18 +723,18 @@ fun FuelLogApp(
         pendingDeleteAction?.let { deleteAction ->
             AlertDialog(
                 onDismissRequest = { pendingDeleteAction = null },
-                title = { Text("ยืนยันการลบ") },
-                text = { Text("รายการที่ลบแล้วไม่สามารถกู้คืนได้") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.confirm_delete_title)) },
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.confirm_delete_message)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             pendingDeleteAction = null
                             deleteAction()
                         },
-                    ) { Text("ลบ", color = MaterialTheme.colorScheme.error) }
+                    ) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete), color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { pendingDeleteAction = null }) { Text("ยกเลิก") }
+                    TextButton(onClick = { pendingDeleteAction = null }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) }
                 },
             )
         }
@@ -761,8 +761,8 @@ fun FuelLogApp(
         state.errorMessage?.let { message ->
             AlertDialog(
                 onDismissRequest = onClearError,
-                confirmButton = { TextButton(onClick = onClearError) { Text("ตกลง") } },
-                title = { Text("ตรวจสอบข้อมูล") },
+                confirmButton = { TextButton(onClick = onClearError) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) } },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.check_data_title)) },
                 text = { Text(message) },
             )
         }
@@ -3202,13 +3202,13 @@ private fun VehicleEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (editing != null) "แก้ไขรถ" else "เพิ่มรถ") },
+                title = { Text(if (editing != null) stringResource(com.songsit.fuellogpro.R.string.vehicle_edit_title) else stringResource(com.songsit.fuellogpro.R.string.vehicle_add_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "ปิด") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_close)) }
                 },
                 actions = {
                     IconButton(enabled = !saving, onClick = ::handleSave) {
-                        Icon(Icons.Filled.Check, contentDescription = "บันทึก")
+                        Icon(Icons.Filled.Check, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_save))
                     }
                 },
             )
@@ -3263,18 +3263,18 @@ private fun VehicleEditScreen(
                                     if (onPickCameraPhoto != null) photoSourceMenuExpanded = true else onPickPhoto(null, handlePicked)
                                 },
                             ) {
-                                Icon(Icons.Filled.PhotoCamera, contentDescription = "เปลี่ยนรูปรถ")
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_change_vehicle_photo))
                             }
                             DropdownMenu(
                                 expanded = photoSourceMenuExpanded,
                                 onDismissRequest = { photoSourceMenuExpanded = false },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("ถ่ายรูป") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_take_photo)) },
                                     onClick = { photoSourceMenuExpanded = false; onPickCameraPhoto?.invoke(null, handlePicked) },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("เลือกจากแกลอรี่") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_choose_from_gallery)) },
                                     onClick = { photoSourceMenuExpanded = false; onPickPhoto(null, handlePicked) },
                                 )
                             }
@@ -3282,15 +3282,15 @@ private fun VehicleEditScreen(
                     }
                 }
             }
-            item { OutlinedTextField(name, { name = it }, label = { Text("ชื่อรถ") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { Text("ข้อมูลรถ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { OutlinedTextField(name, { name = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_vehicle_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_vehicle_info), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
-                            value = brand, 
-                            onValueChange = { brand = it }, 
-                            label = { Text("แบรนด์รถ") }, 
+                            value = brand,
+                            onValueChange = { brand = it },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_vehicle_brand)) },
                             singleLine = true, 
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = if (!brandLogoUrl.isNullOrBlank()) {
@@ -3310,55 +3310,56 @@ private fun VehicleEditScreen(
                                 .clickable { showMakeSelection = true }
                         )
                     }
-                    OutlinedTextField(model, { model = it }, label = { Text("รุ่นรถ") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(model, { model = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_vehicle_model)) }, singleLine = true, modifier = Modifier.weight(1f))
                 }
             }
             item {
                 OutlinedTextField(
                     modelYear,
                     { modelYear = it },
-                    label = { Text("ปี MY") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_model_year)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item { Text("หน่วย", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            item { UnitDropdownField("หน่วยระยะทาง", distanceUnit, listOf("km", "mi")) { distanceUnit = it } }
-            item { UnitDropdownField("หน่วยปริมาตร", volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
-            item { UnitDropdownField("หน่วยอัตราการใช้งาน", consumptionUnit, listOf("km/l", "l/100km", "mpg")) { consumptionUnit = it } }
-            item { Text("ชนิดเชื้อเพลิง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            item { UnitDropdownField("ชนิดเชื้อเพลิง", fuelType, fuelTypeOptions) { fuelType = it } }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_units), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.label_distance_unit), distanceUnit, listOf("km", "mi")) { distanceUnit = it } }
+            item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.label_volume_unit), volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
+            item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.label_consumption_unit), consumptionUnit, listOf("km/l", "l/100km", "mpg")) { consumptionUnit = it } }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_fuel_type), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            // fuelType/fuelTypeOptions are persisted data values (matched elsewhere), not translated
+            item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.section_fuel_type), fuelType, fuelTypeOptions) { fuelType = it } }
             item {
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("ยานพาหนะมีเชื้อเพลิง 2 ถัง")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_dual_tank_vehicle))
                     Switch(checked = hasDualTank, onCheckedChange = { hasDualTank = it })
                 }
             }
-            item { Text("ความจุถัง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_tank_capacity), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 OutlinedTextField(
                     tankCapacity,
                     { tankCapacity = it },
-                    label = { Text("ความจุถัง (${volumeUnit})") },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_tank_capacity_with_unit, volumeUnit)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item { Text("ไม่จำเป็น", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            item { OutlinedTextField(registration, { registration = it }, label = { Text("ทะเบียนรถ") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { Text(stringResource(com.songsit.fuellogpro.R.string.section_optional_fields), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+            item { OutlinedTextField(registration, { registration = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_registration)) }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(vin, { vin = it }, label = { Text("VIN") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(insurance, { insurance = it }, label = { Text("กรมธรรม์ประกันภัย") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(insurance, { insurance = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_insurance_policy)) }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item {
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("ใช้งานอยู่")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_vehicle_active))
                     Switch(checked = isActive, onCheckedChange = { isActive = it })
                 }
             }
@@ -3907,7 +3908,7 @@ private fun AddFuelScreen(
                 }
                 item {
                     FormRow(Icons.Filled.Info) {
-                        Text("ก่อนหน้าพลาดการ เติม-เพิ่ม", modifier = Modifier.weight(1f))
+                        Text(stringResource(com.songsit.fuellogpro.R.string.label_missed_previous_fillup), modifier = Modifier.weight(1f))
                         Switch(checked = missedPreviousFillUp, onCheckedChange = { missedPreviousFillUp = it })
                     }
                 }
@@ -3948,7 +3949,15 @@ private fun OdometerField(
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
-                label = { Text(if (isTripMeter) "มาตรวัดการเดินทาง (km)" else "มาตรวัดระยะทางรวม (km)") },
+                label = {
+                    Text(
+                        if (isTripMeter) {
+                            stringResource(com.songsit.fuellogpro.R.string.odometer_trip_label)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.odometer_total_label)
+                        },
+                    )
+                },
                 singleLine = true,
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3956,24 +3965,24 @@ private fun OdometerField(
                             CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(end = 8.dp), strokeWidth = 2.dp)
                         } else if (onScanClick != null) {
                             IconButton(onClick = onScanClick) {
-                                Icon(Icons.Filled.PhotoCamera, contentDescription = "สแกนเลขไมล์")
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_scan_odometer))
                             }
                         }
                         IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "เลือกมาตรวัด")
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_select_odometer_mode))
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(text = { Text("มาตรวัดระยะทางรวม") }, onClick = { onModeChange(false); menuExpanded = false })
-                DropdownMenuItem(text = { Text("มาตรวัดการเดินทาง") }, onClick = { onModeChange(true); menuExpanded = false })
+                DropdownMenuItem(text = { Text(stringResource(com.songsit.fuellogpro.R.string.odometer_mode_total)) }, onClick = { onModeChange(false); menuExpanded = false })
+                DropdownMenuItem(text = { Text(stringResource(com.songsit.fuellogpro.R.string.odometer_mode_trip)) }, onClick = { onModeChange(true); menuExpanded = false })
             }
         }
         if (latestOdometer != null) {
             Text(
-                "ค่าสุดท้าย: ${"%.0f".format(Locale.US, latestOdometer)} km",
+                stringResource(com.songsit.fuellogpro.R.string.odometer_last_value, "%.0f".format(Locale.US, latestOdometer)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, top = 2.dp),
@@ -3999,20 +4008,20 @@ private fun TankLevelDialog(
     val estimatedLiters = capacityValue?.let { it * localPercent / 100.0 }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ระดับน้ำมันเชื้อเพลิง") },
+        title = { Text(stringResource(com.songsit.fuellogpro.R.string.tank_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("ระดับถังก่อนเติม หรือ หลังเติม", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(com.songsit.fuellogpro.R.string.tank_dialog_subtitle), style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = localTiming == "before", onClick = { localTiming = "before" })
                     Text(
-                        "ก่อนหน้า",
+                        stringResource(com.songsit.fuellogpro.R.string.tank_before_short),
                         modifier = Modifier.clickable { localTiming = "before" },
                     )
                     Spacer(Modifier.width(16.dp))
                     RadioButton(selected = localTiming == "after", onClick = { localTiming = "after" })
                     Text(
-                        "หลังจาก",
+                        stringResource(com.songsit.fuellogpro.R.string.tank_after_short),
                         modifier = Modifier.clickable { localTiming = "after" },
                     )
                 }
@@ -4020,7 +4029,7 @@ private fun TankLevelDialog(
                     OutlinedTextField(
                         localCapacity,
                         { localCapacity = it },
-                        label = { Text("ความจุถัง (L)") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_tank_capacity)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -4028,7 +4037,7 @@ private fun TankLevelDialog(
                         estimatedLiters?.let { "%.1f".format(Locale.US, it) } ?: "-",
                         {},
                         readOnly = true,
-                        label = { Text("น้ำมันเชื้อเพลิงโดยประมาณ (L)") },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_estimated_fuel)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -4038,9 +4047,9 @@ private fun TankLevelDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(localTiming, localPercent.toDouble(), localCapacity, estimatedLiters) }) { Text("บันทึก") }
+            TextButton(onClick = { onSave(localTiming, localPercent.toDouble(), localCapacity, estimatedLiters) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
     )
 }
 

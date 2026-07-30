@@ -222,4 +222,57 @@
     <string name="label_discount_unit">หน่วยส่วนลด</string>
     <string name="unit_baht">บาท</string>
     <string name="unit_baht_per_liter">บาท/ลิตร</string>
+    <string name="label_missed_previous_fillup">ก่อนหน้าพลาดการ เติม-เพิ่ม</string>
+
+    <string name="odometer_trip_label">มาตรวัดการเดินทาง (km)</string>
+    <string name="odometer_total_label">มาตรวัดระยะทางรวม (km)</string>
+    <string name="content_desc_scan_odometer">สแกนเลขไมล์</string>
+    <string name="content_desc_select_odometer_mode">เลือกมาตรวัด</string>
+    <string name="odometer_mode_total">มาตรวัดระยะทางรวม</string>
+    <string name="odometer_mode_trip">มาตรวัดการเดินทาง</string>
+    <string name="odometer_last_value">ค่าสุดท้าย: %1$s km</string>
+    <string name="tank_dialog_title">ระดับน้ำมันเชื้อเพลิง</string>
+    <string name="tank_dialog_subtitle">ระดับถังก่อนเติม หรือ หลังเติม</string>
+    <string name="tank_before_short">ก่อนหน้า</string>
+    <string name="tank_after_short">หลังจาก</string>
+    <string name="label_tank_capacity">ความจุถัง (L)</string>
+    <string name="label_estimated_fuel">น้ำมันเชื้อเพลิงโดยประมาณ (L)</string>
+
+    <!-- VehicleEditScreen -->
+    <string name="vehicle_edit_title">แก้ไขรถ</string>
+    <string name="vehicle_add_title">เพิ่มรถ</string>
+    <string name="content_desc_change_vehicle_photo">เปลี่ยนรูปรถ</string>
+    <string name="label_vehicle_name">ชื่อรถ</string>
+    <string name="section_vehicle_info">ข้อมูลรถ</string>
+    <string name="label_vehicle_brand">แบรนด์รถ</string>
+    <string name="label_vehicle_model">รุ่นรถ</string>
+    <string name="label_model_year">ปี MY</string>
+    <string name="section_units">หน่วย</string>
+    <string name="label_distance_unit">หน่วยระยะทาง</string>
+    <string name="label_volume_unit">หน่วยปริมาตร</string>
+    <string name="label_consumption_unit">หน่วยอัตราการใช้งาน</string>
+    <string name="section_fuel_type">ชนิดเชื้อเพลิง</string>
+    <string name="label_dual_tank_vehicle">ยานพาหนะมีเชื้อเพลิง 2 ถัง</string>
+    <string name="section_tank_capacity">ความจุถัง</string>
+    <string name="label_tank_capacity_with_unit">ความจุถัง (%1$s)</string>
+    <string name="section_optional_fields">ไม่จำเป็น</string>
+    <string name="label_registration">ทะเบียนรถ</string>
+    <string name="label_insurance_policy">กรมธรรม์ประกันภัย</string>
+    <string name="label_vehicle_active">ใช้งานอยู่</string>
+
+    <!-- Main scaffold: import/backup progress dialogs, nav drawer, FAB menu, delete/error dialogs -->
+    <string name="importing_data_title">กำลังนำเข้าข้อมูล</string>
+    <string name="importing_data_progress">กำลังนำเข้าข้อมูล... %1$d%%</string>
+    <string name="drive_backup_title">กำลังสำรองไป Google ไดรฟ์</string>
+    <string name="drive_backup_progress">กำลังอัปโหลด... %1$d%%</string>
+    <string name="content_desc_menu">เมนู</string>
+    <string name="label_select_vehicle">เลือกรถ</string>
+    <string name="fab_add_fuel">เพิ่มการเติมน้ำมัน</string>
+    <string name="fab_add_expense">เพิ่มค่าใช้จ่าย</string>
+    <string name="fab_scan_receipt">สแกนใบเสร็จ</string>
+    <string name="fab_add_maintenance">เพิ่มงานบำรุงรักษา</string>
+    <string name="fab_record_trip">บันทึกการเดินทาง</string>
+    <string name="confirm_delete_title">ยืนยันการลบ</string>
+    <string name="confirm_delete_message">รายการที่ลบแล้วไม่สามารถกู้คืนได้</string>
+    <string name="check_data_title">ตรวจสอบข้อมูล</string>
 </resources>

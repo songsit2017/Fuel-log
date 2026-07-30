@@ -243,4 +243,58 @@
     <string name="label_discount_unit">Discount unit</string>
     <string name="unit_baht">Baht</string>
     <string name="unit_baht_per_liter">Baht/liter</string>
+    <string name="label_missed_previous_fillup">Missed previous fill-up</string>
+
+    <!-- OdometerField / TankLevelDialog -->
+    <string name="odometer_trip_label">Trip meter (km)</string>
+    <string name="odometer_total_label">Total odometer (km)</string>
+    <string name="content_desc_scan_odometer">Scan odometer</string>
+    <string name="content_desc_select_odometer_mode">Select odometer mode</string>
+    <string name="odometer_mode_total">Total odometer</string>
+    <string name="odometer_mode_trip">Trip meter</string>
+    <string name="odometer_last_value">Last: %1$s km</string>
+    <string name="tank_dialog_title">Fuel tank level</string>
+    <string name="tank_dialog_subtitle">Tank level before or after this fill-up</string>
+    <string name="tank_before_short">Before</string>
+    <string name="tank_after_short">After</string>
+    <string name="label_tank_capacity">Tank capacity (L)</string>
+    <string name="label_estimated_fuel">Estimated fuel (L)</string>
+
+    <!-- VehicleEditScreen -->
+    <string name="vehicle_edit_title">Edit vehicle</string>
+    <string name="vehicle_add_title">Add vehicle</string>
+    <string name="content_desc_change_vehicle_photo">Change vehicle photo</string>
+    <string name="label_vehicle_name">Vehicle name</string>
+    <string name="section_vehicle_info">Vehicle info</string>
+    <string name="label_vehicle_brand">Brand</string>
+    <string name="label_vehicle_model">Model</string>
+    <string name="label_model_year">Model year</string>
+    <string name="section_units">Units</string>
+    <string name="label_distance_unit">Distance unit</string>
+    <string name="label_volume_unit">Volume unit</string>
+    <string name="label_consumption_unit">Consumption unit</string>
+    <string name="section_fuel_type">Fuel type</string>
+    <string name="label_dual_tank_vehicle">Vehicle has a dual fuel tank</string>
+    <string name="section_tank_capacity">Tank capacity</string>
+    <string name="label_tank_capacity_with_unit">Tank capacity (%1$s)</string>
+    <string name="section_optional_fields">Optional</string>
+    <string name="label_registration">Registration</string>
+    <string name="label_insurance_policy">Insurance policy</string>
+    <string name="label_vehicle_active">Active</string>
+
+    <!-- Main scaffold: import/backup progress dialogs, nav drawer, FAB menu, delete/error dialogs -->
+    <string name="importing_data_title">Importing data</string>
+    <string name="importing_data_progress">Importing… %1$d%%</string>
+    <string name="drive_backup_title">Backing up to Google Drive</string>
+    <string name="drive_backup_progress">Uploading… %1$d%%</string>
+    <string name="content_desc_menu">Menu</string>
+    <string name="label_select_vehicle">Select vehicle</string>
+    <string name="fab_add_fuel">Add fuel entry</string>
+    <string name="fab_add_expense">Add expense</string>
+    <string name="fab_scan_receipt">Scan receipt</string>
+    <string name="fab_add_maintenance">Add maintenance task</string>
+    <string name="fab_record_trip">Record trip</string>
+    <string name="confirm_delete_title">Confirm delete</string>
+    <string name="confirm_delete_message">Deleted items cannot be recovered</string>
+    <string name="check_data_title">Check your data</string>
 </resources>

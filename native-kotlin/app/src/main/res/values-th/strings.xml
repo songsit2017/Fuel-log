@@ -530,6 +530,17 @@
     <string name="currency_jpy">เยนญี่ปุ่น (JPY)</string>
     <string name="unit_liters_short">ลิตร</string>
     <string name="unit_km_per_liter_short">กม./ลิตร</string>
+
+    <!-- FirestoreSyncRepository -->
+    <string name="error_conflict_not_found">ไม่พบรายการขัดแย้งนี้แล้ว</string>
+    <string name="error_local_vehicle_not_found">ไม่พบข้อมูลรถในเครื่อง</string>
+    <string name="error_cloud_vehicle_not_found">ไม่พบข้อมูลรถบน Cloud</string>
+    <string name="error_unknown_record_type">ไม่รู้จักประเภทข้อมูล %1$s</string>
+    <string name="error_local_data_not_found">ไม่พบข้อมูลในเครื่อง</string>
+    <string name="error_cloud_data_not_found">ไม่พบข้อมูลบน Cloud</string>
+    <string name="vehicle_from_cloud_default_name">รถจาก Cloud</string>
+    <string name="maintenance_default_name">รายการดูแลรถ</string>
+    <string name="trip_default_name">ทริป</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

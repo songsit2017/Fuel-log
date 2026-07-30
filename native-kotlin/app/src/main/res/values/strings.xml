@@ -552,6 +552,17 @@
     <string name="currency_jpy">Japanese Yen (JPY)</string>
     <string name="unit_liters_short">L</string>
     <string name="unit_km_per_liter_short">km/L</string>
+
+    <!-- FirestoreSyncRepository -->
+    <string name="error_conflict_not_found">This conflict no longer exists</string>
+    <string name="error_local_vehicle_not_found">No local vehicle data found</string>
+    <string name="error_cloud_vehicle_not_found">No vehicle data found in the cloud</string>
+    <string name="error_unknown_record_type">Unknown record type: %1$s</string>
+    <string name="error_local_data_not_found">No local data found</string>
+    <string name="error_cloud_data_not_found">No cloud data found</string>
+    <string name="vehicle_from_cloud_default_name">Vehicle from Cloud</string>
+    <string name="maintenance_default_name">Maintenance item</string>
+    <string name="trip_default_name">Trip</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

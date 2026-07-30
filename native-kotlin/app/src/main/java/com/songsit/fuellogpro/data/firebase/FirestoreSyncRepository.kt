@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.data.firebase
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -11,6 +12,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import com.songsit.fuellogpro.R
 import com.songsit.fuellogpro.data.local.DeletionTombstoneEntity
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
@@ -40,6 +42,7 @@ data class CloudSyncResult(
 
 class FirestoreSyncRepository(
     private val database: FuelLogDatabase,
+    private val context: Context,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
 ) {
@@ -168,7 +171,7 @@ class FirestoreSyncRepository(
                     local = database.maintenanceDao().getAll().filter { it.vehicleId == vehicleId },
                     idOf = MaintenanceEntity::id,
                     encode = ::maintenanceCloudMap,
-                    decode = { parseMaintenance(vehicleId, it) },
+                    decode = { parseMaintenance(vehicleId, it, context) },
                     upsert = { database.maintenanceDao().upsertAll(it) },
                 ).also {
                     uploaded += it.uploaded
@@ -185,7 +188,7 @@ class FirestoreSyncRepository(
                     local = database.tripDao().getAll().filter { it.vehicleId == vehicleId },
                     idOf = TripEntity::id,
                     encode = ::tripCloudMap,
-                    decode = { parseTrip(vehicleId, it) },
+                    decode = { parseTrip(vehicleId, it, context) },
                     upsert = { database.tripDao().upsertAll(it) },
                 ).also {
                     uploaded += it.uploaded
@@ -201,20 +204,20 @@ class FirestoreSyncRepository(
 
     suspend fun resolveConflict(key: String, useLocal: Boolean) {
         val conflict = database.syncConflictDao().getByKey(key)
-            ?: error("ไม่พบรายการขัดแย้งนี้แล้ว")
+            ?: error(context.getString(R.string.error_conflict_not_found))
         if (conflict.collectionName == VEHICLES_COLLECTION) {
             val reference = firestore.collection("vehicles").document(conflict.recordId)
             if (useLocal) {
                 val local = database.vehicleDao().getById(conflict.recordId)
-                    ?: error("ไม่พบข้อมูลรถในเครื่อง")
+                    ?: error(context.getString(R.string.error_local_vehicle_not_found))
                 reference.set(
                     vehicleEditableCloudMap(local) + ("updatedAt" to FieldValue.serverTimestamp()),
                     SetOptions.merge(),
                 ).await()
             } else {
                 val cloud = reference.get().await()
-                require(cloud.exists()) { "ไม่พบข้อมูลรถบน Cloud" }
-                database.vehicleDao().upsert(parseVehicle(cloud))
+                require(cloud.exists()) { context.getString(R.string.error_cloud_vehicle_not_found) }
+                database.vehicleDao().upsert(parseVehicle(cloud, context))
             }
             database.syncConflictDao().deleteByKey(key)
             return
@@ -228,21 +231,21 @@ class FirestoreSyncRepository(
                 "expenses" -> database.expenseDao().getById(conflict.recordId)?.let(::expenseCloudMap)
                 "reminders" -> database.maintenanceDao().getById(conflict.recordId)?.let(::maintenanceCloudMap)
                 "trips" -> database.tripDao().getById(conflict.recordId)?.let(::tripCloudMap)
-                else -> error("ไม่รู้จักประเภทข้อมูล ${conflict.collectionName}")
-            } ?: error("ไม่พบข้อมูลในเครื่อง")
+                else -> error(context.getString(R.string.error_unknown_record_type, conflict.collectionName))
+            } ?: error(context.getString(R.string.error_local_data_not_found))
             reference.set(
                 payload + ("updatedAt" to FieldValue.serverTimestamp()),
                 SetOptions.merge(),
             ).await()
         } else {
             val cloud = reference.get().await()
-            require(cloud.exists()) { "ไม่พบข้อมูลบน Cloud" }
+            require(cloud.exists()) { context.getString(R.string.error_cloud_data_not_found) }
             when (conflict.collectionName) {
                 "entries" -> database.fuelEntryDao().upsert(parseFuel(conflict.vehicleId, cloud))
                 "expenses" -> database.expenseDao().upsert(parseExpense(conflict.vehicleId, cloud))
-                "reminders" -> database.maintenanceDao().upsert(parseMaintenance(conflict.vehicleId, cloud))
-                "trips" -> database.tripDao().upsert(parseTrip(conflict.vehicleId, cloud))
-                else -> error("ไม่รู้จักประเภทข้อมูล ${conflict.collectionName}")
+                "reminders" -> database.maintenanceDao().upsert(parseMaintenance(conflict.vehicleId, cloud, context))
+                "trips" -> database.tripDao().upsert(parseTrip(conflict.vehicleId, cloud, context))
+                else -> error(context.getString(R.string.error_unknown_record_type, conflict.collectionName))
             }
         }
         database.syncConflictDao().deleteByKey(key)
@@ -674,9 +677,9 @@ private fun tripCloudMap(item: TripEntity): Map<String, Any?> = mapOf(
     "other" to item.otherCost,
 )
 
-private fun parseVehicle(document: DocumentSnapshot) = VehicleEntity(
+private fun parseVehicle(document: DocumentSnapshot, context: Context) = VehicleEntity(
     id = document.id,
-    name = document.getString("name") ?: "รถจาก Cloud",
+    name = document.getString("name") ?: context.getString(R.string.vehicle_from_cloud_default_name),
     registration = document.getString("registration").orEmpty(),
     fuelType = document.getString("fuelType").orEmpty(),
     createdAt = document.timestampMillis("createdAt"),
@@ -722,10 +725,10 @@ private fun parseExpense(vehicleId: String, document: DocumentSnapshot) = Expens
     createdAt = document.timestampMillis("createdAt"),
 )
 
-private fun parseMaintenance(vehicleId: String, document: DocumentSnapshot) = MaintenanceEntity(
+private fun parseMaintenance(vehicleId: String, document: DocumentSnapshot, context: Context) = MaintenanceEntity(
     id = document.id,
     vehicleId = vehicleId,
-    name = document.getString("name") ?: "รายการดูแลรถ",
+    name = document.getString("name") ?: context.getString(R.string.maintenance_default_name),
     category = document.getString("category") ?: "บำรุงรักษา",
     nextDate = document.getString("nextDate")?.takeIf(String::isNotBlank),
     nextOdometerKm = document.optionalNumber("nextOdo", "nextOdometerKm"),
@@ -739,10 +742,10 @@ private fun parseMaintenance(vehicleId: String, document: DocumentSnapshot) = Ma
     createdAt = document.timestampMillis("createdAt"),
 )
 
-private fun parseTrip(vehicleId: String, document: DocumentSnapshot) = TripEntity(
+private fun parseTrip(vehicleId: String, document: DocumentSnapshot, context: Context) = TripEntity(
     id = document.id,
     vehicleId = vehicleId,
-    name = document.getString("name") ?: "ทริป",
+    name = document.getString("name") ?: context.getString(R.string.trip_default_name),
     date = document.getString("date").orEmpty(),
     distanceKm = document.number("distance", "distanceKm"),
     fuelCost = document.number("fuel", "fuelCost"),

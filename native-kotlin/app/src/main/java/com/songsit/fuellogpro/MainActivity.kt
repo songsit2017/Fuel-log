@@ -535,7 +535,7 @@ class MainActivity : AppCompatActivity() {
         csvExportRepository = LocalCsvExportRepository(database)
         fuelioImportRepository = FuelioImportRepository(applicationContext, database)
         val authRepository = GoogleAuthRepository()
-        val cloudRepository = FirestoreSyncRepository(database)
+        val cloudRepository = FirestoreSyncRepository(database, applicationContext)
         val deletionRecorder = LocalDeletionRecorder(database)
         val fuelRepository = LocalFuelRepository(database.fuelEntryDao(), deletionRecorder)
         val expenseRepository = LocalExpenseRepository(database.expenseDao(), deletionRecorder)

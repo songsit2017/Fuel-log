@@ -426,6 +426,10 @@ fun FuelLogApp(
         val drawerTabTargets = listOf(0, 1, 5, 2, 6, 3, 4)
         androidx.compose.material3.ModalNavigationDrawer(
             drawerState = drawerState,
+            // Off on the map tab only — its two-finger pinch-zoom competes with the drawer's own
+            // edge-swipe-to-open gesture detector, occasionally revealing the drawer mid-pinch and
+            // stuttering the zoom. The hamburger icon still opens the drawer normally everywhere.
+            gesturesEnabled = !(tab == 0 && homeTab == 3),
             drawerContent = {
                 androidx.compose.material3.ModalDrawerSheet {
                     Text(

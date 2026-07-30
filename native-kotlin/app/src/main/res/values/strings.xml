@@ -387,6 +387,15 @@
     <string name="section_payment_reminder">Payment reminder</string>
     <string name="label_add_reminder">Add reminder</string>
     <string name="label_reminder_date">Reminder date</string>
+
+    <!-- TimelineScreen -->
+    <string name="timeline_empty_title">No entries yet</string>
+    <string name="timeline_empty_subtitle">Fuel and expense entries will appear here</string>
+    <string name="content_desc_delete_photo">Delete photo</string>
+    <string name="action_share">Share</string>
+    <string name="share_image_chooser_title">Share photo</string>
+    <string name="share_image_failed">Couldn\'t share the photo</string>
+    <string name="open_pdf_failed">Couldn\'t open the PDF — try installing a PDF reader app</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

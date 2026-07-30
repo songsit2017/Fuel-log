@@ -47,6 +47,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -66,11 +68,6 @@ import java.util.Locale
 
 private val timelineCurrency = NumberFormat.getCurrencyInstance(Locale("th", "TH"))
 private val timelineNumber = NumberFormat.getNumberInstance(Locale("th", "TH")).apply { maximumFractionDigits = 2 }
-
-private val thaiMonthNames = listOf(
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-)
 
 private sealed class TimelineRow(val date: String, val sortKey: String) {
     class FuelRow(val entry: FuelEntry) : TimelineRow(entry.date, entry.date + " " + entry.time)
@@ -95,6 +92,7 @@ fun TimelineScreen(
             parsed?.let { it.year to it.monthValue }
         }
     }
+    val unknownDateLabel = stringResource(com.songsit.fuellogpro.R.string.unknown_date)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -104,15 +102,16 @@ fun TimelineScreen(
             item {
                 Card(shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีรายการ", fontWeight = FontWeight.SemiBold)
-                        Text("การเติมน้ำมันและค่าใช้จ่ายจะปรากฏที่นี่", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.timeline_empty_title), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.timeline_empty_subtitle), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
         groups.forEach { (yearMonth, groupRows) ->
             item {
-                val label = yearMonth?.let { (year, month) -> "${thaiMonthNames[month - 1]} $year" } ?: "ไม่ทราบวันที่"
+                val monthNames = stringArrayResource(com.songsit.fuellogpro.R.array.month_names_full)
+                val label = yearMonth?.let { (year, month) -> "${monthNames[month - 1]} $year" } ?: unknownDateLabel
                 Text(
                     label,
                     style = MaterialTheme.typography.titleMedium,
@@ -185,7 +184,7 @@ private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (String) -> Unit
         }
         val detail = listOfNotNull(
             entry.station.takeIf(String::isNotBlank),
-            "${timelineNumber.format(entry.odometerKm)} กม.",
+            "${timelineNumber.format(entry.odometerKm)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}",
         ).joinToString(" • ")
         Text(detail, style = MaterialTheme.typography.bodySmall)
         if (entry.photoUrls.isNotEmpty()) TimelineThumbnails(entry.photoUrls, onImageClick)
@@ -235,12 +234,12 @@ private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -
             ) {
                 if (isPdfPath(uri)) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "ไฟล์ PDF", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_pdf_file), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     AsyncImage(
                         model = if (uri.startsWith("/")) java.io.File(uri) else uri,
-                        contentDescription = "รูปที่แนบ",
+                        contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_attached_photo),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
@@ -261,7 +260,7 @@ fun openPdfExternally(context: android.content.Context, path: String) {
         }
         context.startActivity(intent)
     }.onFailure {
-        Toast.makeText(context, "เปิด PDF ไม่ได้ ลองติดตั้งแอปอ่าน PDF", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(com.songsit.fuellogpro.R.string.open_pdf_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -276,21 +275,21 @@ fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit, onDelete: ((
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AsyncImage(
                 model = if (imagePath.startsWith("/")) java.io.File(imagePath) else imagePath,
-                contentDescription = "รูปที่แนบ",
+                contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_attached_photo),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
             IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = "ปิด", tint = Color.White)
+                Icon(Icons.Filled.Close, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_close), tint = Color.White)
             }
             Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 if (onDelete != null) {
                     IconButton(onClick = { onDelete(); onDismiss() }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "ลบรูป", tint = Color.White)
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_delete_photo), tint = Color.White)
                     }
                 }
                 IconButton(onClick = { scope.launch { shareTimelineImage(context, imagePath) } }) {
-                    Icon(Icons.Filled.Share, contentDescription = "แชร์", tint = Color.White)
+                    Icon(Icons.Filled.Share, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_share), tint = Color.White)
                 }
             }
         }
@@ -324,9 +323,9 @@ private suspend fun shareTimelineImage(context: android.content.Context, imagePa
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "แชร์รูปภาพ"))
+        context.startActivity(Intent.createChooser(intent, context.getString(com.songsit.fuellogpro.R.string.share_image_chooser_title)))
     } catch (e: Exception) {
-        Toast.makeText(context, "แชร์รูปไม่สำเร็จ", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(com.songsit.fuellogpro.R.string.share_image_failed), Toast.LENGTH_SHORT).show()
     }
 }
 

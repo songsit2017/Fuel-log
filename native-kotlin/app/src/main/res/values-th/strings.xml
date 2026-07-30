@@ -365,6 +365,15 @@
     <string name="section_payment_reminder">จดหมายเตือนชำระเงิน</string>
     <string name="label_add_reminder">เพิ่มการเตือน</string>
     <string name="label_reminder_date">วันเตือนชำระ</string>
+
+    <!-- TimelineScreen -->
+    <string name="timeline_empty_title">ยังไม่มีรายการ</string>
+    <string name="timeline_empty_subtitle">การเติมน้ำมันและค่าใช้จ่ายจะปรากฏที่นี่</string>
+    <string name="content_desc_delete_photo">ลบรูป</string>
+    <string name="action_share">แชร์</string>
+    <string name="share_image_chooser_title">แชร์รูปภาพ</string>
+    <string name="share_image_failed">แชร์รูปไม่สำเร็จ</string>
+    <string name="open_pdf_failed">เปิด PDF ไม่ได้ ลองติดตั้งแอปอ่าน PDF</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

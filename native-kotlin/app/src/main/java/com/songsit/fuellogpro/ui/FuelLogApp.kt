@@ -1103,14 +1103,6 @@ private fun Dashboard(
             }
         }
         item {
-            MetricCard(
-                "เลขไมล์ล่าสุด",
-                state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: "ยังไม่มีข้อมูล",
-                Modifier.fillMaxWidth(),
-                Icons.Filled.Speed,
-            )
-        }
-        item {
             val operatingCost = state.summary.totalSpent + state.totalExpenses + state.tripSummary.totalCost
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -1150,15 +1142,21 @@ private fun Dashboard(
                             Icons.Filled.Route,
                         )
                         MetricCard(
-                            "จำนวนรายการ",
-                            number.format(
-                                state.entries.size + state.expenses.size +
-                                    state.maintenanceTasks.size + state.trips.size,
-                            ),
+                            "เลขไมล์ล่าสุด",
+                            state.summary.latestOdometerKm?.let { formatDistanceKm(it, displaySettings) } ?: "ยังไม่มีข้อมูล",
                             Modifier.weight(1f),
-                            Icons.Filled.ListAlt,
+                            Icons.Filled.Speed,
                         )
                     }
+                    MetricCard(
+                        "จำนวนรายการ",
+                        number.format(
+                            state.entries.size + state.expenses.size +
+                                state.maintenanceTasks.size + state.trips.size,
+                        ),
+                        Modifier.fillMaxWidth(),
+                        Icons.Filled.ListAlt,
+                    )
                 }
             }
         }

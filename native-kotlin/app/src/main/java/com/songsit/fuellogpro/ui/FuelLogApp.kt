@@ -4419,7 +4419,10 @@ private fun AddMaintenanceDialog(
     onSave: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit)? = null,
 ) {
-    var name by remember { mutableStateOf(editing?.name ?: "เปลี่ยนน้ำมันเครื่อง") }
+    // Default name is translated (free text, no data-matching implications); category default
+    // and maintenanceCategoryOptions are NOT — see the string resource comment for why.
+    val defaultMaintenanceName = stringResource(com.songsit.fuellogpro.R.string.maintenance_default_name)
+    var name by remember { mutableStateOf(editing?.name ?: defaultMaintenanceName) }
     var category by remember { mutableStateOf(editing?.category ?: "บำรุงรักษา") }
     var nextDate by remember { mutableStateOf(editing?.nextDate ?: "") }
     var nextOdometer by remember {
@@ -4436,17 +4439,25 @@ private fun AddMaintenanceDialog(
     val selectedCategory = if (category in maintenanceCategoryOptions) category else "อื่นๆ"
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editing != null) "แก้ไขรายการดูแลรถ" else "เพิ่มรายการดูแลรถ") },
+        title = {
+            Text(
+                if (editing != null) {
+                    stringResource(com.songsit.fuellogpro.R.string.maintenance_dialog_edit_title)
+                } else {
+                    stringResource(com.songsit.fuellogpro.R.string.maintenance_dialog_add_title)
+                },
+            )
+        },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedTextField(name, { name = it }, label = { Text("รายการ") }, singleLine = true) }
+                item { OutlinedTextField(name, { name = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_name)) }, singleLine = true) }
                 item {
                     Box(Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = selectedCategory,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("ประเภท") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_category)) },
                             trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -4469,18 +4480,18 @@ private fun AddMaintenanceDialog(
                         OutlinedTextField(
                             value = category,
                             onValueChange = { category = it },
-                            label = { Text("ระบุประเภท") },
+                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_category)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
-                item { OutlinedTextField(nextDate, { nextDate = it }, label = { Text("กำหนดวันที่ (ไม่บังคับ)") }, singleLine = true) }
-                item { OutlinedTextField(nextOdometer, { nextOdometer = it }, label = { Text("กำหนดเลขไมล์ (ไม่บังคับ)") }, singleLine = true) }
-                item { OutlinedTextField(warningDays, { warningDays = it }, label = { Text("เตือนล่วงหน้า (วัน)") }, singleLine = true) }
-                item { OutlinedTextField(warningOdometer, { warningOdometer = it }, label = { Text("เตือนก่อนถึงระยะ (กม.)") }, singleLine = true) }
-                item { OutlinedTextField(repeatMonths, { repeatMonths = it }, label = { Text("ทำซ้ำทุก (เดือน)") }, singleLine = true) }
-                item { OutlinedTextField(repeatOdometer, { repeatOdometer = it }, label = { Text("ทำซ้ำทุก (กม.)") }, singleLine = true) }
+                item { OutlinedTextField(nextDate, { nextDate = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_due_date_optional)) }, singleLine = true) }
+                item { OutlinedTextField(nextOdometer, { nextOdometer = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_due_odometer_optional)) }, singleLine = true) }
+                item { OutlinedTextField(warningDays, { warningDays = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_warning_days)) }, singleLine = true) }
+                item { OutlinedTextField(warningOdometer, { warningOdometer = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_warning_odometer)) }, singleLine = true) }
+                item { OutlinedTextField(repeatMonths, { repeatMonths = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_repeat_months)) }, singleLine = true) }
+                item { OutlinedTextField(repeatOdometer, { repeatOdometer = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_repeat_odometer)) }, singleLine = true) }
             }
         },
         confirmButton = {
@@ -4505,9 +4516,9 @@ private fun AddMaintenanceDialog(
                         )
                     }
                 },
-            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+            ) { Text(if (saving) stringResource(com.songsit.fuellogpro.R.string.action_saving) else stringResource(com.songsit.fuellogpro.R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
     )
 }
 
@@ -4536,17 +4547,25 @@ private fun AddTripDialog(
     var other by remember { mutableStateOf(editing?.otherCost?.let { "%.2f".format(Locale.US, it) } ?: "") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editing != null) "แก้ไขทริป" else "เพิ่มทริป") },
+        title = {
+            Text(
+                if (editing != null) {
+                    stringResource(com.songsit.fuellogpro.R.string.trip_dialog_edit_title)
+                } else {
+                    stringResource(com.songsit.fuellogpro.R.string.trip_dialog_add_title)
+                },
+            )
+        },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedTextField(name, { name = it }, label = { Text("ชื่องาน/ปลายทาง") }, singleLine = true) }
-                item { OutlinedTextField(date, { date = it }, label = { Text("วันที่ YYYY-MM-DD") }, singleLine = true) }
-                item { OutlinedTextField(distance, { distance = it }, label = { Text("ระยะทาง (กม.)") }, singleLine = true) }
-                item { OutlinedTextField(fuel, { fuel = it }, label = { Text("ค่าน้ำมัน") }, singleLine = true) }
-                item { OutlinedTextField(toll, { toll = it }, label = { Text("ค่าทางด่วน") }, singleLine = true) }
-                item { OutlinedTextField(parking, { parking = it }, label = { Text("ค่าที่จอด") }, singleLine = true) }
-                item { OutlinedTextField(food, { food = it }, label = { Text("อาหาร/ที่พัก") }, singleLine = true) }
-                item { OutlinedTextField(other, { other = it }, label = { Text("อื่น ๆ") }, singleLine = true) }
+                item { OutlinedTextField(name, { name = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_trip_name)) }, singleLine = true) }
+                item { OutlinedTextField(date, { date = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date_ymd)) }, singleLine = true) }
+                item { OutlinedTextField(distance, { distance = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_distance_km)) }, singleLine = true) }
+                item { OutlinedTextField(fuel, { fuel = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_fuel_cost)) }, singleLine = true) }
+                item { OutlinedTextField(toll, { toll = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_toll_cost)) }, singleLine = true) }
+                item { OutlinedTextField(parking, { parking = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_parking_cost)) }, singleLine = true) }
+                item { OutlinedTextField(food, { food = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_food_lodging)) }, singleLine = true) }
+                item { OutlinedTextField(other, { other = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_other_cost)) }, singleLine = true) }
             }
         },
         confirmButton = {
@@ -4565,9 +4584,9 @@ private fun AddTripDialog(
                         onSave(name, date, distanceValue, fuelValue, tollValue, parkingValue, foodValue, otherValue, onDismiss)
                     }
                 },
-            ) { Text(if (saving) "กำลังบันทึก…" else "บันทึก") }
+            ) { Text(if (saving) stringResource(com.songsit.fuellogpro.R.string.action_saving) else stringResource(com.songsit.fuellogpro.R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ยกเลิก") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
     )
 }
 
@@ -4578,31 +4597,47 @@ private fun ImportSummaryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("สรุปผลการนำเข้าข้อมูล", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_title), fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("นำเข้าและรวมข้อมูลเรียบร้อยแล้ว:", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_intro), style = MaterialTheme.typography.bodyMedium)
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("จำนวนรถที่นำเข้า/อัปเดต:")
-                    Text("${result.vehicles} คัน", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_vehicles))
+                    Text(
+                        stringResource(com.songsit.fuellogpro.R.string.import_summary_vehicles_count, result.vehicles),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("รายการเติมน้ำมัน:")
-                    Text("${result.fuelEntries} รายการ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_fuel_entries))
+                    Text(
+                        stringResource(com.songsit.fuellogpro.R.string.import_summary_count_items, result.fuelEntries),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("รายการค่าใช้จ่ายอื่นๆ:")
-                    Text("${result.expenses} รายการ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_expenses))
+                    Text(
+                        stringResource(com.songsit.fuellogpro.R.string.import_summary_count_items, result.expenses),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("รูปภาพประกอบที่นำเข้าสำเร็จ:")
-                    Text("${result.photos} รูป", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.import_summary_photos))
+                    Text(
+                        stringResource(com.songsit.fuellogpro.R.string.import_summary_photos_count, result.photos),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) { Text("ตกลง") }
+            Button(onClick = onDismiss) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) }
         },
     )
 }

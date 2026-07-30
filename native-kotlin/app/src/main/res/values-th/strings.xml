@@ -154,4 +154,40 @@
     <string name="fuel_liters_price_line">%1$s ลิตร • %2$s/ลิตร</string>
     <string name="fuel_efficiency_line">%1$s กม./ลิตร</string>
     <string name="fuel_full_tank">เต็มถัง</string>
+
+    <string name="maintenance_default_name">เปลี่ยนน้ำมันเครื่อง</string>
+    <string name="maintenance_dialog_edit_title">แก้ไขรายการดูแลรถ</string>
+    <string name="maintenance_dialog_add_title">เพิ่มรายการดูแลรถ</string>
+    <string name="label_name">รายการ</string>
+    <string name="label_category">ประเภท</string>
+    <string name="label_specify_category">ระบุประเภท</string>
+    <string name="label_due_date_optional">กำหนดวันที่ (ไม่บังคับ)</string>
+    <string name="label_due_odometer_optional">กำหนดเลขไมล์ (ไม่บังคับ)</string>
+    <string name="label_warning_days">เตือนล่วงหน้า (วัน)</string>
+    <string name="label_warning_odometer">เตือนก่อนถึงระยะ (กม.)</string>
+    <string name="label_repeat_months">ทำซ้ำทุก (เดือน)</string>
+    <string name="label_repeat_odometer">ทำซ้ำทุก (กม.)</string>
+    <string name="action_saving">กำลังบันทึก…</string>
+    <string name="action_save">บันทึก</string>
+
+    <string name="trip_dialog_edit_title">แก้ไขทริป</string>
+    <string name="trip_dialog_add_title">เพิ่มทริป</string>
+    <string name="label_trip_name">ชื่องาน/ปลายทาง</string>
+    <string name="label_date_ymd">วันที่ YYYY-MM-DD</string>
+    <string name="label_distance_km">ระยะทาง (กม.)</string>
+    <string name="label_fuel_cost">ค่าน้ำมัน</string>
+    <string name="label_toll_cost">ค่าทางด่วน</string>
+    <string name="label_parking_cost">ค่าที่จอด</string>
+    <string name="label_food_lodging">อาหาร/ที่พัก</string>
+    <string name="label_other_cost">อื่น ๆ</string>
+
+    <string name="import_summary_title">สรุปผลการนำเข้าข้อมูล</string>
+    <string name="import_summary_intro">นำเข้าและรวมข้อมูลเรียบร้อยแล้ว:</string>
+    <string name="import_summary_vehicles">จำนวนรถที่นำเข้า/อัปเดต:</string>
+    <string name="import_summary_vehicles_count">%1$d คัน</string>
+    <string name="import_summary_fuel_entries">รายการเติมน้ำมัน:</string>
+    <string name="import_summary_count_items">%1$d รายการ</string>
+    <string name="import_summary_expenses">รายการค่าใช้จ่ายอื่นๆ:</string>
+    <string name="import_summary_photos">รูปภาพประกอบที่นำเข้าสำเร็จ:</string>
+    <string name="import_summary_photos_count">%1$d รูป</string>
 </resources>

@@ -165,4 +165,47 @@
     <string name="fuel_liters_price_line">%1$s L • %2$s/L</string>
     <string name="fuel_efficiency_line">%1$s km/L</string>
     <string name="fuel_full_tank">Full tank</string>
+
+    <!-- AddMaintenanceDialog. NOTE: maintenanceCategoryOptions (the fixed category list, "อื่นๆ"
+         sentinel, and the `category` field's own default) are intentionally NOT translated here
+         — MaintenanceTask.category is stored verbatim and matched elsewhere (breakdowns, Fuelio
+         import), so translating it would make records created under different languages stop
+         matching each other. Only pure display labels/buttons are converted. -->
+    <string name="maintenance_default_name">Engine oil change</string>
+    <string name="maintenance_dialog_edit_title">Edit maintenance item</string>
+    <string name="maintenance_dialog_add_title">Add maintenance item</string>
+    <string name="label_name">Name</string>
+    <string name="label_category">Category</string>
+    <string name="label_specify_category">Specify category</string>
+    <string name="label_due_date_optional">Due date (optional)</string>
+    <string name="label_due_odometer_optional">Due odometer (optional)</string>
+    <string name="label_warning_days">Warn ahead (days)</string>
+    <string name="label_warning_odometer">Warn before due (km)</string>
+    <string name="label_repeat_months">Repeat every (months)</string>
+    <string name="label_repeat_odometer">Repeat every (km)</string>
+    <string name="action_saving">Saving…</string>
+    <string name="action_save">Save</string>
+
+    <!-- AddTripDialog -->
+    <string name="trip_dialog_edit_title">Edit trip</string>
+    <string name="trip_dialog_add_title">Add trip</string>
+    <string name="label_trip_name">Trip name/destination</string>
+    <string name="label_date_ymd">Date YYYY-MM-DD</string>
+    <string name="label_distance_km">Distance (km)</string>
+    <string name="label_fuel_cost">Fuel cost</string>
+    <string name="label_toll_cost">Toll cost</string>
+    <string name="label_parking_cost">Parking cost</string>
+    <string name="label_food_lodging">Food/lodging</string>
+    <string name="label_other_cost">Other</string>
+
+    <!-- ImportSummaryDialog -->
+    <string name="import_summary_title">Import summary</string>
+    <string name="import_summary_intro">Data imported and merged successfully:</string>
+    <string name="import_summary_vehicles">Vehicles imported/updated:</string>
+    <string name="import_summary_vehicles_count">%1$d vehicle(s)</string>
+    <string name="import_summary_fuel_entries">Fill-up entries:</string>
+    <string name="import_summary_count_items">%1$d item(s)</string>
+    <string name="import_summary_expenses">Other expense entries:</string>
+    <string name="import_summary_photos">Photos imported successfully:</string>
+    <string name="import_summary_photos_count">%1$d photo(s)</string>
 </resources>

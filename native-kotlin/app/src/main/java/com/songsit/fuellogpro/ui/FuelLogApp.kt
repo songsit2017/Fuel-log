@@ -2232,6 +2232,8 @@ private fun SettingsScreen(
             settings = displaySettings,
             onSettingsChange = onDisplaySettingsChange,
             onDismiss = { showOtherSettings = false },
+            reminderSettings = reminderSettings,
+            onReminderSettingsChange = onReminderSettingsChange,
         )
         return
     }
@@ -2629,6 +2631,8 @@ private fun OtherSettingsScreen(
     settings: DisplaySettings,
     onSettingsChange: (DisplaySettings) -> Unit,
     onDismiss: () -> Unit,
+    reminderSettings: ReminderSettings = ReminderSettings(),
+    onReminderSettingsChange: (ReminderSettings) -> Unit = {},
 ) {
     BackHandler(onBack = onDismiss)
     Scaffold(
@@ -2679,6 +2683,24 @@ private fun OtherSettingsScreen(
                     },
                     onClick = {
                         onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
+                    },
+                )
+            }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_notifications)) }
+            item {
+                PreferenceListItem(
+                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_subtitle),
+                    trailing = {
+                        Switch(
+                            checked = reminderSettings.fuelEfficiencyAlerts,
+                            onCheckedChange = {
+                                onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = it))
+                            },
+                        )
+                    },
+                    onClick = {
+                        onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = !reminderSettings.fuelEfficiencyAlerts))
                     },
                 )
             }

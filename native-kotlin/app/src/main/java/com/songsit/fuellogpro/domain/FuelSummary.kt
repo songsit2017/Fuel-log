@@ -54,3 +54,40 @@ fun calculatePerEntryKmPerLiter(entries: List<FuelEntry>): Map<String, Double> {
     }
     return result
 }
+
+data class FuelEfficiencyAlert(
+    val latestKmPerLiter: Double,
+    val averageKmPerLiter: Double,
+    val dropPercent: Double,
+)
+
+/**
+ * Flags a fill-up whose per-entry km/L (see [calculatePerEntryKmPerLiter] above) sits well
+ * below the vehicle's own recent trend — a relative comparison rather than a fixed threshold,
+ * since "normal" km/L varies hugely by vehicle. Needs [minPriorSamples] prior full-tank
+ * data points before it will fire at all, so a nearly-new vehicle's first few fill-ups (still
+ * settling into a baseline) don't trip a false alarm.
+ */
+fun checkFuelEfficiencyDrop(
+    priorEntries: List<FuelEntry>,
+    newEntry: FuelEntry,
+    minPriorSamples: Int = 3,
+    dropThreshold: Double = 0.15,
+): FuelEfficiencyAlert? {
+    if (!newEntry.fullTank || newEntry.missedPreviousFillUp) return null
+    val kmPerLiterById = calculatePerEntryKmPerLiter(priorEntries + newEntry)
+    val latest = kmPerLiterById[newEntry.id] ?: return null
+    val priorValues = orderedFullTankEntries(priorEntries)
+        .mapNotNull { kmPerLiterById[it.id] }
+        .takeLast(5)
+    if (priorValues.size < minPriorSamples) return null
+    val average = priorValues.average()
+    if (average <= 0) return null
+    val drop = (average - latest) / average
+    if (drop < dropThreshold) return null
+    return FuelEfficiencyAlert(
+        latestKmPerLiter = latest,
+        averageKmPerLiter = average,
+        dropPercent = drop * 100,
+    )
+}

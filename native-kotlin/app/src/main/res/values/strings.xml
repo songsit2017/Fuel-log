@@ -62,6 +62,7 @@
 
     <!-- OtherSettingsScreen -->
     <string name="other_settings_category_logging">Logging</string>
+    <string name="other_settings_category_notifications">Notifications</string>
     <string name="other_settings_full_tank_default_title">Full tank by default</string>
     <string name="other_settings_full_tank_default_subtitle">Turn on the full-tank option automatically for new fill-ups</string>
     <string name="other_settings_confirm_delete_title">Confirm before deleting</string>
@@ -684,4 +685,13 @@
     <string name="date_range_end_date">End date (YYYY-MM-DD)</string>
     <string name="date_range_chip_all_time">%1$d entries (all time)</string>
     <string name="date_range_chip_dated">%1$d entries (%2$s – %3$s)</string>
+
+    <!-- FuelEfficiencyNotifier -->
+    <string name="notification_channel_fuel_efficiency_name">Fuel efficiency alerts</string>
+    <string name="notification_channel_fuel_efficiency_desc">Alerts when a fill-up\'s efficiency drops well below your average</string>
+    <string name="fuel_efficiency_alert_title">Fuel efficiency dropped</string>
+    <string name="fuel_efficiency_alert_body">Your last fill-up got %2$s km/L, %1$s%% below your average. Possible causes: low tire pressure, driving conditions, or it might be time for a check-up.</string>
+    <string name="fuel_efficiency_alert_body_maintenance">Your last fill-up got %2$s km/L, %1$s%% below your average — and you have overdue maintenance, which is a likely cause. Worth checking tire pressure too.</string>
+    <string name="other_settings_fuel_efficiency_alerts_title">Fuel efficiency alerts</string>
+    <string name="other_settings_fuel_efficiency_alerts_subtitle">Notify when a fill-up\'s efficiency drops well below your average</string>
 </resources>

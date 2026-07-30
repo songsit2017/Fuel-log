@@ -55,6 +55,7 @@
     <string name="dialog_theme_title">เลือกธีม</string>
 
     <string name="other_settings_category_logging">การบันทึก</string>
+    <string name="other_settings_category_notifications">การแจ้งเตือน</string>
     <string name="other_settings_full_tank_default_title">เติมเต็มถังเป็นค่าเริ่มต้น</string>
     <string name="other_settings_full_tank_default_subtitle">เปิดตัวเลือกเต็มถังอัตโนมัติเมื่อเพิ่มรายการเติมน้ำมันใหม่</string>
     <string name="other_settings_confirm_delete_title">ยืนยันก่อนลบ</string>
@@ -662,4 +663,13 @@
     <string name="date_range_end_date">วันที่สิ้นสุด (YYYY-MM-DD)</string>
     <string name="date_range_chip_all_time">%1$d รายการ (ทั้งหมด)</string>
     <string name="date_range_chip_dated">%1$d รายการ (%2$s – %3$s)</string>
+
+    <!-- FuelEfficiencyNotifier -->
+    <string name="notification_channel_fuel_efficiency_name">แจ้งเตือนอัตราสิ้นเปลือง</string>
+    <string name="notification_channel_fuel_efficiency_desc">แจ้งเตือนเมื่ออัตราสิ้นเปลืองของการเติมน้ำมันครั้งล่าสุดต่ำกว่าค่าเฉลี่ยมาก</string>
+    <string name="fuel_efficiency_alert_title">อัตราสิ้นเปลืองลดลง</string>
+    <string name="fuel_efficiency_alert_body">การเติมน้ำมันครั้งล่าสุดได้ %2$s กม./ลิตร ต่ำกว่าค่าเฉลี่ย %1$s%% สาเหตุที่เป็นไปได้: ลมยางอ่อน, สภาพการขับ, หรือถึงเวลาเช็คสภาพรถ</string>
+    <string name="fuel_efficiency_alert_body_maintenance">การเติมน้ำมันครั้งล่าสุดได้ %2$s กม./ลิตร ต่ำกว่าค่าเฉลี่ย %1$s%% และมีงานบำรุงรักษาที่เลยกำหนดอยู่ ซึ่งน่าจะเป็นสาเหตุหลัก ลองเช็คลมยางด้วย</string>
+    <string name="other_settings_fuel_efficiency_alerts_title">แจ้งเตือนอัตราสิ้นเปลือง</string>
+    <string name="other_settings_fuel_efficiency_alerts_subtitle">แจ้งเตือนเมื่ออัตราสิ้นเปลืองของการเติมน้ำมันครั้งล่าสุดต่ำกว่าค่าเฉลี่ยมาก</string>
 </resources>

@@ -13,6 +13,9 @@ import com.songsit.fuellogpro.data.LocalTripRepository
 import com.songsit.fuellogpro.domain.FuelSummary
 import com.songsit.fuellogpro.domain.calculateFuelSummary
 import com.songsit.fuellogpro.domain.calculateExpenseSummary
+import com.songsit.fuellogpro.domain.calculateMaintenanceStatus
+import com.songsit.fuellogpro.domain.checkFuelEfficiencyDrop
+import com.songsit.fuellogpro.domain.DueLevel
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.domain.model.FuelEntryFormValues
 import com.songsit.fuellogpro.domain.model.Expense
@@ -22,6 +25,8 @@ import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.domain.TripSummary
 import com.songsit.fuellogpro.domain.calculateTripSummary
 import com.songsit.fuellogpro.domain.model.Trip
+import com.songsit.fuellogpro.notifications.FuelEfficiencyNotifier
+import com.songsit.fuellogpro.notifications.NotificationPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +83,7 @@ class NativeAppViewModel(
     private val onReminderDataChanged: () -> Unit,
 ) : ViewModel() {
     private fun getString(resId: Int) = context.getString(resId)
+    private val notificationPreferences = NotificationPreferences(context)
     private val saving = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
     private val selectedVehicleId = MutableStateFlow<String?>(null)
@@ -204,17 +210,50 @@ class NativeAppViewModel(
             error.value = getString(R.string.error_invalid_fuel_fields)
             return
         }
+        val priorEntries = state.value.entries
+        val maintenanceTasks = state.value.maintenanceTasks
         viewModelScope.launch {
             saving.value = true
             error.value = null
             runCatching { fuelRepository.add(vehicleId, values) }
                 .onSuccess {
                     onReminderDataChanged()
+                    checkFuelEfficiencyAlert(vehicleId, priorEntries, values, maintenanceTasks)
                     onSaved()
                 }
                 .onFailure { error.value = it.message ?: getString(R.string.error_save_failed) }
             saving.value = false
         }
+    }
+
+    // Fires right after a fill-up is saved rather than on a schedule (see FuelEfficiencyNotifier) —
+    // there's nothing to check periodically, only right after a new per-entry km/L becomes
+    // available. Uses the just-submitted form values directly instead of waiting on the
+    // repository's Flow to refresh, since the new entry's generated id isn't returned by add().
+    private fun checkFuelEfficiencyAlert(
+        vehicleId: String,
+        priorEntries: List<FuelEntry>,
+        values: FuelEntryFormValues,
+        maintenanceTasks: List<MaintenanceTask>,
+    ) {
+        if (!notificationPreferences.load().fuelEfficiencyAlerts) return
+        val newEntry = FuelEntry(
+            id = "pending-efficiency-check",
+            vehicleId = vehicleId,
+            date = values.date,
+            time = values.time,
+            odometerKm = values.odometerKm,
+            liters = values.liters,
+            pricePerLiter = values.pricePerLiter,
+            amount = values.grossAmount,
+            fullTank = values.fullTank,
+            missedPreviousFillUp = values.missedPreviousFillUp,
+        )
+        val alert = checkFuelEfficiencyDrop(priorEntries, newEntry) ?: return
+        val maintenanceOverdue = maintenanceTasks.any {
+            calculateMaintenanceStatus(it, values.odometerKm).level == DueLevel.OVERDUE
+        }
+        FuelEfficiencyNotifier.notify(context, alert, maintenanceOverdue)
     }
 
     fun updateFuel(id: String, values: FuelEntryFormValues, onSaved: () -> Unit) {

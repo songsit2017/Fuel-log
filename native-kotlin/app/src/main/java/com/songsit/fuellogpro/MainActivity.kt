@@ -531,7 +531,7 @@ class MainActivity : AppCompatActivity() {
         val notificationPreferences = NotificationPreferences(this)
         val displayPreferences = DisplayPreferences(this)
         val backupPreferences = com.songsit.fuellogpro.settings.BackupPreferences(this)
-        backupRepository = LocalBackupRepository(database)
+        backupRepository = LocalBackupRepository(database, this)
         csvExportRepository = LocalCsvExportRepository(database)
         fuelioImportRepository = FuelioImportRepository(applicationContext, database)
         val authRepository = GoogleAuthRepository()

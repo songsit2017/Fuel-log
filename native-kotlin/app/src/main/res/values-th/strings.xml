@@ -600,6 +600,11 @@
     <string name="error_maps_api_key_missing">กรุณาตั้งค่า MAPS_API_KEY ใน local.properties</string>
     <string name="error_places_api_failed_http">เรียก Google Places API ไม่สำเร็จ (HTTP %1$d)</string>
     <string name="error_maps_invalid_key">ไม่สามารถเชื่อมต่อ Google Maps ได้ (API Key ไม่ถูกต้อง) กรุณาตรวจสอบการตั้งค่า</string>
+
+    <!-- LocalBackupRepository -->
+    <string name="error_not_fuellog_backup">ไฟล์นี้ไม่ใช่ข้อมูลสำรอง FuelLog Native</string>
+    <string name="error_unsupported_backup_version">เวอร์ชันไฟล์สำรองยังไม่รองรับ</string>
+    <string name="error_orphan_vehicle_reference">พบข้อมูลที่อ้างถึงรถซึ่งไม่มีอยู่ในไฟล์สำรอง</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

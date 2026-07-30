@@ -1,6 +1,8 @@
 package com.songsit.fuellogpro.data
 
+import android.content.Context
 import androidx.room.withTransaction
+import com.songsit.fuellogpro.R
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
@@ -24,6 +26,7 @@ data class BackupImportResult(
 
 class LocalBackupRepository(
     private val database: FuelLogDatabase,
+    private val context: Context,
 ) {
     suspend fun exportJson(): String = database.withTransaction {
         JSONObject()
@@ -40,9 +43,9 @@ class LocalBackupRepository(
 
     suspend fun importJson(rawJson: String): BackupImportResult {
         val root = JSONObject(rawJson)
-        require(root.optString("format") == FORMAT) { "ไฟล์นี้ไม่ใช่ข้อมูลสำรอง FuelLog Native" }
+        require(root.optString("format") == FORMAT) { context.getString(R.string.error_not_fuellog_backup) }
         val version = root.optInt("version", 0)
-        require(version in 1..VERSION) { "เวอร์ชันไฟล์สำรองยังไม่รองรับ" }
+        require(version in 1..VERSION) { context.getString(R.string.error_unsupported_backup_version) }
 
         val snapshot = BackupSnapshot(
             vehicles = root.array("vehicles").mapObjects(::parseVehicle),
@@ -60,7 +63,7 @@ class LocalBackupRepository(
                 addAll(snapshot.maintenanceTasks.map(MaintenanceEntity::vehicleId).filterNot(vehicleIds::contains))
                 addAll(snapshot.trips.map(TripEntity::vehicleId).filterNot(vehicleIds::contains))
             }.firstOrNull()
-            require(orphan == null) { "พบข้อมูลที่อ้างถึงรถซึ่งไม่มีอยู่ในไฟล์สำรอง" }
+            require(orphan == null) { context.getString(R.string.error_orphan_vehicle_reference) }
 
             database.vehicleDao().upsertAll(snapshot.vehicles)
             database.fuelEntryDao().upsertAll(snapshot.fuelEntries)

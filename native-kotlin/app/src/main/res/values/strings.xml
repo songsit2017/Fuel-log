@@ -622,6 +622,11 @@
     <string name="error_maps_api_key_missing">Set MAPS_API_KEY in local.properties</string>
     <string name="error_places_api_failed_http">Google Places API call failed (HTTP %1$d)</string>
     <string name="error_maps_invalid_key">Couldn\'t connect to Google Maps (invalid API key) — please check your configuration</string>
+
+    <!-- LocalBackupRepository -->
+    <string name="error_not_fuellog_backup">This isn\'t a FuelLog Native backup file</string>
+    <string name="error_unsupported_backup_version">This backup file version isn\'t supported</string>
+    <string name="error_orphan_vehicle_reference">Found records referencing a vehicle that isn\'t in the backup file</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

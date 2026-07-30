@@ -583,6 +583,9 @@
     <string name="weather_code_95">พายุฝนฟ้าคะนอง</string>
     <string name="weather_code_96">พายุฝนฟ้าคะนองและลูกเห็บเล็ก</string>
     <string name="weather_code_99">พายุฝนฟ้าคะนองและลูกเห็บหนัก</string>
+
+    <!-- FuelioImportRepository -->
+    <string name="imported_vehicle_default_name">รถนำเข้า</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

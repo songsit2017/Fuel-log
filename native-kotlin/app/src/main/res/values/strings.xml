@@ -605,6 +605,9 @@
     <string name="weather_code_95">Thunderstorm</string>
     <string name="weather_code_96">Thunderstorm with slight hail</string>
     <string name="weather_code_99">Thunderstorm with heavy hail</string>
+
+    <!-- FuelioImportRepository -->
+    <string name="imported_vehicle_default_name">Imported vehicle</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

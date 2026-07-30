@@ -2,6 +2,7 @@ package com.songsit.fuellogpro.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.songsit.fuellogpro.R
 import com.songsit.fuellogpro.data.local.ExpenseEntity
 import com.songsit.fuellogpro.data.local.FuelEntryEntity
 import com.songsit.fuellogpro.data.local.FuelLogDatabase
@@ -116,9 +117,9 @@ class FuelioImportRepository(
             val parsed = csvEntry.parsed
             if (parsed.fuelRows.isEmpty() && parsed.costRows.isEmpty()) continue
             var parsedVehicleName = parsed.vehicleName
-                ?: csvEntry.entryName.substringAfterLast('/').substringBeforeLast('.').ifBlank { "รถนำเข้า" }
+                ?: csvEntry.entryName.substringAfterLast('/').substringBeforeLast('.').ifBlank { context.getString(R.string.imported_vehicle_default_name) }
             if (csvEntry.isCostFile && (parsedVehicleName.lowercase().contains("cost") || parsedVehicleName.lowercase().contains("expense"))) {
-                parsedVehicleName = existingVehicles.firstOrNull()?.name ?: "รถนำเข้า"
+                parsedVehicleName = existingVehicles.firstOrNull()?.name ?: context.getString(R.string.imported_vehicle_default_name)
             }
             val matchedVehicle = existingVehicles.find { it.name.trim().equals(parsedVehicleName.trim(), ignoreCase = true) }
             val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()
@@ -159,7 +160,7 @@ class FuelioImportRepository(
     // There is no nested pictures.data to draw photos from here.
     suspend fun importFuelioCsv(text: String): BackupImportResult = withContext(Dispatchers.IO) {
         val parsed = parseFuelioCsv(text)
-        val vehicleName = parsed.vehicleName ?: "รถนำเข้า"
+        val vehicleName = parsed.vehicleName ?: context.getString(R.string.imported_vehicle_default_name)
         val existingVehicles = database.vehicleDao().getAll()
         val matchedVehicle = existingVehicles.find { it.name.trim().equals(vehicleName.trim(), ignoreCase = true) }
         val vehicleId = matchedVehicle?.id ?: UUID.randomUUID().toString()

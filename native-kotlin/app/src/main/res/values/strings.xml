@@ -356,6 +356,17 @@
     <string name="language_system_default">ตามระบบ / System default</string>
     <string name="language_name_thai">ไทย</string>
     <string name="language_name_english">English</string>
+
+    <!-- EmptyFuelState -->
+    <string name="fuel_list_empty_title">No fuel entries yet</string>
+    <string name="fuel_list_empty_subtitle">Tap + to log your first entry</string>
+
+    <!-- PhotoAttachmentRow -->
+    <string name="content_desc_pdf_file">PDF file</string>
+    <string name="content_desc_attached_photo">Attached photo</string>
+    <string name="action_attach_photo_receipt">Attach photo/receipt</string>
+    <string name="action_add_photo">Add photo</string>
+    <string name="action_attach_pdf">Attach PDF</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

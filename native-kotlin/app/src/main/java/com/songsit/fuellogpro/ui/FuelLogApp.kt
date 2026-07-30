@@ -3100,8 +3100,8 @@ private fun NotificationSettingRow(
 private fun EmptyFuelState() {
     Card(shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("ยังไม่มีรายการเติมน้ำมัน", fontWeight = FontWeight.SemiBold)
-            Text("แตะ + เพื่อบันทึกรายการแรก", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(com.songsit.fuellogpro.R.string.fuel_list_empty_title), fontWeight = FontWeight.SemiBold)
+            Text(stringResource(com.songsit.fuellogpro.R.string.fuel_list_empty_subtitle), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -4094,12 +4094,12 @@ private fun PhotoAttachmentRow(
             ) {
                 if (isPdfPath(uri)) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "ไฟล์ PDF", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_pdf_file), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     AsyncImage(
                         model = if (uri.startsWith("/")) java.io.File(uri) else uri,
-                        contentDescription = "รูปที่แนบ",
+                        contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_attached_photo),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
@@ -4113,7 +4113,13 @@ private fun PhotoAttachmentRow(
                 TextButton(onClick = { if (hasMenu) showSourceMenu = true else onPickGallery() }) {
                     Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(if (photoUris.isEmpty()) "แนบรูป/ใบเสร็จ" else "เพิ่มรูป")
+                    Text(
+                        if (photoUris.isEmpty()) {
+                            stringResource(com.songsit.fuellogpro.R.string.action_attach_photo_receipt)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.action_add_photo)
+                        },
+                    )
                 }
                 if (hasMenu) {
                     DropdownMenu(
@@ -4122,17 +4128,17 @@ private fun PhotoAttachmentRow(
                     ) {
                         if (onPickCamera != null) {
                             DropdownMenuItem(
-                                text = { Text("ถ่ายรูป") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_take_photo)) },
                                 onClick = { showSourceMenu = false; onPickCamera() },
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("เลือกจากแกลอรี่") },
+                            text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_choose_from_gallery)) },
                             onClick = { showSourceMenu = false; onPickGallery() },
                         )
                         if (onPickPdf != null) {
                             DropdownMenuItem(
-                                text = { Text("แนบ PDF") },
+                                text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_attach_pdf)) },
                                 onClick = { showSourceMenu = false; onPickPdf() },
                             )
                         }

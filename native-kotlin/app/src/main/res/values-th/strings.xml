@@ -334,6 +334,17 @@
     <string name="language_system_default">ตามระบบ / System default</string>
     <string name="language_name_thai">ไทย</string>
     <string name="language_name_english">English</string>
+
+    <!-- EmptyFuelState -->
+    <string name="fuel_list_empty_title">ยังไม่มีรายการเติมน้ำมัน</string>
+    <string name="fuel_list_empty_subtitle">แตะ + เพื่อบันทึกรายการแรก</string>
+
+    <!-- PhotoAttachmentRow -->
+    <string name="content_desc_pdf_file">ไฟล์ PDF</string>
+    <string name="content_desc_attached_photo">รูปที่แนบ</string>
+    <string name="action_attach_photo_receipt">แนบรูป/ใบเสร็จ</string>
+    <string name="action_add_photo">เพิ่มรูป</string>
+    <string name="action_attach_pdf">แนบ PDF</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

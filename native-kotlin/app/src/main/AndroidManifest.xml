@@ -25,6 +25,11 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
+        <!-- Pre-fetches the Document Scanner module at install time instead of downloading it
+             on first "สแกนบิล/ใบเสร็จด้วย AI" tap. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="document_ui" />
         <service
             android:name=".trip.TripRecordingService"
             android:exported="false"

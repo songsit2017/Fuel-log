@@ -6,7 +6,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -283,6 +287,64 @@ class MainActivity : ComponentActivity() {
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", destFile)
         takePicture.launch(uri)
     }
+
+    // Receipt/expense-bill scans go through Google Play services' Document Scanner instead of a
+    // plain camera capture — it auto-detects the paper's edges, crops to just the document, and
+    // applies a scan-style filter, matching what a dedicated document-scanner app produces.
+    // launchCameraCapture above (odometer photos, plain "แนบรูป" attach) stays a plain photo
+    // since those aren't documents and edge-detection would just fail on a car dashboard.
+    private var pendingScanResult: ((uris: List<String>, scanResult: ReceiptScanResult?) -> Unit)? = null
+    private var pendingScanType: String? = null
+    private val documentScanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val onCaptured = pendingScanResult
+        val type = pendingScanType
+        pendingScanResult = null
+        pendingScanType = null
+        if (onCaptured == null) return@registerForActivityResult
+        val pageUri = GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pages?.firstOrNull()?.imageUri
+        if (pageUri == null) { onCaptured(emptyList(), null); return@registerForActivityResult }
+        lifecycleScope.launch {
+            runCatching {
+                val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+                val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
+                contentResolver.openInputStream(pageUri)?.use { input ->
+                    destFile.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("ไม่สามารถเปิดไฟล์รูปได้")
+                destFile.absolutePath
+            }.onSuccess { path ->
+                val scanResult = scanFirstPhoto(path, type)
+                onCaptured(listOf(path), scanResult)
+            }.onFailure {
+                Toast.makeText(this@MainActivity, it.message ?: "แนบรูปไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                onCaptured(emptyList(), null)
+            }
+        }
+    }
+
+    private fun launchDocumentScan(type: String, onCaptured: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) {
+        pendingScanResult = onCaptured
+        pendingScanType = type
+        val options = GmsDocumentScannerOptions.Builder()
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE_WITH_FILTER)
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .setPageLimit(1)
+            .setGalleryImportAllowed(true)
+            .build()
+        GmsDocumentScanning.getClient(options)
+            .getStartScanIntent(this)
+            .addOnSuccessListener { intentSender ->
+                documentScanLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+            }
+            .addOnFailureListener { e ->
+                pendingScanResult = null
+                pendingScanType = null
+                Toast.makeText(this, e.message ?: "เปิดตัวสแกนเอกสารไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                onCaptured(emptyList(), null)
+            }
+    }
+
     // The "add fill-up" dialog can request nearby-station lookup and weather capture back-to-back
     // on open, both needing location permission — this flag stops the second request from calling
     // launch() on the shared registerForActivityResult launcher while the first is still pending.
@@ -609,7 +671,9 @@ class MainActivity : ComponentActivity() {
                         ),
                     )
                 },
-                onPickCameraPhoto = { type, onPicked -> launchCameraCapture(type, onPicked) },
+                onPickCameraPhoto = { type, onPicked ->
+                    if (type == "fuel" || type == "expense") launchDocumentScan(type, onPicked) else launchCameraCapture(type, onPicked)
+                },
                 oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->

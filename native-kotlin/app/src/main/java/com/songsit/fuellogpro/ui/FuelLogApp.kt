@@ -1443,11 +1443,6 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
     }
 }
 
-private val fuelListThaiMonthNames = listOf(
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-)
-
 @Composable
 private fun FuelList(
     entries: List<FuelEntry>,
@@ -1472,7 +1467,8 @@ private fun FuelList(
         if (entries.isEmpty()) item { EmptyFuelState() }
         groups.forEach { (yearMonth, groupEntries) ->
             item {
-                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: unknownDateLabel
+                val monthNames = stringArrayResource(com.songsit.fuellogpro.R.array.month_names_full)
+                val label = yearMonth?.let { (year, month) -> "${monthNames[month - 1]} $year" } ?: unknownDateLabel
                 Text(
                     label,
                     style = MaterialTheme.typography.titleSmall,
@@ -1566,7 +1562,8 @@ private fun ExpenseList(
         }
         groups.forEach { (yearMonth, groupExpenses) ->
             item {
-                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: unknownDateLabel
+                val monthNames = stringArrayResource(com.songsit.fuellogpro.R.array.month_names_full)
+                val label = yearMonth?.let { (year, month) -> "${monthNames[month - 1]} $year" } ?: unknownDateLabel
                 Text(
                     label,
                     style = MaterialTheme.typography.titleSmall,
@@ -1602,7 +1599,7 @@ private fun ExpenseRow(
                     fontWeight = FontWeight.SemiBold,
                 )
                 expense.odometerKm?.let {
-                    Text("${number.format(it)} กม.", style = MaterialTheme.typography.labelSmall)
+                    Text("${number.format(it)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}", style = MaterialTheme.typography.labelSmall)
                 }
                 val notes = listOfNotNull(
                     stringResource(com.songsit.fuellogpro.R.string.expense_recurring_label).takeIf { expense.recurring },
@@ -1686,7 +1683,7 @@ private fun TripList(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
+                            "%.2f ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)} • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
                             style = MaterialTheme.typography.headlineSmall,
                         )
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1714,7 +1711,7 @@ private fun TripList(
                     Column(Modifier.fillMaxWidth().padding(18.dp)) {
                         Text(stringResource(com.songsit.fuellogpro.R.string.trip_recording_done_title), fontWeight = FontWeight.Bold)
                         Text(
-                            "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
+                            "%.2f ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)} • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1877,7 +1874,7 @@ private fun FuelRow(
                             )
                         }
                     }
-                    Text("${entry.date} • ${number.format(entry.odometerKm)} กม.", style = MaterialTheme.typography.bodySmall)
+                    Text("${entry.date} • ${number.format(entry.odometerKm)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}", style = MaterialTheme.typography.bodySmall)
                 }
                 Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
             }
@@ -1908,9 +1905,9 @@ private fun DisplaySettingsCard(
 
     Card(shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("การตั้งค่าการแสดงผล", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.songsit.fuellogpro.R.string.display_settings_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
-            Text("สกุลเงิน", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(com.songsit.fuellogpro.R.string.settings_currency_title), style = MaterialTheme.typography.labelLarge)
             Box {
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { currencyMenuExpanded = true },
@@ -1935,7 +1932,7 @@ private fun DisplaySettingsCard(
                 }
             }
 
-            Text("จำนวนทศนิยม", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(com.songsit.fuellogpro.R.string.dialog_decimals_title), style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (0..3).forEach { d ->
                     if (settings.decimals == d) {
@@ -1947,9 +1944,11 @@ private fun DisplaySettingsCard(
             }
 
             HorizontalDivider()
-            Text("ระยะทาง", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(com.songsit.fuellogpro.R.string.label_distance), style = MaterialTheme.typography.labelLarge)
+            val kmLabel = stringResource(com.songsit.fuellogpro.R.string.unit_km)
+            val miLabel = stringResource(com.songsit.fuellogpro.R.string.unit_mi)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("km" to "กิโลเมตร (กม.)", "mi" to "ไมล์ (mi)").forEach { (value, label) ->
+                listOf("km" to kmLabel, "mi" to miLabel).forEach { (value, label) ->
                     if (settings.distanceUnit == value) {
                         Button(onClick = { onChange(settings.copy(distanceUnit = value)) }) { Text(label) }
                     } else {
@@ -1958,9 +1957,11 @@ private fun DisplaySettingsCard(
                 }
             }
 
-            Text("ปริมาตรน้ำมัน", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(com.songsit.fuellogpro.R.string.label_fuel_volume), style = MaterialTheme.typography.labelLarge)
+            val litersLabel = stringResource(com.songsit.fuellogpro.R.string.unit_liters)
+            val gallonsLabel = stringResource(com.songsit.fuellogpro.R.string.unit_gallons)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("liters" to "ลิตร (L)", "gal" to "แกลลอน (US gal)").forEach { (value, label) ->
+                listOf("liters" to litersLabel, "gal" to gallonsLabel).forEach { (value, label) ->
                     if (settings.volumeUnit == value) {
                         Button(onClick = { onChange(settings.copy(volumeUnit = value)) }) { Text(label) }
                     } else {
@@ -1969,14 +1970,17 @@ private fun DisplaySettingsCard(
                 }
             }
             Text(
-                "ข้อมูลยังเก็บเป็นกิโลเมตร/ลิตรเสมอ แค่แสดงผลตามหน่วยที่เลือก เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม",
+                stringResource(com.songsit.fuellogpro.R.string.display_settings_units_note),
                 style = MaterialTheme.typography.bodySmall,
             )
 
             HorizontalDivider()
-            Text("ธีม", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(com.songsit.fuellogpro.R.string.settings_theme_title), style = MaterialTheme.typography.labelLarge)
+            val lightLabel = stringResource(com.songsit.fuellogpro.R.string.theme_light)
+            val darkLabel = stringResource(com.songsit.fuellogpro.R.string.theme_dark)
+            val systemLabel = stringResource(com.songsit.fuellogpro.R.string.theme_system)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("light" to "สว่าง", "dark" to "มืด", "system" to "ตามระบบ").forEach { (value, label) ->
+                listOf("light" to lightLabel, "dark" to darkLabel, "system" to systemLabel).forEach { (value, label) ->
                     if (settings.themeMode == value) {
                         Button(onClick = { onChange(settings.copy(themeMode = value)) }) { Text(label) }
                     } else {
@@ -2006,8 +2010,8 @@ private fun VehiclesListScreen(
             item {
                 Card(shape = RoundedCornerShape(20.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีรถ", fontWeight = FontWeight.Bold)
-                        Text("แตะ + เพื่อเพิ่มรถคันแรก")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.vehicle_list_empty_title), fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.vehicle_list_empty_subtitle))
                     }
                 }
             }
@@ -2073,20 +2077,20 @@ private fun VehiclesListScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                             if (vehicle.id == selectedVehicleId) {
-                                Text("กำลังใช้", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(com.songsit.fuellogpro.R.string.label_in_use), color = Color.White, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = "เมนู", tint = Color.White)
+                                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_menu), tint = Color.White)
                             }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("แก้ไข") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_edit)) },
                                     onClick = { menuExpanded = false; onEdit(vehicle) },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("ลบ") },
+                                    text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) },
                                     onClick = { menuExpanded = false; onDelete(vehicle.id) },
                                 )
                             }

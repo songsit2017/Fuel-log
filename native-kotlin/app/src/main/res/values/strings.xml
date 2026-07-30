@@ -328,4 +328,29 @@
     <string name="fuel_grade_diesel_b7">Diesel B7</string>
     <string name="fuel_grade_diesel_b20">Diesel B20</string>
     <string name="fuel_grade_premium_95">Premium 95</string>
+
+    <!-- FuelList / ExpenseList month-group headers -->
+    <string name="unit_km_short">km</string>
+    <string name="display_settings_title">Display settings</string>
+    <string name="display_settings_units_note">Data is always stored in kilometers/liters — this only changes how it\'s displayed. You can switch anytime without affecting existing data.</string>
+
+    <!-- VehiclesListScreen -->
+    <string name="vehicle_list_empty_title">No vehicles yet</string>
+    <string name="vehicle_list_empty_subtitle">Tap + to add your first vehicle</string>
+    <string name="label_in_use">In use</string>
+    <string name="action_edit">Edit</string>
+    <string-array name="month_names_full">
+        <item>January</item>
+        <item>February</item>
+        <item>March</item>
+        <item>April</item>
+        <item>May</item>
+        <item>June</item>
+        <item>July</item>
+        <item>August</item>
+        <item>September</item>
+        <item>October</item>
+        <item>November</item>
+        <item>December</item>
+    </string-array>
 </resources>

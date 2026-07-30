@@ -306,4 +306,29 @@
     <string name="fuel_grade_diesel_b7">ดีเซล B7</string>
     <string name="fuel_grade_diesel_b20">ดีเซล B20</string>
     <string name="fuel_grade_premium_95">พรีเมียม 95</string>
+
+    <!-- FuelList / ExpenseList month-group headers -->
+    <string name="unit_km_short">กม.</string>
+    <string name="display_settings_title">การตั้งค่าการแสดงผล</string>
+    <string name="display_settings_units_note">ข้อมูลยังเก็บเป็นกิโลเมตร/ลิตรเสมอ แค่แสดงผลตามหน่วยที่เลือก เปลี่ยนได้ตลอดเวลาไม่กระทบข้อมูลเดิม</string>
+
+    <!-- VehiclesListScreen -->
+    <string name="vehicle_list_empty_title">ยังไม่มีรถ</string>
+    <string name="vehicle_list_empty_subtitle">แตะ + เพื่อเพิ่มรถคันแรก</string>
+    <string name="label_in_use">กำลังใช้</string>
+    <string name="action_edit">แก้ไข</string>
+    <string-array name="month_names_full">
+        <item>มกราคม</item>
+        <item>กุมภาพันธ์</item>
+        <item>มีนาคม</item>
+        <item>เมษายน</item>
+        <item>พฤษภาคม</item>
+        <item>มิถุนายน</item>
+        <item>กรกฎาคม</item>
+        <item>สิงหาคม</item>
+        <item>กันยายน</item>
+        <item>ตุลาคม</item>
+        <item>พฤศจิกายน</item>
+        <item>ธันวาคม</item>
+    </string-array>
 </resources>

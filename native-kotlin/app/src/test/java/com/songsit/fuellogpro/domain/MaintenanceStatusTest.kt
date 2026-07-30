@@ -17,7 +17,8 @@ class MaintenanceStatusTest {
         )
 
         assertEquals(DueLevel.OVERDUE, status.level)
-        assertEquals("เกินกำหนด 7 วัน", status.label)
+        assertEquals(MaintenanceUnit.DAYS, status.unit)
+        assertEquals(7L, status.magnitudeDays)
     }
 
     @Test
@@ -29,13 +30,14 @@ class MaintenanceStatusTest {
         )
 
         assertEquals(DueLevel.DUE_SOON, status.level)
-        assertEquals("อีก 500 กม.", status.label)
+        assertEquals(MaintenanceUnit.DISTANCE, status.unit)
+        assertEquals("500", status.magnitudeKm)
     }
 
     @Test
     fun missingScheduleIsNotReportedAsOverdue() {
         assertEquals(
-            MaintenanceStatus(DueLevel.OK, "ยังไม่กำหนด"),
+            MaintenanceStatus(DueLevel.OK, MaintenanceUnit.NONE),
             calculateMaintenanceStatus(task(nextDate = null, nextOdometerKm = null), null, today),
         )
     }

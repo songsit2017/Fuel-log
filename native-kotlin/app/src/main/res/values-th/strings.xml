@@ -518,6 +518,9 @@
     <string name="error_vehicle_not_found_for_trip">ไม่พบรถสำหรับทริปนี้</string>
     <string name="error_update_trip_failed">แก้ไขทริปไม่สำเร็จ</string>
     <string name="error_delete_trip_failed">ลบทริปไม่สำเร็จ</string>
+
+    <!-- MaintenanceStatus -->
+    <string name="maintenance_not_set">ยังไม่กำหนด</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

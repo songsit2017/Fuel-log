@@ -1826,7 +1826,20 @@ private fun MaintenanceList(
                             Text(task.name, fontWeight = FontWeight.Bold)
                             Text(task.category, style = MaterialTheme.typography.bodySmall)
                         }
-                        Text(status.label, fontWeight = FontWeight.SemiBold)
+                        val statusLabel = when (status.unit) {
+                            com.songsit.fuellogpro.domain.MaintenanceUnit.DAYS -> if (status.level == DueLevel.OVERDUE) {
+                                stringResource(com.songsit.fuellogpro.R.string.maint_overdue_days, status.magnitudeDays)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.maint_due_in_days, status.magnitudeDays)
+                            }
+                            com.songsit.fuellogpro.domain.MaintenanceUnit.DISTANCE -> if (status.level == DueLevel.OVERDUE) {
+                                stringResource(com.songsit.fuellogpro.R.string.maint_overdue_km, status.magnitudeKm)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.maint_due_in_km, status.magnitudeKm)
+                            }
+                            com.songsit.fuellogpro.domain.MaintenanceUnit.NONE -> stringResource(com.songsit.fuellogpro.R.string.maintenance_not_set)
+                        }
+                        Text(statusLabel, fontWeight = FontWeight.SemiBold)
                     }
                     val due = listOfNotNull(
                         task.nextDate?.let { stringResource(com.songsit.fuellogpro.R.string.maintenance_due_date, it) },

@@ -540,6 +540,9 @@
     <string name="error_vehicle_not_found_for_trip">Couldn\'t find the vehicle for this trip</string>
     <string name="error_update_trip_failed">Couldn\'t update the trip</string>
     <string name="error_delete_trip_failed">Couldn\'t delete the trip</string>
+
+    <!-- MaintenanceStatus -->
+    <string name="maintenance_not_set">Not yet set</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

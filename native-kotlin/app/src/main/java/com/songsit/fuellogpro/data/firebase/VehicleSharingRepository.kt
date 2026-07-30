@@ -1,7 +1,9 @@
 package com.songsit.fuellogpro.data.firebase
 
+import android.content.Context
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.songsit.fuellogpro.R
 import kotlinx.coroutines.tasks.await
 import kotlin.random.Random
 
@@ -29,6 +31,7 @@ data class InviteResult(
  * in a concurrent session) — this file does not import or reference it.
  */
 class VehicleSharingRepository(
+    private val context: Context,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
     suspend fun loadMembers(vehicleId: String): List<VehicleMember> {
@@ -59,7 +62,7 @@ class VehicleSharingRepository(
         targetEmail: String,
         role: String,
     ): InviteResult {
-        require(role == "editor" || role == "viewer") { "สิทธิ์ต้องเป็น editor หรือ viewer" }
+        require(role == "editor" || role == "viewer") { context.getString(R.string.error_invalid_role) }
         val code = randomCode()
         val expiresAt = System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000
         val invite = mapOf(
@@ -89,18 +92,18 @@ class VehicleSharingRepository(
         currentPhotoUrl: String? = null,
     ): String {
         val normalizedCode = code.trim().uppercase()
-        require(normalizedCode.length == 8) { "กรอกรหัสเชิญให้ครบ 8 ตัว" }
+        require(normalizedCode.length == 8) { context.getString(R.string.error_invite_code_length) }
         val inviteSnapshot = firestore.collection("invites").document(normalizedCode).get().await()
-        if (!inviteSnapshot.exists()) error("ไม่พบรหัสเชิญ")
+        if (!inviteSnapshot.exists()) error(context.getString(R.string.error_invite_code_not_found))
         val expiresAt = inviteSnapshot.getLong("expiresAt") ?: 0L
-        if (expiresAt < System.currentTimeMillis()) error("รหัสเชิญหมดอายุแล้ว")
+        if (expiresAt < System.currentTimeMillis()) error(context.getString(R.string.error_invite_code_expired))
         val emailLower = currentEmail.trim().lowercase()
         val inviteEmail = inviteSnapshot.getString("emailLower")
-        if (!inviteEmail.isNullOrBlank() && inviteEmail != emailLower) error("รหัสนี้สร้างไว้สำหรับบัญชี Google อื่น")
+        if (!inviteEmail.isNullOrBlank() && inviteEmail != emailLower) error(context.getString(R.string.error_invite_wrong_account))
         val role = inviteSnapshot.getString("role")
-        if (role != "editor" && role != "viewer") error("สิทธิ์ในรหัสเชิญไม่ถูกต้อง")
-        val vehicleId = inviteSnapshot.getString("vehicleId") ?: error("รหัสเชิญไม่มีข้อมูลรถ")
-        val vehicleName = inviteSnapshot.getString("vehicleName") ?: "รถที่แชร์"
+        if (role != "editor" && role != "viewer") error(context.getString(R.string.error_invite_invalid_role))
+        val vehicleId = inviteSnapshot.getString("vehicleId") ?: error(context.getString(R.string.error_invite_missing_vehicle))
+        val vehicleName = inviteSnapshot.getString("vehicleName") ?: context.getString(R.string.shared_vehicle_default_name)
 
         val vehicleRef = firestore.collection("vehicles").document(vehicleId)
         vehicleRef.update(

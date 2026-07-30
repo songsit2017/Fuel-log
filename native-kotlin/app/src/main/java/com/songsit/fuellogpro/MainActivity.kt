@@ -543,7 +543,7 @@ class MainActivity : AppCompatActivity() {
         val maintenanceRepository = LocalMaintenanceRepository(database.maintenanceDao(), deletionRecorder)
         val tripRepository = LocalTripRepository(database.tripDao(), deletionRecorder)
         val oilPriceRepository = OilPriceRepository()
-        val vehicleSharingRepository = VehicleSharingRepository()
+        val vehicleSharingRepository = VehicleSharingRepository(applicationContext)
         setContent {
             var cloudState by remember {
                 mutableStateOf(

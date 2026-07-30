@@ -563,6 +563,16 @@
     <string name="vehicle_from_cloud_default_name">Vehicle from Cloud</string>
     <string name="maintenance_default_name">Maintenance item</string>
     <string name="trip_default_name">Trip</string>
+
+    <!-- VehicleSharingRepository -->
+    <string name="error_invalid_role">Role must be editor or viewer</string>
+    <string name="error_invite_code_length">Enter all 8 characters of the invite code</string>
+    <string name="error_invite_code_not_found">Invite code not found</string>
+    <string name="error_invite_code_expired">This invite code has expired</string>
+    <string name="error_invite_wrong_account">This code was created for a different Google account</string>
+    <string name="error_invite_invalid_role">This invite code has an invalid role</string>
+    <string name="error_invite_missing_vehicle">This invite code has no vehicle data</string>
+    <string name="shared_vehicle_default_name">Shared vehicle</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

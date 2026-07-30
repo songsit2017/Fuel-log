@@ -541,6 +541,16 @@
     <string name="vehicle_from_cloud_default_name">รถจาก Cloud</string>
     <string name="maintenance_default_name">รายการดูแลรถ</string>
     <string name="trip_default_name">ทริป</string>
+
+    <!-- VehicleSharingRepository -->
+    <string name="error_invalid_role">สิทธิ์ต้องเป็น editor หรือ viewer</string>
+    <string name="error_invite_code_length">กรอกรหัสเชิญให้ครบ 8 ตัว</string>
+    <string name="error_invite_code_not_found">ไม่พบรหัสเชิญ</string>
+    <string name="error_invite_code_expired">รหัสเชิญหมดอายุแล้ว</string>
+    <string name="error_invite_wrong_account">รหัสนี้สร้างไว้สำหรับบัญชี Google อื่น</string>
+    <string name="error_invite_invalid_role">สิทธิ์ในรหัสเชิญไม่ถูกต้อง</string>
+    <string name="error_invite_missing_vehicle">รหัสเชิญไม่มีข้อมูลรถ</string>
+    <string name="shared_vehicle_default_name">รถที่แชร์</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

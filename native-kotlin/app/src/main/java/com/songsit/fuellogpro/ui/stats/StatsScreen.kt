@@ -761,12 +761,12 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     val prevMonthLabel = stringResource(com.songsit.fuellogpro.R.string.stats_prev_month)
 
     Column(modifier = modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab) {
+        ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 12.dp) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold) }
+                    text = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
                 )
             }
         }

@@ -618,4 +618,22 @@
         <item>พฤศจิกายน</item>
         <item>ธันวาคม</item>
     </string-array>
+
+    <!-- Fuel type / category display-label mapping (stored value stays Thai for matching;
+         these are only the localized labels shown in dropdowns/lists) -->
+    <string name="fuel_type_gasoline">เบนซิน</string>
+    <string name="fuel_type_diesel">ดีเซล</string>
+    <string name="category_scheduled_service">เช็คระยะ</string>
+    <string name="category_oil_change">เปลี่ยนถ่ายน้ำมันเครื่อง</string>
+    <string name="category_insurance_ctpl">ประกันภัย/พ.ร.บ.</string>
+    <string name="category_vehicle_tax">ภาษี</string>
+    <string name="category_maintenance">บำรุงรักษา</string>
+    <string name="category_service">บริการ</string>
+    <string name="category_registration">ทะเบียน</string>
+    <string name="category_parking">ที่จอดรถ</string>
+    <string name="category_car_wash">ล้างรถ</string>
+    <string name="category_toll">ทางด่วน</string>
+    <string name="category_tickets_fines">ตั๋ว/ค่าปรับ</string>
+    <string name="category_modifications">ปรับแต่ง</string>
+    <string name="category_insurance">การประกันภัย</string>
 </resources>

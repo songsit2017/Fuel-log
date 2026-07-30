@@ -59,6 +59,7 @@ import com.songsit.fuellogpro.data.local.isPdfPath
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.NativeAppState
+import com.songsit.fuellogpro.ui.categoryDisplayLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -209,7 +210,7 @@ private fun ExpenseTimelineContent(expense: Expense, onImageClick: (String) -> U
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
-        val detail = listOf(expense.category, expense.description).filter(String::isNotBlank).joinToString(" • ")
+        val detail = listOf(categoryDisplayLabel(expense.category), expense.description).filter(String::isNotBlank).joinToString(" • ")
         if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall)
         if (expense.photoUrls.isNotEmpty()) TimelineThumbnails(expense.photoUrls, onImageClick)
     }

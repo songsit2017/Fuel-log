@@ -640,4 +640,22 @@
         <item>November</item>
         <item>December</item>
     </string-array>
+
+    <!-- Fuel type / category display-label mapping (stored value stays Thai for matching;
+         these are only the localized labels shown in dropdowns/lists) -->
+    <string name="fuel_type_gasoline">Gasoline</string>
+    <string name="fuel_type_diesel">Diesel</string>
+    <string name="category_scheduled_service">Scheduled service</string>
+    <string name="category_oil_change">Engine oil change</string>
+    <string name="category_insurance_ctpl">Insurance / CTPL</string>
+    <string name="category_vehicle_tax">Vehicle tax</string>
+    <string name="category_maintenance">Maintenance</string>
+    <string name="category_service">Service</string>
+    <string name="category_registration">Registration</string>
+    <string name="category_parking">Parking</string>
+    <string name="category_car_wash">Car wash</string>
+    <string name="category_toll">Toll</string>
+    <string name="category_tickets_fines">Tickets / fines</string>
+    <string name="category_modifications">Modifications</string>
+    <string name="category_insurance">Insurance</string>
 </resources>

@@ -1537,7 +1537,7 @@ private fun ExpenseList(
                             val fraction = if (categoryTotalSum > 0) (total / categoryTotalSum).toFloat() else 0f
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(category, style = MaterialTheme.typography.bodyMedium)
+                                    Text(categoryDisplayLabel(category), style = MaterialTheme.typography.bodyMedium)
                                     Text(thaiCurrency.format(total), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                 }
                                 LinearProgressIndicator(
@@ -1595,7 +1595,7 @@ private fun ExpenseRow(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "${expense.date} • ${expense.description.ifBlank { expense.category }}",
+                    "${expense.date} • ${expense.description.ifBlank { categoryDisplayLabel(expense.category) }}",
                     fontWeight = FontWeight.SemiBold,
                 )
                 expense.odometerKm?.let {
@@ -1824,7 +1824,7 @@ private fun MaintenanceList(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(task.name, fontWeight = FontWeight.Bold)
-                            Text(task.category, style = MaterialTheme.typography.bodySmall)
+                            Text(categoryDisplayLabel(task.category), style = MaterialTheme.typography.bodySmall)
                         }
                         val statusLabel = when (status.unit) {
                             com.songsit.fuellogpro.domain.MaintenanceUnit.DAYS -> if (status.level == DueLevel.OVERDUE) {
@@ -3135,12 +3135,13 @@ private fun UnitDropdownField(
     value: String,
     options: List<String>,
     modifier: Modifier = Modifier.fillMaxWidth(),
+    displayLabel: @Composable (String) -> String = { it },
     onSelect: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
         OutlinedTextField(
-            value = value,
+            value = displayLabel(value),
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -3152,7 +3153,7 @@ private fun UnitDropdownField(
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
-                DropdownMenuItem(text = { Text(option) }, onClick = { onSelect(option); expanded = false })
+                DropdownMenuItem(text = { Text(displayLabel(option)) }, onClick = { onSelect(option); expanded = false })
             }
         }
     }
@@ -3350,8 +3351,16 @@ private fun VehicleEditScreen(
             item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.label_volume_unit), volumeUnit, listOf("L", "gal")) { volumeUnit = it } }
             item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.label_consumption_unit), consumptionUnit, listOf("km/l", "l/100km", "mpg")) { consumptionUnit = it } }
             item { Text(stringResource(com.songsit.fuellogpro.R.string.section_fuel_type), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            // fuelType/fuelTypeOptions are persisted data values (matched elsewhere), not translated
-            item { UnitDropdownField(stringResource(com.songsit.fuellogpro.R.string.section_fuel_type), fuelType, fuelTypeOptions) { fuelType = it } }
+            // fuelType/fuelTypeOptions are persisted data values (matched elsewhere) — only the
+            // displayed label is translated via fuelTypeDisplayLabel, the stored value stays Thai.
+            item {
+                UnitDropdownField(
+                    stringResource(com.songsit.fuellogpro.R.string.section_fuel_type),
+                    fuelType,
+                    fuelTypeOptions,
+                    displayLabel = { fuelTypeDisplayLabel(it) },
+                ) { fuelType = it }
+            }
             item {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -3733,6 +3742,7 @@ private fun AddFuelScreen(
                             fuelType,
                             availableFuelTypes,
                             modifier = Modifier.weight(1f),
+                            displayLabel = { fuelTypeDisplayLabel(it) },
                         ) { fuelType = it }
                     }
                 }
@@ -4268,7 +4278,7 @@ private fun AddExpenseScreen(
             item {
                 Box {
                     OutlinedTextField(
-                        value = category,
+                        value = categoryDisplayLabel(category),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_expense_category)) },
@@ -4282,7 +4292,7 @@ private fun AddExpenseScreen(
                     )
                     DropdownMenu(expanded = categoryMenuExpanded, onDismissRequest = { categoryMenuExpanded = false }) {
                         expenseCategories.forEach { option ->
-                            DropdownMenuItem(text = { Text(option) }, onClick = { category = option; categoryMenuExpanded = false })
+                            DropdownMenuItem(text = { Text(categoryDisplayLabel(option)) }, onClick = { category = option; categoryMenuExpanded = false })
                         }
                     }
                 }
@@ -4479,8 +4489,9 @@ private fun AddMaintenanceDialog(
     onSave: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit)? = null,
 ) {
-    // Default name is translated (free text, no data-matching implications); category default
-    // and maintenanceCategoryOptions are NOT — see the string resource comment for why.
+    // Default name is translated (free text, no data-matching implications); the category
+    // default and maintenanceCategoryOptions stay Thai (persisted/matched values) — only their
+    // displayed label is translated, via categoryDisplayLabel below.
     val defaultMaintenanceName = stringResource(com.songsit.fuellogpro.R.string.maintenance_default_name)
     var name by remember { mutableStateOf(editing?.name ?: defaultMaintenanceName) }
     var category by remember { mutableStateOf(editing?.category ?: "บำรุงรักษา") }
@@ -4514,7 +4525,7 @@ private fun AddMaintenanceDialog(
                 item {
                     Box(Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            value = selectedCategory,
+                            value = categoryDisplayLabel(selectedCategory),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_category)) },
@@ -4525,7 +4536,7 @@ private fun AddMaintenanceDialog(
                         DropdownMenu(expanded = categoryMenuExpanded, onDismissRequest = { categoryMenuExpanded = false }) {
                             maintenanceCategoryOptions.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option) },
+                                    text = { Text(categoryDisplayLabel(option)) },
                                     onClick = {
                                         categoryMenuExpanded = false
                                         category = if (option == "อื่นๆ") "" else option

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_overview">ภาพรวม</string>
+    <string name="title_fuel_log">การเติมน้ำมัน</string>
+    <string name="title_expenses">บันทึกค่าใช้จ่าย</string>
+    <string name="title_maintenance">บำรุงรักษา</string>
+    <string name="title_my_vehicles">รถของฉัน</string>
+    <string name="title_stats">สถิติ</string>
+    <string name="title_trips">ทริป</string>
+    <string name="nav_timeline">ไทม์ไลน์</string>
+    <string name="nav_calculator">เครื่องคิดเลข</string>
+    <string name="nav_map">แผนที่</string>
+</resources>

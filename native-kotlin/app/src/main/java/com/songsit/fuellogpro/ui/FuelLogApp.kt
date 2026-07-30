@@ -121,6 +121,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -283,8 +284,24 @@ fun FuelLogApp(
     // so Back should return to homeTab=0 (Overview) as usual. Set to non-null only by the
     // Timeline card click; cleared on any direct drawer navigation or after Back is consumed.
     var fuelListReturnHomeTab by remember { mutableStateOf<Int?>(null) }
-    val titles = listOf("ภาพรวม", "การเติมน้ำมัน", "บันทึกค่าใช้จ่าย", "บำรุงรักษา", "รถของฉัน", "สถิติ", "ทริป")
-    val homeTitles = listOf("ภาพรวม", "ไทม์ไลน์", "เครื่องคิดเลข", "แผนที่")
+    // Pilot batch for real per-app language (AppCompatDelegate.setApplicationLocales(), see the
+    // "ภาษา / Language" Settings row) — the rest of the app's strings are still Thai-hardcoded
+    // and don't yet respond to the system language switch; only nav chrome does so far.
+    val titles = listOf(
+        stringResource(com.songsit.fuellogpro.R.string.title_overview),
+        stringResource(com.songsit.fuellogpro.R.string.title_fuel_log),
+        stringResource(com.songsit.fuellogpro.R.string.title_expenses),
+        stringResource(com.songsit.fuellogpro.R.string.title_maintenance),
+        stringResource(com.songsit.fuellogpro.R.string.title_my_vehicles),
+        stringResource(com.songsit.fuellogpro.R.string.title_stats),
+        stringResource(com.songsit.fuellogpro.R.string.title_trips),
+    )
+    val homeTitles = listOf(
+        stringResource(com.songsit.fuellogpro.R.string.title_overview),
+        stringResource(com.songsit.fuellogpro.R.string.nav_timeline),
+        stringResource(com.songsit.fuellogpro.R.string.nav_calculator),
+        stringResource(com.songsit.fuellogpro.R.string.nav_map),
+    )
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
     val requestDelete: (() -> Unit) -> Unit = { action ->
@@ -2107,6 +2124,7 @@ private fun SettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
     var showThemePaletteDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
     var showOpenSourceLicenses by remember { mutableStateOf(false) }
@@ -2216,6 +2234,19 @@ private fun SettingsScreen(
                     onClick = { showThemePaletteDialog = true },
                 )
             }
+            item {
+                val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
+                PreferenceListItem(
+                    title = "ภาษา / Language",
+                    subtitle = when (currentLanguageTag) {
+                        "th" -> "ไทย"
+                        "en" -> "English"
+                        else -> "ตามระบบ / System default"
+                    },
+                    onClick = { showLanguageDialog = true },
+                )
+            }
+
             item {
                 PreferenceListItem(
                     title = "การตั้งค่าอื่น ๆ",
@@ -2394,6 +2425,47 @@ private fun SettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("ปิด") } },
+        )
+    }
+
+    if (showLanguageDialog) {
+        // Real per-app language (not just an in-app string swap): setApplicationLocales()
+        // persists the choice itself and recreates the Activity with the new configuration —
+        // Android 13+ also surfaces this same choice under system Settings > Apps > Language
+        // via the locales_config.xml declared in the manifest.
+        val currentTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("ภาษา / Language") },
+            text = {
+                Column {
+                    listOf(null to "ตามระบบ / System default", "th" to "ไทย", "en" to "English").forEach { (tag, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable {
+                                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                                        if (tag == null) {
+                                            androidx.core.os.LocaleListCompat.getEmptyLocaleList()
+                                        } else {
+                                            androidx.core.os.LocaleListCompat.forLanguageTags(tag)
+                                        },
+                                    )
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = if (tag == null) currentTag.isBlank() else currentTag == tag,
+                                onClick = null,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("ปิด") } },
         )
     }
 

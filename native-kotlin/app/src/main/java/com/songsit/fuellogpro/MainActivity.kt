@@ -4,8 +4,8 @@ import android.os.Bundle
 import android.Manifest
 import android.content.Intent
 import android.os.Build
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -61,7 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 // Cap matches PhotoAttachmentRow's MAX_PHOTOS in ui/FuelLogApp.kt.
 private const val MAX_PICK_PHOTOS = 8
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private lateinit var backupRepository: LocalBackupRepository
     private lateinit var csvExportRepository: LocalCsvExportRepository
     private val driveBackupRepository = com.songsit.fuellogpro.data.GoogleDriveBackupRepository()

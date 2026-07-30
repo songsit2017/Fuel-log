@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pilot batch for per-app language: top app bar + bottom nav titles. Default resource set
+         is English; see values-th/strings.xml for Thai. The rest of the app's ~580 other strings
+         are still Thai-hardcoded in Kotlin and are being migrated screen-by-screen over time. -->
+    <string name="title_overview">Overview</string>
+    <string name="title_fuel_log">Fuel Log</string>
+    <string name="title_expenses">Expenses</string>
+    <string name="title_maintenance">Maintenance</string>
+    <string name="title_my_vehicles">My Vehicles</string>
+    <string name="title_stats">Stats</string>
+    <string name="title_trips">Trips</string>
+    <string name="nav_timeline">Timeline</string>
+    <string name="nav_calculator">Calculator</string>
+    <string name="nav_map">Map</string>
+</resources>

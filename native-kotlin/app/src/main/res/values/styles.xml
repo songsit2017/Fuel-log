@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FuelLogPro" parent="android:style/Theme.Material.NoActionBar">
+    <!-- AppCompat-derived (not the plain platform Theme.Material) — MainActivity is now an
+         AppCompatActivity so AppCompatDelegate.setApplicationLocales() (per-app language) works;
+         AppCompatActivity throws at runtime if the applied theme isn't Theme.AppCompat-derived. -->
+    <style name="Theme.FuelLogPro" parent="Theme.AppCompat.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:navigationBarColor">#111318</item>

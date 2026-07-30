@@ -511,6 +511,35 @@
     <string name="error_read_location_gps">Couldn\'t read location — turn on GPS</string>
     <string name="error_nearby_search_failed">Search failed — allow location access or type the station name yourself</string>
     <string name="error_weather_fetch_failed">Couldn\'t fetch weather data</string>
+
+    <!-- NativeAppViewModel -->
+    <string name="error_vehicle_name_required">Please enter a vehicle name</string>
+    <string name="error_save_vehicle_failed">Couldn\'t save the vehicle</string>
+    <string name="error_delete_vehicle_failed">Couldn\'t delete the vehicle</string>
+    <string name="error_add_vehicle_before_fuel">Add a vehicle before logging a fill-up</string>
+    <string name="error_invalid_fuel_fields">Please enter a valid odometer reading, liters, and price</string>
+    <string name="error_save_failed">Couldn\'t save</string>
+    <string name="error_vehicle_not_found_for_record">Couldn\'t find the vehicle for this record</string>
+    <string name="error_update_failed">Couldn\'t update</string>
+    <string name="error_delete_failed">Couldn\'t delete</string>
+    <string name="error_add_vehicle_before_expense">Add a vehicle before logging an expense</string>
+    <string name="error_invalid_expense_fields">Please enter a valid category and amount</string>
+    <string name="error_save_expense_failed">Couldn\'t save the expense</string>
+    <string name="error_update_expense_failed">Couldn\'t update the expense</string>
+    <string name="error_delete_expense_failed">Couldn\'t delete the expense</string>
+    <string name="error_add_vehicle_before_maintenance">Add a vehicle before creating a reminder</string>
+    <string name="error_invalid_maintenance_fields">Please enter a task name and a due date or odometer reading</string>
+    <string name="error_save_maintenance_failed">Couldn\'t save the reminder</string>
+    <string name="error_update_maintenance_failed">Couldn\'t update the reminder</string>
+    <string name="error_complete_maintenance_failed">Couldn\'t update the task</string>
+    <string name="error_delete_maintenance_failed">Couldn\'t delete the reminder</string>
+    <string name="error_add_vehicle_before_trip">Add a vehicle before logging a trip</string>
+    <string name="error_invalid_trip_fields">Please enter a valid trip name and distance</string>
+    <string name="error_trip_costs_negative">Trip costs can\'t be negative</string>
+    <string name="error_save_trip_failed">Couldn\'t save the trip</string>
+    <string name="error_vehicle_not_found_for_trip">Couldn\'t find the vehicle for this trip</string>
+    <string name="error_update_trip_failed">Couldn\'t update the trip</string>
+    <string name="error_delete_trip_failed">Couldn\'t delete the trip</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

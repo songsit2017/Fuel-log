@@ -1,6 +1,8 @@
 package com.songsit.fuellogpro.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.songsit.fuellogpro.R
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.songsit.fuellogpro.data.LocalFuelRepository
@@ -72,8 +74,10 @@ class NativeAppViewModel(
     private val expenseRepository: LocalExpenseRepository,
     private val maintenanceRepository: LocalMaintenanceRepository,
     private val tripRepository: LocalTripRepository,
+    private val context: Context,
     private val onReminderDataChanged: () -> Unit,
 ) : ViewModel() {
+    private fun getString(resId: Int) = context.getString(resId)
     private val saving = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
     private val selectedVehicleId = MutableStateFlow<String?>(null)
@@ -147,7 +151,7 @@ class NativeAppViewModel(
 
     fun addVehicle(values: VehicleFormValues, onSaved: () -> Unit) {
         if (values.name.isBlank()) {
-            error.value = "กรุณาระบุชื่อรถ"
+            error.value = getString(R.string.error_vehicle_name_required)
             return
         }
         viewModelScope.launch {
@@ -158,14 +162,14 @@ class NativeAppViewModel(
                     selectedVehicleId.value = it
                     onSaved()
                 }
-                .onFailure { error.value = it.message ?: "บันทึกรถไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_vehicle_failed) }
             saving.value = false
         }
     }
 
     fun updateVehicle(id: String, values: VehicleFormValues, onSaved: () -> Unit) {
         if (values.name.isBlank()) {
-            error.value = "กรุณาระบุชื่อรถ"
+            error.value = getString(R.string.error_vehicle_name_required)
             return
         }
         viewModelScope.launch {
@@ -173,7 +177,7 @@ class NativeAppViewModel(
             error.value = null
             runCatching { vehicleRepository.update(id, values) }
                 .onSuccess { onSaved() }
-                .onFailure { error.value = it.message ?: "บันทึกรถไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_vehicle_failed) }
             saving.value = false
         }
     }
@@ -186,18 +190,18 @@ class NativeAppViewModel(
                 maintenanceRepository.deleteForVehicle(id)
                 tripRepository.deleteForVehicle(id)
                 vehicleRepository.delete(id)
-            }.onFailure { error.value = it.message ?: "ลบรถไม่สำเร็จ" }
+            }.onFailure { error.value = it.message ?: getString(R.string.error_delete_vehicle_failed) }
         }
     }
 
     fun addFuel(values: FuelEntryFormValues, onSaved: () -> Unit) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "กรุณาเพิ่มรถก่อนบันทึกการเติมน้ำมัน"
+            error.value = getString(R.string.error_add_vehicle_before_fuel)
             return
         }
         if (values.odometerKm <= 0 || values.liters <= 0 || values.pricePerLiter <= 0) {
-            error.value = "กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_fuel_fields)
             return
         }
         viewModelScope.launch {
@@ -208,7 +212,7 @@ class NativeAppViewModel(
                     onReminderDataChanged()
                     onSaved()
                 }
-                .onFailure { error.value = it.message ?: "บันทึกไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_failed) }
             saving.value = false
         }
     }
@@ -217,11 +221,11 @@ class NativeAppViewModel(
         val vehicleId = state.value.entries.firstOrNull { it.id == id }?.vehicleId
             ?: state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "ไม่พบรถสำหรับรายการนี้"
+            error.value = getString(R.string.error_vehicle_not_found_for_record)
             return
         }
         if (values.odometerKm <= 0 || values.liters <= 0 || values.pricePerLiter <= 0) {
-            error.value = "กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_fuel_fields)
             return
         }
         viewModelScope.launch {
@@ -231,7 +235,7 @@ class NativeAppViewModel(
                 .onSuccess {
                     onReminderDataChanged()
                     onSaved()
-                }.onFailure { error.value = it.message ?: "แก้ไขไม่สำเร็จ" }
+                }.onFailure { error.value = it.message ?: getString(R.string.error_update_failed) }
             saving.value = false
         }
     }
@@ -240,7 +244,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             runCatching { fuelRepository.delete(id) }
                 .onSuccess { onReminderDataChanged() }
-                .onFailure { error.value = it.message ?: "ลบไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_delete_failed) }
         }
     }
 
@@ -259,11 +263,11 @@ class NativeAppViewModel(
     ) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "กรุณาเพิ่มรถก่อนบันทึกค่าใช้จ่าย"
+            error.value = getString(R.string.error_add_vehicle_before_expense)
             return
         }
         if (amount <= 0 || category.isBlank()) {
-            error.value = "กรุณาระบุหมวดหมู่และจำนวนเงินให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_expense_fields)
             return
         }
         viewModelScope.launch {
@@ -287,7 +291,7 @@ class NativeAppViewModel(
                 onReminderDataChanged()
                 onSaved()
             }
-                .onFailure { error.value = it.message ?: "บันทึกค่าใช้จ่ายไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_expense_failed) }
             saving.value = false
         }
     }
@@ -309,11 +313,11 @@ class NativeAppViewModel(
         val vehicleId = state.value.expenses.firstOrNull { it.id == id }?.vehicleId
             ?: state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "ไม่พบรถสำหรับรายการนี้"
+            error.value = getString(R.string.error_vehicle_not_found_for_record)
             return
         }
         if (amount <= 0 || category.isBlank()) {
-            error.value = "กรุณาระบุหมวดหมู่และจำนวนเงินให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_expense_fields)
             return
         }
         viewModelScope.launch {
@@ -324,7 +328,7 @@ class NativeAppViewModel(
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()
-            }.onFailure { error.value = it.message ?: "แก้ไขค่าใช้จ่ายไม่สำเร็จ" }
+            }.onFailure { error.value = it.message ?: getString(R.string.error_update_expense_failed) }
             saving.value = false
         }
     }
@@ -333,7 +337,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             runCatching { expenseRepository.delete(id) }
                 .onSuccess { onReminderDataChanged() }
-                .onFailure { error.value = it.message ?: "ลบค่าใช้จ่ายไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_delete_expense_failed) }
         }
     }
 
@@ -350,11 +354,11 @@ class NativeAppViewModel(
     ) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "กรุณาเพิ่มรถก่อนสร้างรายการเตือน"
+            error.value = getString(R.string.error_add_vehicle_before_maintenance)
             return
         }
         if (name.isBlank() || (nextDate.isNullOrBlank() && nextOdometerKm == null)) {
-            error.value = "กรุณาระบุรายการและกำหนดวันที่หรือเลขไมล์"
+            error.value = getString(R.string.error_invalid_maintenance_fields)
             return
         }
         viewModelScope.launch {
@@ -376,7 +380,7 @@ class NativeAppViewModel(
                 onReminderDataChanged()
                 onSaved()
             }
-                .onFailure { error.value = it.message ?: "บันทึกรายการเตือนไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_maintenance_failed) }
             saving.value = false
         }
     }
@@ -396,11 +400,11 @@ class NativeAppViewModel(
         val vehicleId = state.value.maintenanceTasks.firstOrNull { it.id == id }?.vehicleId
             ?: state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "ไม่พบรถสำหรับรายการนี้"
+            error.value = getString(R.string.error_vehicle_not_found_for_record)
             return
         }
         if (name.isBlank() || (nextDate.isNullOrBlank() && nextOdometerKm == null)) {
-            error.value = "กรุณาระบุรายการและกำหนดวันที่หรือเลขไมล์"
+            error.value = getString(R.string.error_invalid_maintenance_fields)
             return
         }
         viewModelScope.launch {
@@ -422,7 +426,7 @@ class NativeAppViewModel(
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()
-            }.onFailure { error.value = it.message ?: "แก้ไขรายการเตือนไม่สำเร็จ" }
+            }.onFailure { error.value = it.message ?: getString(R.string.error_update_maintenance_failed) }
             saving.value = false
         }
     }
@@ -433,7 +437,7 @@ class NativeAppViewModel(
             runCatching {
                 maintenanceRepository.markDone(task, state.value.summary.latestOdometerKm)
             }.onSuccess { onReminderDataChanged() }
-                .onFailure { error.value = it.message ?: "อัปเดตรายการไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_complete_maintenance_failed) }
         }
     }
 
@@ -441,7 +445,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             runCatching { maintenanceRepository.delete(id) }
                 .onSuccess { onReminderDataChanged() }
-                .onFailure { error.value = it.message ?: "ลบรายการเตือนไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_delete_maintenance_failed) }
         }
     }
 
@@ -458,16 +462,16 @@ class NativeAppViewModel(
     ) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "กรุณาเพิ่มรถก่อนบันทึกทริป"
+            error.value = getString(R.string.error_add_vehicle_before_trip)
             return
         }
         if (name.isBlank() || distanceKm < 0) {
-            error.value = "กรุณาระบุชื่อทริปและระยะทางให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_trip_fields)
             return
         }
         val costs = listOf(fuelCost, tollCost, parkingCost, foodCost, otherCost)
         if (costs.any { it < 0 }) {
-            error.value = "ค่าใช้จ่ายของทริปต้องไม่ติดลบ"
+            error.value = getString(R.string.error_trip_costs_negative)
             return
         }
         viewModelScope.launch {
@@ -479,7 +483,7 @@ class NativeAppViewModel(
                     tollCost, parkingCost, foodCost, otherCost,
                 )
             }.onSuccess { onSaved() }
-                .onFailure { error.value = it.message ?: "บันทึกทริปไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_save_trip_failed) }
             saving.value = false
         }
     }
@@ -499,11 +503,11 @@ class NativeAppViewModel(
         val vehicleId = state.value.trips.firstOrNull { it.id == id }?.vehicleId
             ?: state.value.selectedVehicle?.id
         if (vehicleId == null) {
-            error.value = "ไม่พบรถสำหรับทริปนี้"
+            error.value = getString(R.string.error_vehicle_not_found_for_trip)
             return
         }
         if (name.isBlank() || distanceKm < 0) {
-            error.value = "กรุณาระบุชื่อทริปและระยะทางให้ถูกต้อง"
+            error.value = getString(R.string.error_invalid_trip_fields)
             return
         }
         viewModelScope.launch {
@@ -512,7 +516,7 @@ class NativeAppViewModel(
             runCatching {
                 tripRepository.update(id, vehicleId, name, date, distanceKm, fuelCost, tollCost, parkingCost, foodCost, otherCost)
             }.onSuccess { onSaved() }
-                .onFailure { error.value = it.message ?: "แก้ไขทริปไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_update_trip_failed) }
             saving.value = false
         }
     }
@@ -520,7 +524,7 @@ class NativeAppViewModel(
     fun deleteTrip(id: String) {
         viewModelScope.launch {
             runCatching { tripRepository.delete(id) }
-                .onFailure { error.value = it.message ?: "ลบทริปไม่สำเร็จ" }
+                .onFailure { error.value = it.message ?: getString(R.string.error_delete_trip_failed) }
         }
     }
 
@@ -535,6 +539,7 @@ class NativeAppViewModelFactory(
     private val expenseRepository: LocalExpenseRepository,
     private val maintenanceRepository: LocalMaintenanceRepository,
     private val tripRepository: LocalTripRepository,
+    private val context: Context,
     private val onReminderDataChanged: () -> Unit,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -545,6 +550,7 @@ class NativeAppViewModelFactory(
             expenseRepository,
             maintenanceRepository,
             tripRepository,
+            context,
             onReminderDataChanged,
         ) as T
 }

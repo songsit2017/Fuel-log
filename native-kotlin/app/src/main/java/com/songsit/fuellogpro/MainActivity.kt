@@ -588,6 +588,7 @@ class MainActivity : AppCompatActivity() {
                     expenseRepository,
                     maintenanceRepository,
                     tripRepository,
+                    applicationContext,
                     onReminderDataChanged = {
                         MaintenanceReminderWorker.refresh(applicationContext)
                         // Fuelio-style auto-sync: mirror every add/edit to Drive in the

@@ -489,6 +489,35 @@
     <string name="error_read_location_gps">ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS</string>
     <string name="error_nearby_search_failed">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</string>
     <string name="error_weather_fetch_failed">ดึงข้อมูลสภาพอากาศไม่สำเร็จ</string>
+
+    <!-- NativeAppViewModel -->
+    <string name="error_vehicle_name_required">กรุณาระบุชื่อรถ</string>
+    <string name="error_save_vehicle_failed">บันทึกรถไม่สำเร็จ</string>
+    <string name="error_delete_vehicle_failed">ลบรถไม่สำเร็จ</string>
+    <string name="error_add_vehicle_before_fuel">กรุณาเพิ่มรถก่อนบันทึกการเติมน้ำมัน</string>
+    <string name="error_invalid_fuel_fields">กรุณากรอกเลขไมล์ ลิตร และราคาให้ถูกต้อง</string>
+    <string name="error_save_failed">บันทึกไม่สำเร็จ</string>
+    <string name="error_vehicle_not_found_for_record">ไม่พบรถสำหรับรายการนี้</string>
+    <string name="error_update_failed">แก้ไขไม่สำเร็จ</string>
+    <string name="error_delete_failed">ลบไม่สำเร็จ</string>
+    <string name="error_add_vehicle_before_expense">กรุณาเพิ่มรถก่อนบันทึกค่าใช้จ่าย</string>
+    <string name="error_invalid_expense_fields">กรุณาระบุหมวดหมู่และจำนวนเงินให้ถูกต้อง</string>
+    <string name="error_save_expense_failed">บันทึกค่าใช้จ่ายไม่สำเร็จ</string>
+    <string name="error_update_expense_failed">แก้ไขค่าใช้จ่ายไม่สำเร็จ</string>
+    <string name="error_delete_expense_failed">ลบค่าใช้จ่ายไม่สำเร็จ</string>
+    <string name="error_add_vehicle_before_maintenance">กรุณาเพิ่มรถก่อนสร้างรายการเตือน</string>
+    <string name="error_invalid_maintenance_fields">กรุณาระบุรายการและกำหนดวันที่หรือเลขไมล์</string>
+    <string name="error_save_maintenance_failed">บันทึกรายการเตือนไม่สำเร็จ</string>
+    <string name="error_update_maintenance_failed">แก้ไขรายการเตือนไม่สำเร็จ</string>
+    <string name="error_complete_maintenance_failed">อัปเดตรายการไม่สำเร็จ</string>
+    <string name="error_delete_maintenance_failed">ลบรายการเตือนไม่สำเร็จ</string>
+    <string name="error_add_vehicle_before_trip">กรุณาเพิ่มรถก่อนบันทึกทริป</string>
+    <string name="error_invalid_trip_fields">กรุณาระบุชื่อทริปและระยะทางให้ถูกต้อง</string>
+    <string name="error_trip_costs_negative">ค่าใช้จ่ายของทริปต้องไม่ติดลบ</string>
+    <string name="error_save_trip_failed">บันทึกทริปไม่สำเร็จ</string>
+    <string name="error_vehicle_not_found_for_trip">ไม่พบรถสำหรับทริปนี้</string>
+    <string name="error_update_trip_failed">แก้ไขทริปไม่สำเร็จ</string>
+    <string name="error_delete_trip_failed">ลบทริปไม่สำเร็จ</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

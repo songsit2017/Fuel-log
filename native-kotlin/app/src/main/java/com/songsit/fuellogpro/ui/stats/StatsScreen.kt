@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -313,15 +315,20 @@ private fun monthlyCostSeries(entries: List<FuelEntry>): List<Pair<YearMonth, Do
 // Fuelio's own reports donut caps at a handful of slices before folding the rest into a
 // residual bucket — an unbounded number of distinct stations would otherwise need an
 // unbounded number of categorical hues, which this app's per-user theme palette doesn't have.
-private fun stationCostBreakdown(entries: List<FuelEntry>, maxSlices: Int = 4): List<Pair<String, Double>> {
+private fun stationCostBreakdown(
+    entries: List<FuelEntry>,
+    unspecifiedStationLabel: String,
+    otherLabel: String,
+    maxSlices: Int = 4,
+): List<Pair<String, Double>> {
     val byStation = entries
-        .groupBy { it.station.ifBlank { "ไม่ระบุสถานี" } }
+        .groupBy { it.station.ifBlank { unspecifiedStationLabel } }
         .mapValues { (_, list) -> list.sumOf(FuelEntry::amount) }
         .toList()
         .sortedByDescending { it.second }
     if (byStation.size <= maxSlices) return byStation
     val otherTotal = byStation.drop(maxSlices).sumOf { it.second }
-    return byStation.take(maxSlices) + ("อื่นๆ" to otherTotal)
+    return byStation.take(maxSlices) + (otherLabel to otherTotal)
 }
 
 private fun odometerSeries(entries: List<FuelEntry>): List<Pair<LocalDate, Double>> =
@@ -344,7 +351,7 @@ private fun MonthlyCostChart(monthlyCosts: List<Pair<YearMonth, Double>>) {
     val startFormatter = remember { CartesianValueFormatter.decimal(decimalCount = 0, thousandsSeparator = ",", prefix = "฿") }
     Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("ค่าใช้จ่ายรายเดือน", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.songsit.fuellogpro.R.string.stats_monthly_cost_chart_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             CartesianChartHost(
                 chart = rememberCartesianChart(
@@ -360,7 +367,7 @@ private fun MonthlyCostChart(monthlyCosts: List<Pair<YearMonth, Double>>) {
 }
 
 @Composable
-private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>) {
+private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>, otherLabel: String) {
     if (breakdown.isEmpty()) return
     val modelProducer = remember { PieChartModelProducer() }
     LaunchedEffect(breakdown) {
@@ -368,7 +375,7 @@ private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>) {
     }
     val total = remember(breakdown) { breakdown.sumOf { it.second } }
     // Fixed categorical order (primary/tertiary/secondary/primaryContainer), never cycled, so a
-    // station keeps its color across recompositions; the residual "อื่นๆ" bucket always gets a
+    // station keeps its color across recompositions; the residual "Other" bucket always gets a
     // neutral tone rather than competing for a "real" hue.
     val sliceColors = listOf(
         MaterialTheme.colorScheme.primary,
@@ -379,7 +386,7 @@ private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>) {
     val otherColor = MaterialTheme.colorScheme.outlineVariant
     val colors = remember(breakdown, sliceColors, otherColor) {
         breakdown.mapIndexed { index, (label, _) ->
-            if (label == "อื่นๆ") otherColor else sliceColors.getOrElse(index) { otherColor }
+            if (label == otherLabel) otherColor else sliceColors.getOrElse(index) { otherColor }
         }
     }
     val pieChart = rememberPieChart(
@@ -390,7 +397,7 @@ private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>) {
     )
     Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("แผนภูมิสถานีบริการ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.songsit.fuellogpro.R.string.stats_station_chart_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             PieChartHost(chart = pieChart, modelProducer = modelProducer, modifier = Modifier.fillMaxWidth().height(200.dp))
             Spacer(Modifier.height(12.dp))
@@ -423,7 +430,7 @@ private fun OdometerLineChart(odometerPoints: List<Pair<LocalDate, Double>>) {
     val startFormatter = remember { CartesianValueFormatter.decimal(decimalCount = 0, thousandsSeparator = ",", suffix = " km") }
     Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("แผนภูมิระยะทาง", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.songsit.fuellogpro.R.string.stats_distance_chart_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             CartesianChartHost(
                 chart = rememberCartesianChart(
@@ -442,10 +449,18 @@ private fun OdometerLineChart(odometerPoints: List<Pair<LocalDate, Double>>) {
 fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     val stats = remember(state.entries) { computeFuelioStats(state.entries) }
     val monthlyCosts = remember(state.entries) { monthlyCostSeries(state.entries) }
-    val stationBreakdown = remember(state.entries) { stationCostBreakdown(state.entries) }
+    val unspecifiedStationLabel = stringResource(com.songsit.fuellogpro.R.string.stats_unspecified_station)
+    val otherLabel = stringResource(com.songsit.fuellogpro.R.string.stats_other)
+    val stationBreakdown = remember(state.entries, unspecifiedStationLabel, otherLabel) {
+        stationCostBreakdown(state.entries, unspecifiedStationLabel, otherLabel)
+    }
     val odometerPoints = remember(state.entries) { odometerSeries(state.entries) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("เติม-เพิ่ม", "ค่าใช้จ่าย", "ระยะทาง")
+    val tabs = stringArrayResource(com.songsit.fuellogpro.R.array.stats_tab_titles)
+    val thisYearLabel = stringResource(com.songsit.fuellogpro.R.string.stats_this_year)
+    val prevYearLabel = stringResource(com.songsit.fuellogpro.R.string.stats_prev_year)
+    val thisMonthLabel = stringResource(com.songsit.fuellogpro.R.string.stats_this_month)
+    val prevMonthLabel = stringResource(com.songsit.fuellogpro.R.string.stats_prev_month)
 
     Column(modifier = modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTab) {
@@ -470,38 +485,38 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     item { HeroCard("Refills") }
                     item {
                         MainValueCard(
-                            title = "เติม-เพิ่ม",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_refills),
                             value = "${stats.totalRefills}",
-                            thisYear = "${stats.refillsThisYear} ปีนี้",
-                            prevYear = "${stats.refillsPrevYear} ปีก่อนหน้านี้",
-                            thisMonth = "${stats.refillsThisMonth} เดือนนี้",
-                            prevMonth = "${stats.refillsPrevMonth} เดือนก่อนหน้า",
+                            thisYear = "${stats.refillsThisYear} $thisYearLabel",
+                            prevYear = "${stats.refillsPrevYear} $prevYearLabel",
+                            thisMonth = "${stats.refillsThisMonth} $thisMonthLabel",
+                            prevMonth = "${stats.refillsPrevMonth} $prevMonthLabel",
                             icon = Icons.Filled.LocalGasStation
                         )
                     }
                     item {
                         MainValueCard(
-                            title = "เชื้อเพลิง",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_fuel),
                             value = "${statsNumber.format(stats.totalLiters)} L",
-                            thisYear = "${statsNumber.format(stats.litersThisYear)} L\nปีนี้",
-                            prevYear = "${statsNumber.format(stats.litersPrevYear)} L\nปีก่อนหน้านี้",
-                            thisMonth = "${statsNumber.format(stats.litersThisMonth)} L\nเดือนนี้",
-                            prevMonth = "${statsNumber.format(stats.litersPrevMonth)} L\nเดือนก่อนหน้า",
+                            thisYear = "${statsNumber.format(stats.litersThisYear)} L\n$thisYearLabel",
+                            prevYear = "${statsNumber.format(stats.litersPrevYear)} L\n$prevYearLabel",
+                            thisMonth = "${statsNumber.format(stats.litersThisMonth)} L\n$thisMonthLabel",
+                            prevMonth = "${statsNumber.format(stats.litersPrevMonth)} L\n$prevMonthLabel",
                             icon = Icons.Filled.WaterDrop,
-                            bottomLeftLabel = "${statsNumber.format(stats.minLiters)} L\nเติมต่ำสุด",
+                            bottomLeftLabel = "${statsNumber.format(stats.minLiters)} L\n${stringResource(com.songsit.fuellogpro.R.string.stats_min_refill)}",
                             bottomLeftIcon = Icons.Filled.ArrowDownward,
-                            bottomRightLabel = "${statsNumber.format(stats.maxLiters)} L\nเติมสูงสุด",
+                            bottomRightLabel = "${statsNumber.format(stats.maxLiters)} L\n${stringResource(com.songsit.fuellogpro.R.string.stats_max_refill)}",
                             bottomRightIcon = Icons.Filled.ArrowUpward
                         )
                     }
                     item {
                         MainValueCard(
-                            title = "ปริมาณการใช้เชื้อเพลิงเฉลี่ย",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_avg_fuel_efficiency),
                             value = "${statsNumber.format(stats.avgKml)} km/l",
-                            bottomLeftLabel = "${statsNumber.format(stats.bestKml)} km/l\nปริมาณการใช้เชื้อเพลิงที่ดีที่สุด",
+                            bottomLeftLabel = "${statsNumber.format(stats.bestKml)} km/l\n${stringResource(com.songsit.fuellogpro.R.string.stats_best_fuel_efficiency)}",
                             bottomLeftIcon = Icons.Filled.ThumbUp,
                             bottomLeftIconTint = Color(0xFF4CAF50),
-                            bottomRightLabel = "${statsNumber.format(stats.worstKml)} km/l\nปริมาณการใช้เชื้อเพลิงที่เลวร้ายที่สุด",
+                            bottomRightLabel = "${statsNumber.format(stats.worstKml)} km/l\n${stringResource(com.songsit.fuellogpro.R.string.stats_worst_fuel_efficiency)}",
                             bottomRightIcon = Icons.Filled.ThumbDown,
                             bottomRightIconTint = Color(0xFFF44336)
                         )
@@ -512,12 +527,12 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     item { HeroCard("Costs") }
                     item {
                         MainValueCard(
-                            title = "ค่าใช้จ่าย",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_costs),
                             value = statsCurrency.format(stats.totalCost),
-                            thisYear = "${statsCurrency.format(stats.costThisYear)}\nปีนี้",
-                            prevYear = "${statsCurrency.format(stats.costPrevYear)}\nปีก่อนหน้านี้",
-                            thisMonth = "${statsCurrency.format(stats.costThisMonth)}\nเดือนนี้",
-                            prevMonth = "${statsCurrency.format(stats.costPrevMonth)}\nเดือนก่อนหน้า",
+                            thisYear = "${statsCurrency.format(stats.costThisYear)}\n$thisYearLabel",
+                            prevYear = "${statsCurrency.format(stats.costPrevYear)}\n$prevYearLabel",
+                            thisMonth = "${statsCurrency.format(stats.costThisMonth)}\n$thisMonthLabel",
+                            prevMonth = "${statsCurrency.format(stats.costPrevMonth)}\n$prevMonthLabel",
                             icon = Icons.Filled.TrendingUp,
                             iconTint = Color(0xFF4CAF50)
                         )
@@ -526,11 +541,11 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Box(modifier = Modifier.weight(1f)) {
                                 MinMaxCard(
-                                    title = "บิล",
+                                    title = stringResource(com.songsit.fuellogpro.R.string.stats_bill),
                                     minVal = statsCurrency.format(stats.minBill),
-                                    minLabel = "รายจ่ายต่ำสุด",
+                                    minLabel = stringResource(com.songsit.fuellogpro.R.string.stats_min_expense),
                                     maxVal = statsCurrency.format(stats.maxBill),
-                                    maxLabel = "รายจ่ายสูงสุด",
+                                    maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_expense),
                                     iconMin = Icons.Filled.MonetizationOn,
                                     iconMinTint = Color(0xFF4CAF50),
                                     iconMax = Icons.Filled.MonetizationOn,
@@ -539,11 +554,11 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             }
                             Box(modifier = Modifier.weight(1f)) {
                                 MinMaxCard(
-                                    title = "ราคาเชื้อเพลิง",
+                                    title = stringResource(com.songsit.fuellogpro.R.string.stats_fuel_price),
                                     minVal = statsCurrency.format(stats.bestPricePerLiter),
-                                    minLabel = "ราคาที่ดีที่สุด",
+                                    minLabel = stringResource(com.songsit.fuellogpro.R.string.stats_best_price),
                                     maxVal = statsCurrency.format(stats.worstPricePerLiter),
-                                    maxLabel = "ราคาที่เลวร้ายที่สุด",
+                                    maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_worst_price),
                                     iconMin = Icons.Filled.LocalGasStation,
                                     iconMinTint = Color(0xFF4CAF50),
                                     iconMax = Icons.Filled.LocalGasStation,
@@ -554,12 +569,12 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     }
                     item {
                         MainValueCard(
-                            title = "รายจ่ายเฉลี่ยต่อกิโลเมตร",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_km),
                             value = "${statsNumber.format(stats.avgCostPerKm)}/km",
-                            bottomLeftLabel = "${statsCurrency.format(stats.bestCostPerKm)}/km\nรายจ่ายที่ดีที่สุดต่อกิโลเมตร",
+                            bottomLeftLabel = "${statsCurrency.format(stats.bestCostPerKm)}/km\n${stringResource(com.songsit.fuellogpro.R.string.stats_best_cost_per_km)}",
                             bottomLeftIcon = Icons.Filled.MonetizationOn,
                             bottomLeftIconTint = Color(0xFF4CAF50),
-                            bottomRightLabel = "${statsCurrency.format(stats.worstCostPerKm)}/km\nรายจ่ายที่เลวร้ายที่สุดต่อกิโลเมตร",
+                            bottomRightLabel = "${statsCurrency.format(stats.worstCostPerKm)}/km\n${stringResource(com.songsit.fuellogpro.R.string.stats_worst_cost_per_km)}",
                             bottomRightIcon = Icons.Filled.MonetizationOn,
                             bottomRightIconTint = Color(0xFFF44336)
                         )
@@ -567,22 +582,22 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     item {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Box(modifier = Modifier.weight(1f)) {
-                                TitleValueCard("ค่าใช้จ่ายเฉลี่ยต่อวัน", statsCurrency.format(stats.avgCostPerDay), Icons.Filled.AttachMoney)
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_day), statsCurrency.format(stats.avgCostPerDay), Icons.Filled.AttachMoney)
                             }
                             Box(modifier = Modifier.weight(1f)) {
-                                TitleValueCard("ค่าใช้จ่ายเฉลี่ยต่อเดือน", statsCurrency.format(stats.avgCostPerMonth), Icons.Filled.AttachMoney)
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_month), statsCurrency.format(stats.avgCostPerMonth), Icons.Filled.AttachMoney)
                             }
                         }
                     }
                     item { MonthlyCostChart(monthlyCosts) }
-                    item { StationCostDonutChart(stationBreakdown) }
+                    item { StationCostDonutChart(stationBreakdown, otherLabel) }
                 }
                 2 -> {
                     // Distance Tab
                     item { HeroCard("Distance") }
                     item {
                         MainValueCard(
-                            title = "ระยะทางที่ขับด้วย FuelLog",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_distance_tracked),
                             value = "${statsNumber.format(stats.totalDistance)} km",
                             icon = Icons.Filled.DirectionsCar,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -590,22 +605,22 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     }
                     item {
                         MainValueCard(
-                            title = "ค่าการนับ odo สุดท้าย",
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_last_odometer),
                             value = "${statsNumber.format(stats.lastOdo)} km",
-                            thisYear = "${statsNumber.format(stats.distanceThisYear)} km\nปีนี้",
-                            prevYear = "${statsNumber.format(stats.distancePrevYear)} km\nปีก่อนหน้านี้",
-                            thisMonth = "${statsNumber.format(stats.distanceThisMonth)} km\nเดือนนี้",
-                            prevMonth = "${statsNumber.format(stats.distancePrevMonth)} km\nเดือนก่อนหน้า",
+                            thisYear = "${statsNumber.format(stats.distanceThisYear)} km\n$thisYearLabel",
+                            prevYear = "${statsNumber.format(stats.distancePrevYear)} km\n$prevYearLabel",
+                            thisMonth = "${statsNumber.format(stats.distanceThisMonth)} km\n$thisMonthLabel",
+                            prevMonth = "${statsNumber.format(stats.distancePrevMonth)} km\n$prevMonthLabel",
                             icon = Icons.Filled.Speed
                         )
                     }
                     item {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Box(modifier = Modifier.weight(1f)) {
-                                TitleValueCard("ระยะทางเฉลี่ยต่อวัน", "${statsNumber.format(stats.avgDistancePerDay)} km", Icons.Filled.DirectionsCar)
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_distance_per_day), "${statsNumber.format(stats.avgDistancePerDay)} km", Icons.Filled.DirectionsCar)
                             }
                             Box(modifier = Modifier.weight(1f)) {
-                                TitleValueCard("ระยะทางเฉลี่ยต่อเดือน", "${statsNumber.format(stats.avgDistancePerMonth)} km", Icons.Filled.DirectionsCar)
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_distance_per_month), "${statsNumber.format(stats.avgDistancePerMonth)} km", Icons.Filled.DirectionsCar)
                             }
                         }
                     }

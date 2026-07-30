@@ -396,6 +396,46 @@
     <string name="share_image_chooser_title">Share photo</string>
     <string name="share_image_failed">Couldn\'t share the photo</string>
     <string name="open_pdf_failed">Couldn\'t open the PDF — try installing a PDF reader app</string>
+
+    <!-- StatsScreen -->
+    <string-array name="stats_tab_titles">
+        <item>Refills</item>
+        <item>Costs</item>
+        <item>Distance</item>
+    </string-array>
+    <string name="stats_refills">Refills</string>
+    <string name="stats_this_year">this year</string>
+    <string name="stats_prev_year">last year</string>
+    <string name="stats_this_month">this month</string>
+    <string name="stats_prev_month">last month</string>
+    <string name="stats_fuel">Fuel</string>
+    <string name="stats_min_refill">Lowest refill</string>
+    <string name="stats_max_refill">Highest refill</string>
+    <string name="stats_avg_fuel_efficiency">Average fuel efficiency</string>
+    <string name="stats_best_fuel_efficiency">Best fuel efficiency</string>
+    <string name="stats_worst_fuel_efficiency">Worst fuel efficiency</string>
+    <string name="stats_costs">Costs</string>
+    <string name="stats_bill">Bill</string>
+    <string name="stats_min_expense">Lowest expense</string>
+    <string name="stats_max_expense">Highest expense</string>
+    <string name="stats_fuel_price">Fuel price</string>
+    <string name="stats_best_price">Best price</string>
+    <string name="stats_worst_price">Worst price</string>
+    <string name="stats_avg_cost_per_km">Average cost per km</string>
+    <string name="stats_best_cost_per_km">Best cost per km</string>
+    <string name="stats_worst_cost_per_km">Worst cost per km</string>
+    <string name="stats_avg_cost_per_day">Average cost per day</string>
+    <string name="stats_avg_cost_per_month">Average cost per month</string>
+    <string name="stats_distance_tracked">Distance tracked with FuelLog</string>
+    <string name="stats_last_odometer">Last odometer reading</string>
+    <string name="stats_avg_distance_per_day">Average distance per day</string>
+    <string name="stats_avg_distance_per_month">Average distance per month</string>
+    <string name="stats_distance">Distance</string>
+    <string name="stats_unspecified_station">Unspecified station</string>
+    <string name="stats_other">Other</string>
+    <string name="stats_monthly_cost_chart_title">Monthly cost</string>
+    <string name="stats_station_chart_title">Cost by station</string>
+    <string name="stats_distance_chart_title">Distance chart</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

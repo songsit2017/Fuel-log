@@ -374,6 +374,46 @@
     <string name="share_image_chooser_title">แชร์รูปภาพ</string>
     <string name="share_image_failed">แชร์รูปไม่สำเร็จ</string>
     <string name="open_pdf_failed">เปิด PDF ไม่ได้ ลองติดตั้งแอปอ่าน PDF</string>
+
+    <!-- StatsScreen -->
+    <string-array name="stats_tab_titles">
+        <item>เติม-เพิ่ม</item>
+        <item>ค่าใช้จ่าย</item>
+        <item>ระยะทาง</item>
+    </string-array>
+    <string name="stats_refills">เติม-เพิ่ม</string>
+    <string name="stats_this_year">ปีนี้</string>
+    <string name="stats_prev_year">ปีก่อนหน้านี้</string>
+    <string name="stats_this_month">เดือนนี้</string>
+    <string name="stats_prev_month">เดือนก่อนหน้า</string>
+    <string name="stats_fuel">เชื้อเพลิง</string>
+    <string name="stats_min_refill">เติมต่ำสุด</string>
+    <string name="stats_max_refill">เติมสูงสุด</string>
+    <string name="stats_avg_fuel_efficiency">ปริมาณการใช้เชื้อเพลิงเฉลี่ย</string>
+    <string name="stats_best_fuel_efficiency">ปริมาณการใช้เชื้อเพลิงที่ดีที่สุด</string>
+    <string name="stats_worst_fuel_efficiency">ปริมาณการใช้เชื้อเพลิงที่เลวร้ายที่สุด</string>
+    <string name="stats_costs">ค่าใช้จ่าย</string>
+    <string name="stats_bill">บิล</string>
+    <string name="stats_min_expense">รายจ่ายต่ำสุด</string>
+    <string name="stats_max_expense">รายจ่ายสูงสุด</string>
+    <string name="stats_fuel_price">ราคาเชื้อเพลิง</string>
+    <string name="stats_best_price">ราคาที่ดีที่สุด</string>
+    <string name="stats_worst_price">ราคาที่เลวร้ายที่สุด</string>
+    <string name="stats_avg_cost_per_km">รายจ่ายเฉลี่ยต่อกิโลเมตร</string>
+    <string name="stats_best_cost_per_km">รายจ่ายที่ดีที่สุดต่อกิโลเมตร</string>
+    <string name="stats_worst_cost_per_km">รายจ่ายที่เลวร้ายที่สุดต่อกิโลเมตร</string>
+    <string name="stats_avg_cost_per_day">ค่าใช้จ่ายเฉลี่ยต่อวัน</string>
+    <string name="stats_avg_cost_per_month">ค่าใช้จ่ายเฉลี่ยต่อเดือน</string>
+    <string name="stats_distance_tracked">ระยะทางที่ขับด้วย FuelLog</string>
+    <string name="stats_last_odometer">ค่าการนับ odo สุดท้าย</string>
+    <string name="stats_avg_distance_per_day">ระยะทางเฉลี่ยต่อวัน</string>
+    <string name="stats_avg_distance_per_month">ระยะทางเฉลี่ยต่อเดือน</string>
+    <string name="stats_distance">ระยะทาง</string>
+    <string name="stats_unspecified_station">ไม่ระบุสถานี</string>
+    <string name="stats_other">อื่นๆ</string>
+    <string name="stats_monthly_cost_chart_title">ค่าใช้จ่ายรายเดือน</string>
+    <string name="stats_station_chart_title">แผนภูมิสถานีบริการ</string>
+    <string name="stats_distance_chart_title">แผนภูมิระยะทาง</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

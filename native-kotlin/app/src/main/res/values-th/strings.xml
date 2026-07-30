@@ -521,6 +521,15 @@
 
     <!-- MaintenanceStatus -->
     <string name="maintenance_not_set">ยังไม่กำหนด</string>
+
+    <!-- DisplayFormatting -->
+    <string name="currency_thb">บาทไทย (THB)</string>
+    <string name="currency_usd">ดอลลาร์สหรัฐ (USD)</string>
+    <string name="currency_eur">ยูโร (EUR)</string>
+    <string name="currency_gbp">ปอนด์อังกฤษ (GBP)</string>
+    <string name="currency_jpy">เยนญี่ปุ่น (JPY)</string>
+    <string name="unit_liters_short">ลิตร</string>
+    <string name="unit_km_per_liter_short">กม./ลิตร</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

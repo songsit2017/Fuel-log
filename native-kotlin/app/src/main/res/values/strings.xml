@@ -543,6 +543,15 @@
 
     <!-- MaintenanceStatus -->
     <string name="maintenance_not_set">Not yet set</string>
+
+    <!-- DisplayFormatting -->
+    <string name="currency_thb">Thai Baht (THB)</string>
+    <string name="currency_usd">US Dollar (USD)</string>
+    <string name="currency_eur">Euro (EUR)</string>
+    <string name="currency_gbp">British Pound (GBP)</string>
+    <string name="currency_jpy">Japanese Yen (JPY)</string>
+    <string name="unit_liters_short">L</string>
+    <string name="unit_km_per_liter_short">km/L</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

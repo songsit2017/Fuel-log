@@ -1926,7 +1926,7 @@ private fun DisplaySettingsCard(
                     modifier = Modifier.fillMaxWidth().clickable { currencyMenuExpanded = true },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(currencyOption.label, modifier = Modifier.weight(1f))
+                    Text(currencyDisplayLabel(currencyOption.code), modifier = Modifier.weight(1f))
                     Text("▾")
                 }
                 DropdownMenu(
@@ -1935,7 +1935,7 @@ private fun DisplaySettingsCard(
                 ) {
                     CURRENCY_OPTIONS.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option.label) },
+                            text = { Text(currencyDisplayLabel(option.code)) },
                             onClick = {
                                 onChange(settings.copy(currency = option.code))
                                 currencyMenuExpanded = false
@@ -2272,7 +2272,7 @@ private fun SettingsScreen(
                 val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
-                    subtitle = currencyOption.label,
+                    subtitle = currencyDisplayLabel(currencyOption.code),
                     onClick = { showCurrencyDialog = true },
                 )
             }
@@ -2460,7 +2460,7 @@ private fun SettingsScreen(
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(option.label, modifier = Modifier.weight(1f))
+                            Text(currencyDisplayLabel(option.code), modifier = Modifier.weight(1f))
                             if (displaySettings.currency == option.code) {
                                 Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             }

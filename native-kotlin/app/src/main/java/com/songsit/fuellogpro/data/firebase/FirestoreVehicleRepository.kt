@@ -1,6 +1,8 @@
 package com.songsit.fuellogpro.data.firebase
 
+import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
+import com.songsit.fuellogpro.R
 import com.songsit.fuellogpro.data.VehicleRepository
 import com.songsit.fuellogpro.domain.model.Vehicle
 import kotlinx.coroutines.flow.Flow
@@ -8,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
 
 class FirestoreVehicleRepository(
+    private val context: Context,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) : VehicleRepository {
     private val vehicles = MutableStateFlow<List<Vehicle>>(emptyList())
@@ -22,7 +25,7 @@ class FirestoreVehicleRepository(
         vehicles.value = snapshot.documents.map { document ->
             Vehicle(
                 id = document.id,
-                name = document.getString("name") ?: "รถจาก Cloud",
+                name = document.getString("name") ?: context.getString(R.string.vehicle_from_cloud_default_name),
                 registration = document.getString("registration").orEmpty(),
                 fuelType = document.getString("fuelType").orEmpty(),
                 imageUri = document.getString("imageUri"),

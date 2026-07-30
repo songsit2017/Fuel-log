@@ -595,6 +595,11 @@
     <string name="error_drive_download_failed_http">ดาวน์โหลดไฟล์สำรองไม่สำเร็จ (HTTP %1$d)</string>
     <string name="error_drive_upload_failed_http">อัปโหลดไฟล์ %1$s ไม่สำเร็จ (HTTP %2$d) %3$s</string>
     <string name="error_drive_api_failed_http">เรียก Google Drive API ไม่สำเร็จ (HTTP %1$d) %2$s</string>
+
+    <!-- NearbyStationRepository -->
+    <string name="error_maps_api_key_missing">กรุณาตั้งค่า MAPS_API_KEY ใน local.properties</string>
+    <string name="error_places_api_failed_http">เรียก Google Places API ไม่สำเร็จ (HTTP %1$d)</string>
+    <string name="error_maps_invalid_key">ไม่สามารถเชื่อมต่อ Google Maps ได้ (API Key ไม่ถูกต้อง) กรุณาตรวจสอบการตั้งค่า</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import com.songsit.fuellogpro.BuildConfig
+import com.songsit.fuellogpro.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -60,7 +61,7 @@ class NearbyStationRepository {
             // back to BuildConfig.MAPS_API_KEY. If the key is genuinely blank we surface a clean
             // error; otherwise we let the Places API validate it and report any auth issue itself.
             if (apiKey.isBlank()) {
-                error("กรุณาตั้งค่า MAPS_API_KEY ใน local.properties")
+                error(context.getString(R.string.error_maps_api_key_missing))
             }
             val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
                 "?location=${URLEncoder.encode("$lat,$lon", "UTF-8")}" +
@@ -77,15 +78,15 @@ class NearbyStationRepository {
                 val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
                 if (responseCode !in 200..299) {
                     Log.e(TAG, "Places API HTTP $responseCode key=${maskKey(apiKey)} body=$body")
-                    error("เรียก Google Places API ไม่สำเร็จ (HTTP $responseCode)")
+                    error(context.getString(R.string.error_places_api_failed_http, responseCode))
                 }
-                parsePlacesResponse(body, lat, lon, apiKey)
+                parsePlacesResponse(body, lat, lon, apiKey, context)
             } finally {
                 connection.disconnect()
             }
         }
 
-    private fun parsePlacesResponse(body: String, lat: Double, lon: Double, apiKey: String): List<NearbyStation> {
+    private fun parsePlacesResponse(body: String, lat: Double, lon: Double, apiKey: String, context: Context): List<NearbyStation> {
         val root = JSONObject(body)
         val status = root.optString("status")
         if (status == "ZERO_RESULTS") return emptyList()
@@ -96,7 +97,7 @@ class NearbyStationRepository {
             val errorMessage = root.optString("error_message").takeIf { it.isNotBlank() }
             Log.e(TAG, "Places API status=$status message=${errorMessage ?: "-"} key=${maskKey(apiKey)}")
             if (status == "REQUEST_DENIED") {
-                error("ไม่สามารถเชื่อมต่อ Google Maps ได้ (API Key ไม่ถูกต้อง) กรุณาตรวจสอบการตั้งค่า")
+                error(context.getString(R.string.error_maps_invalid_key))
             } else {
                 error("Google Places API: $status${errorMessage?.let { " ($it)" } ?: ""}")
             }

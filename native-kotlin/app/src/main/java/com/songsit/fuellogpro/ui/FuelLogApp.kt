@@ -3262,6 +3262,14 @@ private fun AddFuelScreen(
             p != null && p > 0 && t != null -> liters = "%.2f".format(Locale.US, t / p)
         }
     }
+    // onFocusChanged fires once during a field's initial composition too, reporting the default
+    // unfocused state — without this guard, that spurious callback ran on*Commit() immediately
+    // whenever the edit screen opened, silently overwriting the just-loaded total with a fresh
+    // liters × price before the user ever touched a field (e.g. saved total 1000 with liters
+    // 27.24 and price 36.71 reopened showing total back at 999.98).
+    var litersHadFocus by remember { mutableStateOf(false) }
+    var priceHadFocus by remember { mutableStateOf(false) }
+    var totalHadFocus by remember { mutableStateOf(false) }
     var station by remember { mutableStateOf(editing?.station ?: "") }
     var fullTank by remember(editing, defaultFullTank) {
         mutableStateOf(editing?.fullTank ?: defaultFullTank)
@@ -3503,7 +3511,9 @@ private fun AddFuelScreen(
                             { liters = it },
                             label = { Text("เชื้อเพลิง (L)") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onLitersCommit() },
+                            modifier = Modifier.weight(1f).onFocusChanged {
+                                if (it.isFocused) litersHadFocus = true else if (litersHadFocus) onLitersCommit()
+                            },
                         )
                         val availableFuelTypes = remember(vehicleFuelType) { getFuelTypeOptionsForVehicle(vehicleFuelType) }
                         UnitDropdownField(
@@ -3521,14 +3531,18 @@ private fun AddFuelScreen(
                             { price = it },
                             label = { Text("ราคา/L") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onPriceCommit() },
+                            modifier = Modifier.weight(1f).onFocusChanged {
+                                if (it.isFocused) priceHadFocus = true else if (priceHadFocus) onPriceCommit()
+                            },
                         )
                         OutlinedTextField(
                             total,
                             { total = it },
                             label = { Text("ราคารวม") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f).onFocusChanged { if (!it.isFocused) onTotalCommit() },
+                            modifier = Modifier.weight(1f).onFocusChanged {
+                                if (it.isFocused) totalHadFocus = true else if (totalHadFocus) onTotalCommit()
+                            },
                         )
                     }
                 }

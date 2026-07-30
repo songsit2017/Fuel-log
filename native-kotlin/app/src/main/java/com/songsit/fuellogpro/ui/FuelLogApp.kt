@@ -2338,14 +2338,16 @@ private fun SettingsScreen(
     }
 
     if (showUnitDialog) {
+        val distanceOptions = listOf("km" to stringResource(com.songsit.fuellogpro.R.string.unit_km), "mi" to stringResource(com.songsit.fuellogpro.R.string.unit_mi))
+        val volumeOptions = listOf("liters" to stringResource(com.songsit.fuellogpro.R.string.unit_liters), "gal" to stringResource(com.songsit.fuellogpro.R.string.unit_gallons))
         AlertDialog(
             onDismissRequest = { showUnitDialog = false },
-            title = { Text("ตั้งค่าหน่วย") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.dialog_units_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("ระยะทาง", fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_distance), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("km" to "กิโลเมตร (กม.)", "mi" to "ไมล์ (mi)").forEach { (valKey, label) ->
+                        distanceOptions.forEach { (valKey, label) ->
                             if (displaySettings.distanceUnit == valKey) {
                                 Button(onClick = { onDisplaySettingsChange(displaySettings.copy(distanceUnit = valKey)) }) { Text(label) }
                             } else {
@@ -2354,9 +2356,9 @@ private fun SettingsScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("ปริมาตรน้ำมัน", fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.label_fuel_volume), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("liters" to "ลิตร (L)", "gal" to "แกลลอน (US gal)").forEach { (valKey, label) ->
+                        volumeOptions.forEach { (valKey, label) ->
                             if (displaySettings.volumeUnit == valKey) {
                                 Button(onClick = { onDisplaySettingsChange(displaySettings.copy(volumeUnit = valKey)) }) { Text(label) }
                             } else {
@@ -2366,14 +2368,14 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showUnitDialog = false }) { Text("ตกลง") } },
+            confirmButton = { TextButton(onClick = { showUnitDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) } },
         )
     }
 
     if (showCurrencyDialog) {
         AlertDialog(
             onDismissRequest = { showCurrencyDialog = false },
-            title = { Text("เลือกสกุลเงิน") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.dialog_currency_title)) },
             text = {
                 LazyColumn {
                     items(CURRENCY_OPTIONS) { option ->
@@ -2395,14 +2397,14 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text("ยกเลิก") } },
+            confirmButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
         )
     }
 
     if (showDecimalsDialog) {
         AlertDialog(
             onDismissRequest = { showDecimalsDialog = false },
-            title = { Text("จำนวนทศนิยม") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.dialog_decimals_title)) },
             text = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (0..3).forEach { d ->
@@ -2414,17 +2416,22 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showDecimalsDialog = false }) { Text("ปิด") } },
+            confirmButton = { TextButton(onClick = { showDecimalsDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_close)) } },
         )
     }
 
     if (showThemeDialog) {
+        val themeOptions = listOf(
+            "light" to stringResource(com.songsit.fuellogpro.R.string.theme_light),
+            "dark" to stringResource(com.songsit.fuellogpro.R.string.theme_dark),
+            "system" to stringResource(com.songsit.fuellogpro.R.string.theme_system),
+        )
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
-            title = { Text("เลือกธีม") },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.dialog_theme_title)) },
             text = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("light" to "สว่าง", "dark" to "มืด", "system" to "ตามระบบ").forEach { (valKey, label) ->
+                    themeOptions.forEach { (valKey, label) ->
                         if (displaySettings.themeMode == valKey) {
                             Button(onClick = { onDisplaySettingsChange(displaySettings.copy(themeMode = valKey)); showThemeDialog = false }) { Text(label) }
                         } else {
@@ -2433,7 +2440,7 @@ private fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("ปิด") } },
+            confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_close)) } },
         )
     }
 

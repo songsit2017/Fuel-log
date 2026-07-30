@@ -39,4 +39,18 @@
     <string name="settings_weather_title">สภาพอากาศขณะเติมน้ำมัน</string>
     <string name="settings_ocr_title">สแกนใบเสร็จอัตโนมัติ</string>
     <string name="settings_source_code_title">ซอร์สโค้ดโปรเจกต์</string>
+
+    <string name="action_ok">ตกลง</string>
+    <string name="action_cancel">ยกเลิก</string>
+    <string name="action_close">ปิด</string>
+    <string name="dialog_units_title">ตั้งค่าหน่วย</string>
+    <string name="label_distance">ระยะทาง</string>
+    <string name="unit_km">กิโลเมตร (กม.)</string>
+    <string name="unit_mi">ไมล์ (mi)</string>
+    <string name="label_fuel_volume">ปริมาตรน้ำมัน</string>
+    <string name="unit_liters">ลิตร (L)</string>
+    <string name="unit_gallons">แกลลอน (US gal)</string>
+    <string name="dialog_currency_title">เลือกสกุลเงิน</string>
+    <string name="dialog_decimals_title">จำนวนทศนิยม</string>
+    <string name="dialog_theme_title">เลือกธีม</string>
 </resources>

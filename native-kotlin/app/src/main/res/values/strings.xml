@@ -44,4 +44,19 @@
     <string name="settings_weather_title">Weather at fill-up</string>
     <string name="settings_ocr_title">Automatic receipt scanning</string>
     <string name="settings_source_code_title">Project source code</string>
+
+    <!-- Settings dialogs: units / currency / decimals / theme -->
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="dialog_units_title">Unit settings</string>
+    <string name="label_distance">Distance</string>
+    <string name="unit_km">Kilometers (km)</string>
+    <string name="unit_mi">Miles (mi)</string>
+    <string name="label_fuel_volume">Fuel volume</string>
+    <string name="unit_liters">Liters (L)</string>
+    <string name="unit_gallons">Gallons (US gal)</string>
+    <string name="dialog_currency_title">Select currency</string>
+    <string name="dialog_decimals_title">Decimal places</string>
+    <string name="dialog_theme_title">Choose theme</string>
 </resources>

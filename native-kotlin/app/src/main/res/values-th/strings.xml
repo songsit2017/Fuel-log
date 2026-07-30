@@ -447,6 +447,48 @@
     <string name="payment_due_in_days">ถึงวันเตือนชำระใน %1$d วัน</string>
     <string name="notification_channel_maintenance_name">กำหนดดูแลรถ</string>
     <string name="notification_channel_maintenance_desc">แจ้งเตือนตามวันที่ เลขไมล์ และกำหนดชำระ</string>
+
+    <!-- MainActivity toasts/errors -->
+    <string name="drive_auth_failed">ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้</string>
+    <string name="drive_backup_success">สำรองไป Google ไดรฟ์สำเร็จ • อัปโหลดรูปใหม่ %1$d รูป (ข้าม %2$d รูปที่มีอยู่แล้ว)</string>
+    <string name="drive_backup_failed">สำรองไป Google ไดรฟ์ไม่สำเร็จ</string>
+    <string name="drive_backup_not_found">ไม่พบไฟล์สำรองใน Google ไดรฟ์</string>
+    <string name="drive_restore_failed">ดาวน์โหลดจาก Google ไดรฟ์ไม่สำเร็จ</string>
+    <string name="error_open_photo_file">ไม่สามารถเปิดไฟล์รูปได้</string>
+    <string name="error_attach_photo_failed">แนบรูปไม่สำเร็จ</string>
+    <string name="error_open_pdf_file">ไม่สามารถเปิดไฟล์ PDF ได้</string>
+    <string name="error_attach_pdf_failed">แนบ PDF ไม่สำเร็จ</string>
+    <string name="error_open_doc_scanner_failed">เปิดตัวสแกนเอกสารไม่สำเร็จ</string>
+    <string name="error_location_permission_nearby">กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้ฉัน</string>
+    <string name="error_location_permission_weather">กรุณาอนุญาตตำแหน่งเพื่อดึงสภาพอากาศ</string>
+    <string name="error_location_permission_trip">กรุณาอนุญาตตำแหน่งเพื่อบันทึกการเดินทาง</string>
+    <string name="error_open_destination_file">ไม่สามารถเปิดไฟล์ปลายทางได้</string>
+    <string name="backup_success">สำรองข้อมูลเรียบร้อย</string>
+    <string name="backup_failed">สำรองข้อมูลไม่สำเร็จ</string>
+    <string name="error_file_too_large">ไฟล์ใหญ่เกินขนาดที่รองรับ</string>
+    <string name="error_open_backup_file">ไม่สามารถเปิดไฟล์สำรองได้</string>
+    <string name="import_failed">นำเข้าไม่สำเร็จ</string>
+    <string name="csv_export_success">ส่งออก CSV เรียบร้อย</string>
+    <string name="csv_export_failed">ส่งออก CSV ไม่สำเร็จ</string>
+    <string name="auto_sync_success">ซิงก์อัตโนมัติ • อัปโหลด %1$d • ดาวน์โหลด %2$d • รถ %3$d</string>
+    <string name="auto_sync_failed">ซิงก์อัตโนมัติไม่สำเร็จ</string>
+    <string name="error_sign_in_and_select_vehicle">กรุณาเข้าสู่ระบบและเลือกรถก่อน</string>
+    <string name="error_create_invite_failed">สร้างคำเชิญไม่สำเร็จ</string>
+    <string name="error_sign_in_first">กรุณาเข้าสู่ระบบก่อน</string>
+    <string name="error_join_failed">เข้าร่วมไม่สำเร็จ</string>
+    <string name="signed_in_tap_sync">เข้าสู่ระบบแล้ว แตะซิงก์ตอนนี้เพื่อรวมข้อมูล</string>
+    <string name="sign_in_failed">เข้าสู่ระบบไม่สำเร็จ</string>
+    <string name="sync_result">อัปโหลด %1$d • ดาวน์โหลด %2$d • รถ %3$d</string>
+    <string name="sync_failed">ซิงก์ไม่สำเร็จ</string>
+    <string name="signed_out_local_data_intact">ออกจากระบบแล้ว ข้อมูลในเครื่องยังอยู่ครบ</string>
+    <string name="conflict_used_local">ใช้ข้อมูลในเครื่องแล้ว</string>
+    <string name="conflict_used_cloud">ใช้ข้อมูล Cloud แล้ว</string>
+    <string name="conflict_resolve_failed">แก้รายการขัดแย้งไม่สำเร็จ</string>
+    <string name="conflict_used_local_count">ใช้ข้อมูลในเครื่องแล้ว %1$d รายการ</string>
+    <string name="conflict_used_cloud_count">ใช้ข้อมูล Cloud แล้ว %1$d รายการ</string>
+    <string name="error_read_location_gps">ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS</string>
+    <string name="error_nearby_search_failed">ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง</string>
+    <string name="error_weather_fetch_failed">ดึงข้อมูลสภาพอากาศไม่สำเร็จ</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

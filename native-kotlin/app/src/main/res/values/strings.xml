@@ -469,6 +469,48 @@
     <string name="payment_due_in_days">Payment reminder due in %1$d day(s)</string>
     <string name="notification_channel_maintenance_name">Vehicle maintenance</string>
     <string name="notification_channel_maintenance_desc">Alerts based on due dates, odometer readings, and payment reminders</string>
+
+    <!-- MainActivity toasts/errors -->
+    <string name="drive_auth_failed">Couldn\'t get Google Drive permission</string>
+    <string name="drive_backup_success">Backed up to Google Drive • uploaded %1$d new photo(s) (skipped %2$d already there)</string>
+    <string name="drive_backup_failed">Google Drive backup failed</string>
+    <string name="drive_backup_not_found">No backup file found in Google Drive</string>
+    <string name="drive_restore_failed">Couldn\'t download from Google Drive</string>
+    <string name="error_open_photo_file">Couldn\'t open the photo file</string>
+    <string name="error_attach_photo_failed">Couldn\'t attach the photo</string>
+    <string name="error_open_pdf_file">Couldn\'t open the PDF file</string>
+    <string name="error_attach_pdf_failed">Couldn\'t attach the PDF</string>
+    <string name="error_open_doc_scanner_failed">Couldn\'t open the document scanner</string>
+    <string name="error_location_permission_nearby">Allow location access to find nearby stations</string>
+    <string name="error_location_permission_weather">Allow location access to fetch weather</string>
+    <string name="error_location_permission_trip">Allow location access to record a trip</string>
+    <string name="error_open_destination_file">Couldn\'t open the destination file</string>
+    <string name="backup_success">Backup saved</string>
+    <string name="backup_failed">Backup failed</string>
+    <string name="error_file_too_large">File is larger than the supported size</string>
+    <string name="error_open_backup_file">Couldn\'t open the backup file</string>
+    <string name="import_failed">Import failed</string>
+    <string name="csv_export_success">CSV exported</string>
+    <string name="csv_export_failed">CSV export failed</string>
+    <string name="auto_sync_success">Auto sync • uploaded %1$d • downloaded %2$d • vehicles %3$d</string>
+    <string name="auto_sync_failed">Auto sync failed</string>
+    <string name="error_sign_in_and_select_vehicle">Sign in and select a vehicle first</string>
+    <string name="error_create_invite_failed">Couldn\'t create the invite</string>
+    <string name="error_sign_in_first">Sign in first</string>
+    <string name="error_join_failed">Couldn\'t join</string>
+    <string name="signed_in_tap_sync">Signed in — tap Sync now to merge your data</string>
+    <string name="sign_in_failed">Sign-in failed</string>
+    <string name="sync_result">Uploaded %1$d • downloaded %2$d • vehicles %3$d</string>
+    <string name="sync_failed">Sync failed</string>
+    <string name="signed_out_local_data_intact">Signed out — your local data is still intact</string>
+    <string name="conflict_used_local">Using local data</string>
+    <string name="conflict_used_cloud">Using cloud data</string>
+    <string name="conflict_resolve_failed">Couldn\'t resolve the conflict</string>
+    <string name="conflict_used_local_count">Using local data for %1$d item(s)</string>
+    <string name="conflict_used_cloud_count">Using cloud data for %1$d item(s)</string>
+    <string name="error_read_location_gps">Couldn\'t read location — turn on GPS</string>
+    <string name="error_nearby_search_failed">Search failed — allow location access or type the station name yourself</string>
+    <string name="error_weather_fetch_failed">Couldn\'t fetch weather data</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

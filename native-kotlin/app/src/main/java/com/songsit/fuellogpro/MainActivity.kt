@@ -123,7 +123,7 @@ class MainActivity : AppCompatActivity() {
     private fun performDriveBackup(silent: Boolean = false) {
         requestDriveAccessToken { token ->
             if (token == null) {
-                if (!silent) Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
+                if (!silent) Toast.makeText(this, getString(R.string.drive_auth_failed), Toast.LENGTH_LONG).show()
                 return@requestDriveAccessToken
             }
             lifecycleScope.launch {
@@ -142,13 +142,13 @@ class MainActivity : AppCompatActivity() {
                     if (!silent) {
                         Toast.makeText(
                             this@MainActivity,
-                            "สำรองไป Google ไดรฟ์สำเร็จ • อัปโหลดรูปใหม่ ${result.photosUploaded} รูป (ข้าม ${result.photosSkipped} รูปที่มีอยู่แล้ว)",
+                            getString(R.string.drive_backup_success, result.photosUploaded, result.photosSkipped),
                             Toast.LENGTH_LONG,
                         ).show()
                     }
                 }.onFailure {
                     driveBackupProgress.value = null
-                    Toast.makeText(this@MainActivity, it.message ?: "สำรองไป Google ไดรฟ์ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, it.message ?: getString(R.string.drive_backup_failed), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -162,14 +162,14 @@ class MainActivity : AppCompatActivity() {
     private fun performDriveRestore() {
         requestDriveAccessToken { token ->
             if (token == null) {
-                Toast.makeText(this, "ไม่สามารถขอสิทธิ์ Google ไดรฟ์ได้", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.drive_auth_failed), Toast.LENGTH_LONG).show()
                 return@requestDriveAccessToken
             }
             lifecycleScope.launch {
                 importProgress.value = 0
                 runCatching {
                     val json = driveBackupRepository.downloadLatestBackup(token)
-                        ?: error("ไม่พบไฟล์สำรองใน Google ไดรฟ์")
+                        ?: error(getString(R.string.drive_backup_not_found))
                     importProgress.value = 50
                     backupRepository.importJson(json)
                 }.onSuccess {
@@ -177,7 +177,7 @@ class MainActivity : AppCompatActivity() {
                     pendingImportSummaryResult.value = it
                 }.onFailure {
                     importProgress.value = null
-                    Toast.makeText(this@MainActivity, it.message ?: "ดาวน์โหลดจาก Google ไดรฟ์ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, it.message ?: getString(R.string.drive_restore_failed), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -240,7 +240,7 @@ class MainActivity : AppCompatActivity() {
                     val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
                     contentResolver.openInputStream(uri)?.use { input ->
                         destFile.outputStream().use { output -> input.copyTo(output) }
-                    } ?: error("ไม่สามารถเปิดไฟล์รูปได้")
+                    } ?: error(getString(R.string.error_open_photo_file))
                     destFile.absolutePath
                 }
             }.onSuccess { paths ->
@@ -249,7 +249,7 @@ class MainActivity : AppCompatActivity() {
                     onPicked(paths, scanResult)
                 }
             }.onFailure {
-                Toast.makeText(this@MainActivity, it.message ?: "แนบรูปไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, it.message ?: getString(R.string.error_attach_photo_failed), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -273,12 +273,12 @@ class MainActivity : AppCompatActivity() {
                     val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.pdf")
                     contentResolver.openInputStream(uri)?.use { input ->
                         destFile.outputStream().use { output -> input.copyTo(output) }
-                    } ?: error("ไม่สามารถเปิดไฟล์ PDF ได้")
+                    } ?: error(getString(R.string.error_open_pdf_file))
                     destFile.absolutePath
                 }
             }.onSuccess { paths -> onPicked(paths) }
                 .onFailure {
-                    Toast.makeText(this@MainActivity, it.message ?: "แนบ PDF ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, it.message ?: getString(R.string.error_attach_pdf_failed), Toast.LENGTH_LONG).show()
                     onPicked(emptyList())
                 }
         }
@@ -347,13 +347,13 @@ class MainActivity : AppCompatActivity() {
                 val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
                 contentResolver.openInputStream(pageUri)?.use { input ->
                     destFile.outputStream().use { output -> input.copyTo(output) }
-                } ?: error("ไม่สามารถเปิดไฟล์รูปได้")
+                } ?: error(getString(R.string.error_open_photo_file))
                 destFile.absolutePath
             }.onSuccess { path ->
                 val scanResult = scanFirstPhoto(path, type)
                 onCaptured(listOf(path), scanResult)
             }.onFailure {
-                Toast.makeText(this@MainActivity, it.message ?: "แนบรูปไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, it.message ?: getString(R.string.error_attach_photo_failed), Toast.LENGTH_LONG).show()
                 onCaptured(emptyList(), null)
             }
         }
@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 pendingScanResult = null
                 pendingScanType = null
-                Toast.makeText(this, e.message ?: "เปิดตัวสแกนเอกสารไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, e.message ?: getString(R.string.error_open_doc_scanner_failed), Toast.LENGTH_LONG).show()
                 onCaptured(emptyList(), null)
             }
     }
@@ -397,14 +397,14 @@ class MainActivity : AppCompatActivity() {
             if (pendingTripRecordingStart) { pendingTripRecordingStart = false; startTripRecordingService() }
         } else {
             pendingNearbyResult = null
-            pendingNearbyError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้ฉัน")
+            pendingNearbyError?.invoke(getString(R.string.error_location_permission_nearby))
             pendingNearbyError = null
             pendingWeatherResult = null
-            pendingWeatherError?.invoke("กรุณาอนุญาตตำแหน่งเพื่อดึงสภาพอากาศ")
+            pendingWeatherError?.invoke(getString(R.string.error_location_permission_weather))
             pendingWeatherError = null
             if (pendingTripRecordingStart) {
                 pendingTripRecordingStart = false
-                Toast.makeText(this, "กรุณาอนุญาตตำแหน่งเพื่อบันทึกการเดินทาง", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.error_location_permission_trip), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -422,11 +422,11 @@ class MainActivity : AppCompatActivity() {
             runCatching {
                 val json = backupRepository.exportJson()
                 contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(json) }
-                    ?: error("ไม่สามารถเปิดไฟล์ปลายทางได้")
+                    ?: error(getString(R.string.error_open_destination_file))
             }.onSuccess {
-                Toast.makeText(this@MainActivity, "สำรองข้อมูลเรียบร้อย", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.backup_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
-                Toast.makeText(this@MainActivity, it.message ?: "สำรองข้อมูลไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, it.message ?: getString(R.string.backup_failed), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -441,7 +441,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun java.io.InputStream.readTextLimited(maxBytes: Int = 20_000_000): String {
         val bytes = readBytes()
-        require(bytes.size <= maxBytes) { "ไฟล์ใหญ่เกินขนาดที่รองรับ" }
+        require(bytes.size <= maxBytes) { getString(R.string.error_file_too_large) }
         return bytes.toString(Charsets.UTF_8)
     }
 
@@ -468,18 +468,18 @@ class MainActivity : AppCompatActivity() {
                     val prefix = ByteArray(4)
                     val read = stream.read(prefix)
                     prefix.copyOf(if (read < 0) 0 else read)
-                } ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
+                } ?: error(getString(R.string.error_open_backup_file))
                 val isZip = header.size >= 2 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()
                 if (isZip) {
                     val totalBytes = queryFileSize(uri)
                     fuelioImportRepository.importFuelioZip(
-                        openStream = { contentResolver.openInputStream(uri) ?: error("ไม่สามารถเปิดไฟล์สำรองได้") },
+                        openStream = { contentResolver.openInputStream(uri) ?: error(getString(R.string.error_open_backup_file)) },
                         totalBytes = totalBytes,
                         onProgress = { percent -> importProgress.value = percent },
                     )
                 } else {
                     val text = contentResolver.openInputStream(uri)?.use { it.readTextLimited(20_000_000) }
-                        ?: error("ไม่สามารถเปิดไฟล์สำรองได้")
+                        ?: error(getString(R.string.error_open_backup_file))
                     val looksLikeFuelioCsv = text.contains("##Log") || text.contains("##Costs")
                     if (looksLikeFuelioCsv) {
                         fuelioImportRepository.importFuelioCsv(text)
@@ -492,7 +492,7 @@ class MainActivity : AppCompatActivity() {
                 pendingImportSummaryResult.value = it
             }.onFailure {
                 importProgress.value = null
-                Toast.makeText(this@MainActivity, it.message ?: "นำเข้าไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, it.message ?: getString(R.string.import_failed), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -504,13 +504,13 @@ class MainActivity : AppCompatActivity() {
             runCatching {
                 val csv = csvExportRepository.exportCsv()
                 contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(csv) }
-                    ?: error("ไม่สามารถเปิดไฟล์ปลายทางได้")
+                    ?: error(getString(R.string.error_open_destination_file))
             }.onSuccess {
-                Toast.makeText(this@MainActivity, "ส่งออก CSV เรียบร้อย", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.csv_export_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
                 Toast.makeText(
                     this@MainActivity,
-                    it.message ?: "ส่งออก CSV ไม่สำเร็จ",
+                    it.message ?: getString(R.string.csv_export_failed),
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -574,10 +574,10 @@ class MainActivity : AppCompatActivity() {
                     }.onSuccess { result ->
                         cloudState = cloudState.copy(
                             syncing = false,
-                            message = "ซิงก์อัตโนมัติ • อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",
+                            message = getString(R.string.auto_sync_success, result.uploaded, result.downloaded, result.vehicles),
                         )
                     }.onFailure {
-                        cloudState = cloudState.copy(syncing = false, message = it.message ?: "ซิงก์อัตโนมัติไม่สำเร็จ")
+                        cloudState = cloudState.copy(syncing = false, message = it.message ?: getString(R.string.auto_sync_failed))
                     }
                 }
             }
@@ -722,13 +722,13 @@ class MainActivity : AppCompatActivity() {
                     val ownerUid = authRepository.currentUid
                     val vehicleName = state.selectedVehicle?.name ?: ""
                     if (vehicleId == null || ownerUid == null) {
-                        onError("กรุณาเข้าสู่ระบบและเลือกรถก่อน")
+                        onError(getString(R.string.error_sign_in_and_select_vehicle))
                     } else {
                         composeScope.launch {
                             runCatching {
                                 vehicleSharingRepository.createInvite(vehicleId, vehicleName, ownerUid, email, role)
                             }.onSuccess { onResult(it.code) }
-                                .onFailure { onError(it.message ?: "สร้างคำเชิญไม่สำเร็จ") }
+                                .onFailure { onError(it.message ?: getString(R.string.error_create_invite_failed)) }
                         }
                     }
                 },
@@ -736,7 +736,7 @@ class MainActivity : AppCompatActivity() {
                     val uid = authRepository.currentUid
                     val email = authRepository.currentEmail
                     if (uid == null || email == null) {
-                        onError("กรุณาเข้าสู่ระบบก่อน")
+                        onError(getString(R.string.error_sign_in_first))
                     } else {
                         composeScope.launch {
                             runCatching {
@@ -744,7 +744,7 @@ class MainActivity : AppCompatActivity() {
                             }.onSuccess { vehicleName ->
                                 onResult(vehicleName)
                                 runCatching { cloudRepository.sync(uid, email, authRepository.currentDisplayName, authRepository.currentPhotoUrl) }
-                            }.onFailure { onError(it.message ?: "เข้าร่วมไม่สำเร็จ") }
+                            }.onFailure { onError(it.message ?: getString(R.string.error_join_failed)) }
                         }
                     }
                 },
@@ -763,12 +763,12 @@ class MainActivity : AppCompatActivity() {
                             cloudState = CloudUiState(
                                 uid = uid,
                                 email = authRepository.currentEmail,
-                                message = "เข้าสู่ระบบแล้ว แตะซิงก์ตอนนี้เพื่อรวมข้อมูล",
+                                message = getString(R.string.signed_in_tap_sync),
                             )
                         }.onFailure {
                             cloudState = cloudState.copy(
                                 syncing = false,
-                                message = it.message ?: "เข้าสู่ระบบไม่สำเร็จ",
+                                message = it.message ?: getString(R.string.sign_in_failed),
                             )
                         }
                     }
@@ -776,7 +776,7 @@ class MainActivity : AppCompatActivity() {
                 onCloudSync = {
                     val uid = authRepository.currentUid
                     if (uid == null) {
-                        cloudState = cloudState.copy(message = "กรุณาเข้าสู่ระบบก่อน")
+                        cloudState = cloudState.copy(message = getString(R.string.error_sign_in_first))
                     } else {
                         composeScope.launch {
                             cloudState = cloudState.copy(syncing = true, message = null)
@@ -791,12 +791,12 @@ class MainActivity : AppCompatActivity() {
                                 MaintenanceReminderWorker.refresh(applicationContext)
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = "อัปโหลด ${result.uploaded} • ดาวน์โหลด ${result.downloaded} • รถ ${result.vehicles}",
+                                    message = getString(R.string.sync_result, result.uploaded, result.downloaded, result.vehicles),
                                 )
                             }.onFailure {
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = it.message ?: "ซิงก์ไม่สำเร็จ",
+                                    message = it.message ?: getString(R.string.sync_failed),
                                 )
                             }
                         }
@@ -804,7 +804,7 @@ class MainActivity : AppCompatActivity() {
                 },
                 onSignOut = {
                     authRepository.signOut()
-                    cloudState = CloudUiState(message = "ออกจากระบบแล้ว ข้อมูลในเครื่องยังอยู่ครบ")
+                    cloudState = CloudUiState(message = getString(R.string.signed_out_local_data_intact))
                 },
                 syncConflicts = syncConflicts,
                 onResolveConflict = { key, useLocal ->
@@ -814,13 +814,13 @@ class MainActivity : AppCompatActivity() {
                             .onSuccess {
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = if (useLocal) "ใช้ข้อมูลในเครื่องแล้ว" else "ใช้ข้อมูล Cloud แล้ว",
+                                    message = if (useLocal) getString(R.string.conflict_used_local) else getString(R.string.conflict_used_cloud),
                                 )
                             }
                             .onFailure {
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = it.message ?: "แก้รายการขัดแย้งไม่สำเร็จ",
+                                    message = it.message ?: getString(R.string.conflict_resolve_failed),
                                 )
                             }
                     }
@@ -832,13 +832,13 @@ class MainActivity : AppCompatActivity() {
                             .onSuccess { count ->
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = if (useLocal) "ใช้ข้อมูลในเครื่องแล้ว $count รายการ" else "ใช้ข้อมูล Cloud แล้ว $count รายการ",
+                                    message = if (useLocal) getString(R.string.conflict_used_local_count, count) else getString(R.string.conflict_used_cloud_count, count),
                                 )
                             }
                             .onFailure {
                                 cloudState = cloudState.copy(
                                     syncing = false,
-                                    message = it.message ?: "แก้รายการขัดแย้งไม่สำเร็จ",
+                                    message = it.message ?: getString(R.string.conflict_resolve_failed),
                                 )
                             }
                     }
@@ -870,10 +870,10 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching {
                 val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
-                    ?: error("ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS")
+                    ?: error(getString(R.string.error_read_location_gps))
                 NearbyStationRepository().fetchNearbyStations(applicationContext, location.latitude, location.longitude)
             }.onSuccess { stations -> onResult(stations) }
-                .onFailure { onError?.invoke(it.message ?: "ค้นหาไม่ได้ กรุณาอนุญาตตำแหน่งหรือพิมพ์ชื่อปั๊มเอง") }
+                .onFailure { onError?.invoke(it.message ?: getString(R.string.error_nearby_search_failed)) }
         }
     }
 
@@ -889,10 +889,10 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching {
                 val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
-                    ?: error("ไม่สามารถอ่านตำแหน่งได้ กรุณาเปิด GPS")
+                    ?: error(getString(R.string.error_read_location_gps))
                 weatherRepository.fetchCurrent(location.latitude, location.longitude)
             }.onSuccess { weather -> onResult(weather) }
-                .onFailure { onError?.invoke(it.message ?: "ดึงข้อมูลสภาพอากาศไม่สำเร็จ") }
+                .onFailure { onError?.invoke(it.message ?: getString(R.string.error_weather_fetch_failed)) }
         }
     }
 }

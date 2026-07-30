@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Route
@@ -136,10 +137,12 @@ import com.songsit.fuellogpro.domain.model.totalCost
 import com.songsit.fuellogpro.domain.calculatePerEntryKmPerLiter
 import com.songsit.fuellogpro.data.local.SyncConflictEntity
 import com.songsit.fuellogpro.data.local.PhotoUris
+import com.songsit.fuellogpro.data.local.isPdfPath
 import com.songsit.fuellogpro.notifications.ReminderSettings
 import com.songsit.fuellogpro.ui.stats.StatsScreen
 import com.songsit.fuellogpro.ui.timeline.TimelineScreen
 import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
+import com.songsit.fuellogpro.ui.timeline.openPdfExternally
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -241,6 +244,7 @@ fun FuelLogApp(
     onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -404,6 +408,7 @@ fun FuelLogApp(
             selectedVehicleOdometer = state.summary.latestOdometerKm,
             onPickPhoto = onPickPhoto,
             onPickCameraPhoto = onPickCameraPhoto,
+            onPickPdf = onPickPdf,
             onDismiss = { showAddExpense = false; editingExpense = null },
             onSave = onAddExpense,
             onUpdate = onUpdateExpense,
@@ -3855,7 +3860,9 @@ private fun PhotoAttachmentRow(
     onPickGallery: () -> Unit,
     onRemove: (String) -> Unit,
     onPickCamera: (() -> Unit)? = null,
+    onPickPdf: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     var fullScreenImageUri by remember { mutableStateOf<String?>(null) }
 
     Row(
@@ -3867,37 +3874,54 @@ private fun PhotoAttachmentRow(
             Card(
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                modifier = Modifier.size(64.dp).clickable { fullScreenImageUri = uri },
+                modifier = Modifier.size(64.dp).clickable {
+                    if (isPdfPath(uri)) openPdfExternally(context, uri) else fullScreenImageUri = uri
+                },
             ) {
-                AsyncImage(
-                    model = if (uri.startsWith("/")) java.io.File(uri) else uri,
-                    contentDescription = "รูปที่แนบ",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
+                if (isPdfPath(uri)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "ไฟล์ PDF", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    AsyncImage(
+                        model = if (uri.startsWith("/")) java.io.File(uri) else uri,
+                        contentDescription = "รูปที่แนบ",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             }
         }
         if (photoUris.size < MAX_PHOTOS) {
             var showSourceMenu by remember { mutableStateOf(false) }
+            val hasMenu = onPickCamera != null || onPickPdf != null
             Box {
-                TextButton(onClick = { if (onPickCamera != null) showSourceMenu = true else onPickGallery() }) {
+                TextButton(onClick = { if (hasMenu) showSourceMenu = true else onPickGallery() }) {
                     Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(if (photoUris.isEmpty()) "แนบรูป/ใบเสร็จ" else "เพิ่มรูป")
                 }
-                if (onPickCamera != null) {
+                if (hasMenu) {
                     DropdownMenu(
                         expanded = showSourceMenu,
                         onDismissRequest = { showSourceMenu = false },
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("ถ่ายรูป") },
-                            onClick = { showSourceMenu = false; onPickCamera() },
-                        )
+                        if (onPickCamera != null) {
+                            DropdownMenuItem(
+                                text = { Text("ถ่ายรูป") },
+                                onClick = { showSourceMenu = false; onPickCamera() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("เลือกจากแกลอรี่") },
                             onClick = { showSourceMenu = false; onPickGallery() },
                         )
+                        if (onPickPdf != null) {
+                            DropdownMenuItem(
+                                text = { Text("แนบ PDF") },
+                                onClick = { showSourceMenu = false; onPickPdf() },
+                            )
+                        }
                     }
                 }
             }
@@ -3928,6 +3952,7 @@ private fun AddExpenseScreen(
     selectedVehicleOdometer: Double? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
+    onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
@@ -4129,6 +4154,11 @@ private fun AddExpenseScreen(
                         // only the dedicated "สแกนบิล/ใบเสร็จด้วย AI" button below opts into it.
                         onPickGallery = { isScanning = true; onPickPhoto(null, expenseHandlePicked) },
                         onPickCamera = onPickCameraPhoto?.let { pick -> { isScanning = true; pick(null, expenseHandlePicked) } },
+                        onPickPdf = onPickPdf?.let { pick ->
+                            {
+                                pick { uris -> photoUris = (photoUris + uris).distinct().take(MAX_PHOTOS) }
+                            }
+                        },
                         onRemove = { uri -> photoUris = photoUris - uri },
                     )
                 }

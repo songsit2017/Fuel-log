@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Share
@@ -52,6 +53,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import com.songsit.fuellogpro.data.local.isPdfPath
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
 import com.songsit.fuellogpro.ui.NativeAppState
@@ -218,6 +220,7 @@ private fun ExpenseTimelineContent(expense: Expense, onImageClick: (String) -> U
 // but read-only and capped at 3 thumbnails per Item C/E.
 @Composable
 private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -> Unit) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier.padding(top = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -226,16 +229,39 @@ private fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -
             Card(
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.size(52.dp).clickable { onImageClick(uri) },
+                modifier = Modifier.size(52.dp).clickable {
+                    if (isPdfPath(uri)) openPdfExternally(context, uri) else onImageClick(uri)
+                },
             ) {
-                AsyncImage(
-                    model = if (uri.startsWith("/")) java.io.File(uri) else uri,
-                    contentDescription = "รูปที่แนบ",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
+                if (isPdfPath(uri)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "ไฟล์ PDF", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    AsyncImage(
+                        model = if (uri.startsWith("/")) java.io.File(uri) else uri,
+                        contentDescription = "รูปที่แนบ",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             }
         }
+    }
+}
+
+// Opens a locally-stored PDF in an external reader app — Coil/AsyncImage can't preview a PDF, so
+// tapping one skips the in-app FullScreenImageViewer entirely instead of showing a broken image.
+fun openPdfExternally(context: android.content.Context, path: String) {
+    runCatching {
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", java.io.File(path))
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(context, "เปิด PDF ไม่ได้ ลองติดตั้งแอปอ่าน PDF", Toast.LENGTH_SHORT).show()
     }
 }
 

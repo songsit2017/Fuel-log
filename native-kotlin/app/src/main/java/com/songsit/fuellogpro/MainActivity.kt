@@ -254,6 +254,41 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Expense attachments can also be a PDF (e.g. an emailed e-receipt) — the Android Photo
+    // Picker used by pickPhoto above only surfaces images/videos, so a PDF needs the separate
+    // system document picker instead. Same copy-into-app-storage reasoning as pickPhoto: the
+    // source content:// URI's permission grant isn't guaranteed to outlive this picker session.
+    private var pendingDocumentResult: ((uris: List<String>) -> Unit)? = null
+    private val pickDocument = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        val onPicked = pendingDocumentResult
+        pendingDocumentResult = null
+        if (onPicked == null) return@registerForActivityResult
+        if (uris.isEmpty()) { onPicked(emptyList()); return@registerForActivityResult }
+        lifecycleScope.launch {
+            runCatching {
+                val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+                uris.map { uri ->
+                    val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.pdf")
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    } ?: error("ไม่สามารถเปิดไฟล์ PDF ได้")
+                    destFile.absolutePath
+                }
+            }.onSuccess { paths -> onPicked(paths) }
+                .onFailure {
+                    Toast.makeText(this@MainActivity, it.message ?: "แนบ PDF ไม่สำเร็จ", Toast.LENGTH_LONG).show()
+                    onPicked(emptyList())
+                }
+        }
+    }
+
+    private fun launchPdfPicker(onPicked: (uris: List<String>) -> Unit) {
+        pendingDocumentResult = onPicked
+        pickDocument.launch(arrayOf("application/pdf"))
+    }
+
     // Camera counterpart to pickPhoto above: the user chooses "ถ่ายรูป" instead of "เลือกจาก
     // แกลอรี่" in PhotoAttachmentRow's source menu. TakePicture writes straight into a
     // filesDir/photos file we hand it via FileProvider, so the result path already matches the
@@ -679,6 +714,7 @@ class MainActivity : ComponentActivity() {
                 onPickCameraPhoto = { type, onPicked ->
                     if (type == "fuel" || type == "expense") launchDocumentScan(type, onPicked) else launchCameraCapture(type, onPicked)
                 },
+                onPickPdf = { onPicked -> launchPdfPicker(onPicked) },
                 oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->

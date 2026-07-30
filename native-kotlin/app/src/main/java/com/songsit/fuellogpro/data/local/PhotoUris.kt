@@ -17,3 +17,7 @@ object PhotoUris {
     fun join(values: List<String>): String? =
         values.filter(String::isNotBlank).takeIf { it.isNotEmpty() }?.joinToString(SEPARATOR)
 }
+
+// Attachments are mostly photos, but expenses can also attach a PDF (e.g. an emailed e-receipt) —
+// callers use this to tell the two apart since a PDF can't be decoded/previewed as an image.
+fun isPdfPath(path: String): Boolean = path.substringAfterLast('.', "").equals("pdf", ignoreCase = true)

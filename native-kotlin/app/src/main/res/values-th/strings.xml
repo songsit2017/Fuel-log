@@ -376,9 +376,12 @@
 
     <!-- StatsScreen -->
     <string-array name="stats_tab_titles">
+        <item>ทั่วไป</item>
         <item>เติม-เพิ่ม</item>
         <item>ค่าใช้จ่าย</item>
+        <item>รายรับ</item>
         <item>ระยะทาง</item>
+        <item>บริการ</item>
     </string-array>
     <string name="stats_refills">เติม-เพิ่ม</string>
     <string name="stats_this_year">ปีนี้</string>
@@ -636,4 +639,27 @@
     <string name="category_tickets_fines">ตั๋ว/ค่าปรับ</string>
     <string name="category_modifications">ปรับแต่ง</string>
     <string name="category_insurance">การประกันภัย</string>
+
+    <!-- StatsScreen: General / Income / Service tabs, date-range filter -->
+    <string name="stats_income">รายรับ</string>
+    <string name="stats_min_income">รายรับต่ำสุด</string>
+    <string name="stats_max_income">รายรับสูงสุด</string>
+    <string name="stats_avg_income_per_day">รายรับเฉลี่ยต่อวัน</string>
+    <string name="stats_avg_income_per_month">รายรับเฉลี่ยต่อเดือน</string>
+    <string name="stats_income_count">รายการรายรับ</string>
+    <string name="stats_service">บริการ</string>
+    <string name="stats_min_service_bill">บิลต่ำสุด</string>
+    <string name="stats_max_service_bill">บิลสูงสุด</string>
+    <string name="stats_service_count">รายการบริการ</string>
+    <string name="stats_upcoming_tasks">งานที่กำลังจะถึง</string>
+    <string name="date_range_all_time">ทั้งหมด</string>
+    <string name="date_range_this_year">ปีนี้</string>
+    <string name="date_range_this_month">เดือนนี้</string>
+    <string name="date_range_last_30_days">30 วันล่าสุด</string>
+    <string name="date_range_custom">กำหนดเอง...</string>
+    <string name="date_range_dialog_title">กำหนดช่วงวันที่เอง</string>
+    <string name="date_range_start_date">วันที่เริ่มต้น (YYYY-MM-DD)</string>
+    <string name="date_range_end_date">วันที่สิ้นสุด (YYYY-MM-DD)</string>
+    <string name="date_range_chip_all_time">%1$d รายการ (ทั้งหมด)</string>
+    <string name="date_range_chip_dated">%1$d รายการ (%2$s – %3$s)</string>
 </resources>

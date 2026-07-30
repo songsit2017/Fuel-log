@@ -398,9 +398,12 @@
 
     <!-- StatsScreen -->
     <string-array name="stats_tab_titles">
+        <item>General</item>
         <item>Refills</item>
         <item>Costs</item>
+        <item>Income</item>
         <item>Distance</item>
+        <item>Service</item>
     </string-array>
     <string name="stats_refills">Refills</string>
     <string name="stats_this_year">this year</string>
@@ -658,4 +661,27 @@
     <string name="category_tickets_fines">Tickets / fines</string>
     <string name="category_modifications">Modifications</string>
     <string name="category_insurance">Insurance</string>
+
+    <!-- StatsScreen: General / Income / Service tabs, date-range filter -->
+    <string name="stats_income">Income</string>
+    <string name="stats_min_income">Lowest income</string>
+    <string name="stats_max_income">Highest income</string>
+    <string name="stats_avg_income_per_day">Average income per day</string>
+    <string name="stats_avg_income_per_month">Average income per month</string>
+    <string name="stats_income_count">Income entries</string>
+    <string name="stats_service">Service</string>
+    <string name="stats_min_service_bill">Lowest bill</string>
+    <string name="stats_max_service_bill">Highest bill</string>
+    <string name="stats_service_count">Service records</string>
+    <string name="stats_upcoming_tasks">Upcoming tasks</string>
+    <string name="date_range_all_time">All time</string>
+    <string name="date_range_this_year">This year</string>
+    <string name="date_range_this_month">This month</string>
+    <string name="date_range_last_30_days">Last 30 days</string>
+    <string name="date_range_custom">Custom range…</string>
+    <string name="date_range_dialog_title">Custom date range</string>
+    <string name="date_range_start_date">Start date (YYYY-MM-DD)</string>
+    <string name="date_range_end_date">End date (YYYY-MM-DD)</string>
+    <string name="date_range_chip_all_time">%1$d entries (all time)</string>
+    <string name="date_range_chip_dated">%1$d entries (%2$s – %3$s)</string>
 </resources>

@@ -38,7 +38,9 @@ import com.patrykandpatrick.vico.compose.pie.rememberPieChart
 import com.patrykandpatrick.vico.compose.pie.data.PieChartModelProducer
 import com.patrykandpatrick.vico.compose.pie.data.PieValueFormatter
 import com.patrykandpatrick.vico.compose.pie.data.pieSeries
+import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.domain.model.MaintenanceTask
 import com.songsit.fuellogpro.ui.NativeAppState
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -337,6 +339,204 @@ private fun odometerSeries(entries: List<FuelEntry>): List<Pair<LocalDate, Doubl
         .filter { it.second > 0 }
         .sortedBy { it.first }
 
+// ── Date-range filter (applies to every tab) ────────────────────────────────────────────
+enum class StatsDateRangeMode { ALL_TIME, THIS_YEAR, THIS_MONTH, LAST_30_DAYS, CUSTOM }
+
+data class StatsDateRangeSelection(
+    val mode: StatsDateRangeMode = StatsDateRangeMode.ALL_TIME,
+    val customStart: String = "",
+    val customEnd: String = "",
+)
+
+private fun effectiveDateRange(selection: StatsDateRangeSelection, today: LocalDate): Pair<LocalDate?, LocalDate?> = when (selection.mode) {
+    StatsDateRangeMode.ALL_TIME -> null to null
+    StatsDateRangeMode.THIS_YEAR -> LocalDate.of(today.year, 1, 1) to today
+    StatsDateRangeMode.THIS_MONTH -> today.withDayOfMonth(1) to today
+    StatsDateRangeMode.LAST_30_DAYS -> today.minusDays(29) to today
+    StatsDateRangeMode.CUSTOM ->
+        runCatching { LocalDate.parse(selection.customStart) }.getOrNull() to
+            runCatching { LocalDate.parse(selection.customEnd) }.getOrNull()
+}
+
+// Records with an unparseable date are kept rather than silently dropped — a malformed date
+// shouldn't make a real record invisible from every report.
+private fun <T> List<T>.filterByDateRange(start: LocalDate?, end: LocalDate?, dateOf: (T) -> String): List<T> {
+    if (start == null && end == null) return this
+    return filter { item ->
+        val date = runCatching { LocalDate.parse(dateOf(item)) }.getOrNull() ?: return@filter true
+        (start == null || !date.isBefore(start)) && (end == null || !date.isAfter(end))
+    }
+}
+
+// ── General / Income / Service tabs (Fuelio-parity backlog: the "รายรับ"/"บริการ" money flows
+// live on Expense records, not FuelEntry — MaintenanceTask itself carries no cost, it's only a
+// due-date/odometer reminder, so "Service" spend reads from Expense rows in these categories). ──
+private val serviceExpenseCategories = setOf("บริการ", "บำรุงรักษา")
+
+data class GeneralStats(
+    val totalRecords: Int,
+    val totalCost: Double,
+    val totalIncome: Double,
+    val netCost: Double,
+    val totalDistance: Double,
+    val avgCostPerDay: Double,
+    val avgCostPerMonth: Double,
+)
+
+private fun computeGeneralStats(entries: List<FuelEntry>, expenses: List<Expense>): GeneralStats {
+    val fuelCost = entries.sumOf { it.amount }
+    val expenseCost = expenses.filterNot(Expense::income).sumOf { it.amount }
+    val income = expenses.filter(Expense::income).sumOf { it.amount }
+    val totalCost = fuelCost + expenseCost
+    val dates = entries.mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() } +
+        expenses.mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }
+    val daysBetween = if (dates.isEmpty()) 1L else max(1L, ChronoUnit.DAYS.between(dates.min(), dates.max()))
+    val monthsBetween = if (dates.isEmpty()) {
+        1L
+    } else {
+        max(1L, ChronoUnit.MONTHS.between(dates.min().withDayOfMonth(1), dates.max().withDayOfMonth(1)) + 1)
+    }
+    val sortedOdo = entries.filter { it.odometerKm > 0 }.sortedBy { "${it.date} ${it.time}" }
+    val distance = (sortedOdo.lastOrNull()?.odometerKm ?: 0.0) - (sortedOdo.firstOrNull()?.odometerKm ?: 0.0)
+    return GeneralStats(
+        totalRecords = entries.size + expenses.size,
+        totalCost = totalCost,
+        totalIncome = income,
+        netCost = totalCost - income,
+        totalDistance = if (distance > 0) distance else 0.0,
+        avgCostPerDay = totalCost / daysBetween,
+        avgCostPerMonth = totalCost / monthsBetween,
+    )
+}
+
+data class IncomeStats(
+    val count: Int,
+    val totalIncome: Double,
+    val incomeThisYear: Double,
+    val incomeThisMonth: Double,
+    val incomePrevYear: Double,
+    val incomePrevMonth: Double,
+    val minIncome: Double,
+    val maxIncome: Double,
+    val avgIncomePerDay: Double,
+    val avgIncomePerMonth: Double,
+)
+
+private fun computeIncomeStats(expenses: List<Expense>): IncomeStats {
+    val incomeEntries = expenses.filter(Expense::income)
+    if (incomeEntries.isEmpty()) return IncomeStats(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    val today = LocalDate.now()
+    val thisYear = today.year
+    val thisMonth = YearMonth.now()
+    val prevYear = thisYear - 1
+    val prevMonth = thisMonth.minusMonths(1)
+    var incomeThisYear = 0.0
+    var incomeThisMonth = 0.0
+    var incomePrevYear = 0.0
+    var incomePrevMonth = 0.0
+    var total = 0.0
+    var minIncome = Double.MAX_VALUE
+    var maxIncome = 0.0
+    val dates = mutableListOf<LocalDate>()
+    incomeEntries.forEach { expense ->
+        total += expense.amount
+        minIncome = minOf(minIncome, expense.amount)
+        maxIncome = maxOf(maxIncome, expense.amount)
+        val date = runCatching { LocalDate.parse(expense.date) }.getOrNull()
+        if (date != null) {
+            dates += date
+            val ym = YearMonth.from(date)
+            if (date.year == thisYear) incomeThisYear += expense.amount
+            if (date.year == prevYear) incomePrevYear += expense.amount
+            if (ym == thisMonth) incomeThisMonth += expense.amount
+            if (ym == prevMonth) incomePrevMonth += expense.amount
+        }
+    }
+    val daysBetween = if (dates.isEmpty()) 1L else max(1L, ChronoUnit.DAYS.between(dates.min(), dates.max()))
+    val monthsBetween = if (dates.isEmpty()) {
+        1L
+    } else {
+        max(1L, ChronoUnit.MONTHS.between(dates.min().withDayOfMonth(1), dates.max().withDayOfMonth(1)) + 1)
+    }
+    return IncomeStats(
+        count = incomeEntries.size,
+        totalIncome = total,
+        incomeThisYear = incomeThisYear,
+        incomeThisMonth = incomeThisMonth,
+        incomePrevYear = incomePrevYear,
+        incomePrevMonth = incomePrevMonth,
+        minIncome = if (minIncome == Double.MAX_VALUE) 0.0 else minIncome,
+        maxIncome = maxIncome,
+        avgIncomePerDay = total / daysBetween,
+        avgIncomePerMonth = total / monthsBetween,
+    )
+}
+
+data class ServiceStats(
+    val count: Int,
+    val totalCost: Double,
+    val costThisYear: Double,
+    val costThisMonth: Double,
+    val costPrevYear: Double,
+    val costPrevMonth: Double,
+    val minBill: Double,
+    val maxBill: Double,
+    val avgCostPerDay: Double,
+    val avgCostPerMonth: Double,
+)
+
+private fun computeServiceStats(expenses: List<Expense>): ServiceStats {
+    val serviceEntries = expenses.filter { !it.income && it.category in serviceExpenseCategories }
+    if (serviceEntries.isEmpty()) return ServiceStats(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    val today = LocalDate.now()
+    val thisYear = today.year
+    val thisMonth = YearMonth.now()
+    val prevYear = thisYear - 1
+    val prevMonth = thisMonth.minusMonths(1)
+    var costThisYear = 0.0
+    var costThisMonth = 0.0
+    var costPrevYear = 0.0
+    var costPrevMonth = 0.0
+    var total = 0.0
+    var minBill = Double.MAX_VALUE
+    var maxBill = 0.0
+    val dates = mutableListOf<LocalDate>()
+    serviceEntries.forEach { expense ->
+        total += expense.amount
+        minBill = minOf(minBill, expense.amount)
+        maxBill = maxOf(maxBill, expense.amount)
+        val date = runCatching { LocalDate.parse(expense.date) }.getOrNull()
+        if (date != null) {
+            dates += date
+            val ym = YearMonth.from(date)
+            if (date.year == thisYear) costThisYear += expense.amount
+            if (date.year == prevYear) costPrevYear += expense.amount
+            if (ym == thisMonth) costThisMonth += expense.amount
+            if (ym == prevMonth) costPrevMonth += expense.amount
+        }
+    }
+    val daysBetween = if (dates.isEmpty()) 1L else max(1L, ChronoUnit.DAYS.between(dates.min(), dates.max()))
+    val monthsBetween = if (dates.isEmpty()) {
+        1L
+    } else {
+        max(1L, ChronoUnit.MONTHS.between(dates.min().withDayOfMonth(1), dates.max().withDayOfMonth(1)) + 1)
+    }
+    return ServiceStats(
+        count = serviceEntries.size,
+        totalCost = total,
+        costThisYear = costThisYear,
+        costThisMonth = costThisMonth,
+        costPrevYear = costPrevYear,
+        costPrevMonth = costPrevMonth,
+        minBill = if (minBill == Double.MAX_VALUE) 0.0 else minBill,
+        maxBill = maxBill,
+        avgCostPerDay = total / daysBetween,
+        avgCostPerMonth = total / monthsBetween,
+    )
+}
+
 @Composable
 private fun MonthlyCostChart(monthlyCosts: List<Pair<YearMonth, Double>>) {
     if (monthlyCosts.size < 2) return
@@ -446,15 +646,113 @@ private fun OdometerLineChart(odometerPoints: List<Pair<LocalDate, Double>>) {
 }
 
 @Composable
+private fun DateRangeFilterChip(
+    selection: StatsDateRangeSelection,
+    onSelectionChange: (StatsDateRangeSelection) -> Unit,
+    recordCount: Int,
+    rangeStart: LocalDate?,
+    rangeEnd: LocalDate?,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showCustomDialog by remember { mutableStateOf(false) }
+    val chipLabel = if (selection.mode == StatsDateRangeMode.ALL_TIME) {
+        stringResource(com.songsit.fuellogpro.R.string.date_range_chip_all_time, recordCount)
+    } else {
+        stringResource(
+            com.songsit.fuellogpro.R.string.date_range_chip_dated,
+            recordCount,
+            rangeStart?.toString().orEmpty(),
+            rangeEnd?.toString().orEmpty(),
+        )
+    }
+    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        AssistChip(
+            onClick = { menuExpanded = true },
+            label = { Text(chipLabel) },
+            leadingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        )
+        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_all_time)) },
+                onClick = { onSelectionChange(StatsDateRangeSelection(StatsDateRangeMode.ALL_TIME)); menuExpanded = false },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_this_year)) },
+                onClick = { onSelectionChange(StatsDateRangeSelection(StatsDateRangeMode.THIS_YEAR)); menuExpanded = false },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_this_month)) },
+                onClick = { onSelectionChange(StatsDateRangeSelection(StatsDateRangeMode.THIS_MONTH)); menuExpanded = false },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_last_30_days)) },
+                onClick = { onSelectionChange(StatsDateRangeSelection(StatsDateRangeMode.LAST_30_DAYS)); menuExpanded = false },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_custom)) },
+                onClick = { menuExpanded = false; showCustomDialog = true },
+            )
+        }
+    }
+    if (showCustomDialog) {
+        var startText by remember { mutableStateOf(selection.customStart.ifBlank { LocalDate.now().minusMonths(1).toString() }) }
+        var endText by remember { mutableStateOf(selection.customEnd.ifBlank { LocalDate.now().toString() }) }
+        AlertDialog(
+            onDismissRequest = { showCustomDialog = false },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        startText,
+                        { startText = it },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_start_date)) },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        endText,
+                        { endText = it },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.date_range_end_date)) },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSelectionChange(StatsDateRangeSelection(StatsDateRangeMode.CUSTOM, startText, endText))
+                    showCustomDialog = false
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
 fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
-    val stats = remember(state.entries) { computeFuelioStats(state.entries) }
-    val monthlyCosts = remember(state.entries) { monthlyCostSeries(state.entries) }
+    var dateRangeSelection by remember { mutableStateOf(StatsDateRangeSelection()) }
+    val today = remember { LocalDate.now() }
+    val (rangeStart, rangeEnd) = remember(dateRangeSelection, today) { effectiveDateRange(dateRangeSelection, today) }
+
+    val filteredEntries = remember(state.entries, rangeStart, rangeEnd) {
+        state.entries.filterByDateRange(rangeStart, rangeEnd, FuelEntry::date)
+    }
+    val filteredExpenses = remember(state.expenses, rangeStart, rangeEnd) {
+        state.expenses.filterByDateRange(rangeStart, rangeEnd, Expense::date)
+    }
+
+    val stats = remember(filteredEntries) { computeFuelioStats(filteredEntries) }
+    val generalStats = remember(filteredEntries, filteredExpenses) { computeGeneralStats(filteredEntries, filteredExpenses) }
+    val incomeStats = remember(filteredExpenses) { computeIncomeStats(filteredExpenses) }
+    val serviceStats = remember(filteredExpenses) { computeServiceStats(filteredExpenses) }
+    val monthlyCosts = remember(filteredEntries) { monthlyCostSeries(filteredEntries) }
     val unspecifiedStationLabel = stringResource(com.songsit.fuellogpro.R.string.stats_unspecified_station)
     val otherLabel = stringResource(com.songsit.fuellogpro.R.string.stats_other)
-    val stationBreakdown = remember(state.entries, unspecifiedStationLabel, otherLabel) {
-        stationCostBreakdown(state.entries, unspecifiedStationLabel, otherLabel)
+    val stationBreakdown = remember(filteredEntries, unspecifiedStationLabel, otherLabel) {
+        stationCostBreakdown(filteredEntries, unspecifiedStationLabel, otherLabel)
     }
-    val odometerPoints = remember(state.entries) { odometerSeries(state.entries) }
+    val odometerPoints = remember(filteredEntries) { odometerSeries(filteredEntries) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = stringArrayResource(com.songsit.fuellogpro.R.array.stats_tab_titles)
     val thisYearLabel = stringResource(com.songsit.fuellogpro.R.string.stats_this_year)
@@ -472,6 +770,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 )
             }
         }
+        DateRangeFilterChip(
+            selection = dateRangeSelection,
+            onSelectionChange = { dateRangeSelection = it },
+            recordCount = filteredEntries.size + filteredExpenses.size,
+            rangeStart = rangeStart,
+            rangeEnd = rangeEnd,
+        )
 
         ProvideVicoTheme(rememberM3VicoTheme()) {
         LazyColumn(
@@ -481,6 +786,61 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
         ) {
             when (selectedTab) {
                 0 -> {
+                    // General Tab
+                    item { HeroCard("General") }
+                    item {
+                        MainValueCard(
+                            title = stringResource(com.songsit.fuellogpro.R.string.dashboard_record_count),
+                            value = "${generalStats.totalRecords}",
+                            icon = Icons.Filled.ListAlt,
+                        )
+                    }
+                    item {
+                        MainValueCard(
+                            title = stringResource(com.songsit.fuellogpro.R.string.dashboard_total_cost),
+                            value = statsCurrency.format(generalStats.totalCost),
+                            icon = Icons.Filled.Payments,
+                            iconTint = Color(0xFFF44336),
+                        )
+                    }
+                    item {
+                        MainValueCard(
+                            title = stringResource(com.songsit.fuellogpro.R.string.dashboard_net_cost),
+                            value = statsCurrency.format(generalStats.netCost),
+                            icon = Icons.Filled.AccountBalanceWallet,
+                            iconTint = Color(0xFF4CAF50),
+                        )
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(
+                                    stringResource(com.songsit.fuellogpro.R.string.dashboard_cumulative_distance),
+                                    "${statsNumber.format(generalStats.totalDistance)} km",
+                                    Icons.Filled.Route,
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(
+                                    stringResource(com.songsit.fuellogpro.R.string.stats_income),
+                                    statsCurrency.format(generalStats.totalIncome),
+                                    Icons.Filled.Savings,
+                                )
+                            }
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_day), statsCurrency.format(generalStats.avgCostPerDay), Icons.Filled.AttachMoney)
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_month), statsCurrency.format(generalStats.avgCostPerMonth), Icons.Filled.AttachMoney)
+                            }
+                        }
+                    }
+                }
+                1 -> {
                     // Refills Tab
                     item { HeroCard("Refills") }
                     item {
@@ -522,7 +882,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                         )
                     }
                 }
-                1 -> {
+                2 -> {
                     // Costs Tab
                     item { HeroCard("Costs") }
                     item {
@@ -592,7 +952,53 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     item { MonthlyCostChart(monthlyCosts) }
                     item { StationCostDonutChart(stationBreakdown, otherLabel) }
                 }
-                2 -> {
+                3 -> {
+                    // Income Tab
+                    item { HeroCard("Income") }
+                    item {
+                        MainValueCard(
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_income),
+                            value = statsCurrency.format(incomeStats.totalIncome),
+                            thisYear = "${statsCurrency.format(incomeStats.incomeThisYear)}\n$thisYearLabel",
+                            prevYear = "${statsCurrency.format(incomeStats.incomePrevYear)}\n$prevYearLabel",
+                            thisMonth = "${statsCurrency.format(incomeStats.incomeThisMonth)}\n$thisMonthLabel",
+                            prevMonth = "${statsCurrency.format(incomeStats.incomePrevMonth)}\n$prevMonthLabel",
+                            icon = Icons.Filled.Savings,
+                            iconTint = Color(0xFF4CAF50),
+                        )
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                MinMaxCard(
+                                    title = stringResource(com.songsit.fuellogpro.R.string.stats_income),
+                                    minVal = statsCurrency.format(incomeStats.minIncome),
+                                    minLabel = stringResource(com.songsit.fuellogpro.R.string.stats_min_income),
+                                    maxVal = statsCurrency.format(incomeStats.maxIncome),
+                                    maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_income),
+                                    iconMin = Icons.Filled.Savings,
+                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMax = Icons.Filled.Savings,
+                                    iconMaxTint = Color(0xFF4CAF50),
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_income_count), "${incomeStats.count}", Icons.Filled.ListAlt)
+                            }
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_income_per_day), statsCurrency.format(incomeStats.avgIncomePerDay), Icons.Filled.Savings)
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_income_per_month), statsCurrency.format(incomeStats.avgIncomePerMonth), Icons.Filled.Savings)
+                            }
+                        }
+                    }
+                }
+                4 -> {
                     // Distance Tab
                     item { HeroCard("Distance") }
                     item {
@@ -626,6 +1032,54 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                     }
                     item { OdometerLineChart(odometerPoints) }
                 }
+                5 -> {
+                    // Service Tab
+                    item { HeroCard("Service") }
+                    item {
+                        MainValueCard(
+                            title = stringResource(com.songsit.fuellogpro.R.string.stats_service),
+                            value = statsCurrency.format(serviceStats.totalCost),
+                            thisYear = "${statsCurrency.format(serviceStats.costThisYear)}\n$thisYearLabel",
+                            prevYear = "${statsCurrency.format(serviceStats.costPrevYear)}\n$prevYearLabel",
+                            thisMonth = "${statsCurrency.format(serviceStats.costThisMonth)}\n$thisMonthLabel",
+                            prevMonth = "${statsCurrency.format(serviceStats.costPrevMonth)}\n$prevMonthLabel",
+                            icon = Icons.Filled.Build,
+                        )
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                MinMaxCard(
+                                    title = stringResource(com.songsit.fuellogpro.R.string.stats_bill),
+                                    minVal = statsCurrency.format(serviceStats.minBill),
+                                    minLabel = stringResource(com.songsit.fuellogpro.R.string.stats_min_service_bill),
+                                    maxVal = statsCurrency.format(serviceStats.maxBill),
+                                    maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_service_bill),
+                                    iconMin = Icons.Filled.Build,
+                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMax = Icons.Filled.Build,
+                                    iconMaxTint = Color(0xFFF44336),
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_service_count), "${serviceStats.count}", Icons.Filled.ListAlt)
+                            }
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_day), statsCurrency.format(serviceStats.avgCostPerDay), Icons.Filled.AttachMoney)
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_avg_cost_per_month), statsCurrency.format(serviceStats.avgCostPerMonth), Icons.Filled.AttachMoney)
+                            }
+                        }
+                    }
+                    item {
+                        TitleValueCard(stringResource(com.songsit.fuellogpro.R.string.stats_upcoming_tasks), "${state.maintenanceTasks.size}", Icons.Filled.Build)
+                    }
+                }
             }
         }
         }
@@ -637,6 +1091,12 @@ fun HeroCard(type: String) {
     Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
             when (type) {
+                "General" -> {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Filled.Dashboard, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
+                        Icon(Icons.Filled.Insights, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
+                    }
+                }
                 "Refills" -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Icon(Icons.Filled.LocalGasStation, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
@@ -653,6 +1113,18 @@ fun HeroCard(type: String) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
                         Icon(Icons.Filled.ShowChart, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
+                    }
+                }
+                "Income" -> {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Filled.Savings, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
+                        Icon(Icons.Filled.TrendingUp, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
+                    }
+                }
+                "Service" -> {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
+                        Icon(Icons.Filled.CarRepair, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
                     }
                 }
             }

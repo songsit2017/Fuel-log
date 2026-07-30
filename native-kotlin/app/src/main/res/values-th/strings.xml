@@ -263,7 +263,7 @@
     <!-- Main scaffold: import/backup progress dialogs, nav drawer, FAB menu, delete/error dialogs -->
     <string name="importing_data_title">กำลังนำเข้าข้อมูล</string>
     <string name="importing_data_progress">กำลังนำเข้าข้อมูล... %1$d%%</string>
-    <string name="drive_backup_title">กำลังสำรองไป Google ไดรฟ์</string>
+    <string name="drive_backup_progress_title">กำลังสำรองไป Google ไดรฟ์</string>
     <string name="drive_backup_progress">กำลังอัปโหลด... %1$d%%</string>
     <string name="content_desc_menu">เมนู</string>
     <string name="label_select_vehicle">เลือกรถ</string>
@@ -286,7 +286,6 @@
     <string name="content_desc_quick_pick">เลือกด่วน</string>
     <string name="label_calculator_mode">โหมดการคำนวณ</string>
     <string name="content_desc_select_mode">เลือกโหมด</string>
-    <string name="label_distance_km">ระยะทาง (km)</string>
     <string name="label_fuel_efficiency_km_per_l">อัตราสิ้นเปลือง (km/L)</string>
     <string name="label_budget">งบประมาณ ($)</string>
     <string name="action_calculate">คำนวณ</string>
@@ -324,7 +323,7 @@
     <string name="unit_word_gallons">แกลลอน</string>
     <string name="unit_word_km">กิโลเมตร</string>
     <string name="unit_word_mi">ไมล์</string>
-    <string name="sync_conflicts_found">พบ %1$d รายการที่ต่างกันรอแก้ไข</string>
+    <string name="sync_conflicts_summary">พบ %1$d รายการที่ต่างกันรอแก้ไข</string>
     <string name="sync_cloud_and_local_with_detail">เมฆและสำรองข้อมูลท้องถิ่น • %1$s</string>
     <string name="sync_cloud_and_local">เมฆและสำรองข้อมูลท้องถิ่น</string>
     <string name="google_connected">เชื่อมต่อ Google แล้ว</string>
@@ -349,7 +348,7 @@
     <!-- AddExpenseScreen -->
     <string name="expense_edit_title">แก้ไขค่าใช้จ่าย</string>
     <string name="expense_add_title">เพิ่มค่าใช้จ่าย</string>
-    <string name="label_category">หมวดหมู่</string>
+    <string name="label_expense_category">หมวดหมู่</string>
     <string name="content_desc_select_category">เลือกหมวดหมู่</string>
     <string name="section_expense_info">ข้อมูลค่าใช้จ่าย</string>
     <string name="label_title_field">ชื่อเรื่อง</string>
@@ -539,7 +538,7 @@
     <string name="error_local_data_not_found">ไม่พบข้อมูลในเครื่อง</string>
     <string name="error_cloud_data_not_found">ไม่พบข้อมูลบน Cloud</string>
     <string name="vehicle_from_cloud_default_name">รถจาก Cloud</string>
-    <string name="maintenance_default_name">รายการดูแลรถ</string>
+    <string name="maintenance_from_cloud_default_name">รายการดูแลรถ</string>
     <string name="trip_default_name">ทริป</string>
 
     <!-- VehicleSharingRepository -->

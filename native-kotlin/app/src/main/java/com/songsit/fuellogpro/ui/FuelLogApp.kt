@@ -369,7 +369,7 @@ fun FuelLogApp(
         AlertDialog(
             onDismissRequest = {},
             confirmButton = {},
-            title = { Text(stringResource(com.songsit.fuellogpro.R.string.drive_backup_title)) },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.drive_backup_progress_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LinearProgressIndicator(
@@ -2332,7 +2332,7 @@ private fun SettingsScreen(
             item {
                 val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
                 val syncSubtitle = when {
-                    syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size)
+                    syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_summary, syncConflicts.size)
                     cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
                     else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
                 }
@@ -4271,7 +4271,7 @@ private fun AddExpenseScreen(
                         value = category,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_category)) },
+                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_expense_category)) },
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
                         trailingIcon = {
                             IconButton(onClick = { categoryMenuExpanded = true }) {

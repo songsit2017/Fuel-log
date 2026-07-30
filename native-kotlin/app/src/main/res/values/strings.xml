@@ -285,7 +285,7 @@
     <!-- Main scaffold: import/backup progress dialogs, nav drawer, FAB menu, delete/error dialogs -->
     <string name="importing_data_title">Importing data</string>
     <string name="importing_data_progress">Importing… %1$d%%</string>
-    <string name="drive_backup_title">Backing up to Google Drive</string>
+    <string name="drive_backup_progress_title">Backing up to Google Drive</string>
     <string name="drive_backup_progress">Uploading… %1$d%%</string>
     <string name="content_desc_menu">Menu</string>
     <string name="label_select_vehicle">Select vehicle</string>
@@ -308,7 +308,6 @@
     <string name="content_desc_quick_pick">Quick pick</string>
     <string name="label_calculator_mode">Calculation mode</string>
     <string name="content_desc_select_mode">Select mode</string>
-    <string name="label_distance_km">Distance (km)</string>
     <string name="label_fuel_efficiency_km_per_l">Fuel efficiency (km/L)</string>
     <string name="label_budget">Budget ($)</string>
     <string name="action_calculate">Calculate</string>
@@ -346,7 +345,7 @@
     <string name="unit_word_gallons">Gallons</string>
     <string name="unit_word_km">Kilometers</string>
     <string name="unit_word_mi">Miles</string>
-    <string name="sync_conflicts_found">%1$d conflicting item(s) need review</string>
+    <string name="sync_conflicts_summary">%1$d conflicting item(s) need review</string>
     <string name="sync_cloud_and_local_with_detail">Cloud &amp; local backup • %1$s</string>
     <string name="sync_cloud_and_local">Cloud &amp; local backup</string>
     <string name="google_connected">Google connected</string>
@@ -371,7 +370,7 @@
     <!-- AddExpenseScreen -->
     <string name="expense_edit_title">Edit expense</string>
     <string name="expense_add_title">Add expense</string>
-    <string name="label_category">Category</string>
+    <string name="label_expense_category">Category</string>
     <string name="content_desc_select_category">Select category</string>
     <string name="section_expense_info">Expense info</string>
     <string name="label_title_field">Title</string>
@@ -561,7 +560,7 @@
     <string name="error_local_data_not_found">No local data found</string>
     <string name="error_cloud_data_not_found">No cloud data found</string>
     <string name="vehicle_from_cloud_default_name">Vehicle from Cloud</string>
-    <string name="maintenance_default_name">Maintenance item</string>
+    <string name="maintenance_from_cloud_default_name">Maintenance item</string>
     <string name="trip_default_name">Trip</string>
 
     <!-- VehicleSharingRepository -->

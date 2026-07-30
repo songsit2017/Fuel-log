@@ -128,4 +128,41 @@
     <string name="dashboard_no_data">No data yet</string>
     <string name="dashboard_record_count">Records</string>
     <string name="dashboard_recent_entries">Recent entries</string>
+
+    <!-- FuelList / ExpenseList / ExpenseRow / TripList / MaintenanceList / FuelRow -->
+    <string name="unknown_date">Unknown date</string>
+    <string name="expense_net_after_income">Net after income</string>
+    <string name="expense_summary_line">Expenses %1$s • Income %2$s</string>
+    <string name="expense_by_category">By category</string>
+    <string name="expense_category_other">Other</string>
+    <string name="expense_empty_title">No expenses yet</string>
+    <string name="expense_empty_subtitle">Tap + to add your first entry</string>
+    <string name="expense_recurring_label">Recurring</string>
+    <string name="expense_reminder_label">Reminder %1$s</string>
+    <string name="expense_photo_count">Photos: %1$d</string>
+    <string name="action_menu">Menu</string>
+    <string name="action_delete">Delete</string>
+    <string name="trip_recording_paused">Paused</string>
+    <string name="trip_recording_active">Recording trip</string>
+    <string name="trip_resume">Resume</string>
+    <string name="trip_pause">Pause</string>
+    <string name="trip_finish">Finish</string>
+    <string name="trip_recording_done_title">Trip recording finished</string>
+    <string name="trip_add_as_trip">Add as trip</string>
+    <string name="trip_start_recording">Start GPS trip recording</string>
+    <string name="trip_summary_line">%1$d trips • %2$s km</string>
+    <string name="trip_cost_per_km">%1$s Baht/km</string>
+    <string name="trip_empty_title">No trips yet</string>
+    <string name="trip_empty_subtitle">Tap + to log a trip</string>
+    <string name="trip_distance_line">%1$s • %2$s km</string>
+    <string name="maintenance_empty_title">No maintenance items yet</string>
+    <string name="maintenance_empty_subtitle">Tap + to add tax, insurance, or a maintenance task</string>
+    <string name="maintenance_due_date">Due %1$s</string>
+    <string name="maintenance_due_at_odo">At %1$s km</string>
+    <string name="action_done">Done</string>
+    <string name="fuel_default_label">Fill-up</string>
+    <string name="content_desc_has_photo">Has photo</string>
+    <string name="fuel_liters_price_line">%1$s L • %2$s/L</string>
+    <string name="fuel_efficiency_line">%1$s km/L</string>
+    <string name="fuel_full_tank">Full tank</string>
 </resources>

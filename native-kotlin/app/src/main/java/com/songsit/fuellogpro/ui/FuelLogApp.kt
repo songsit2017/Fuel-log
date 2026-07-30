@@ -1460,6 +1460,9 @@ private fun FuelList(
     val groups = remember(entries) {
         entries.groupBy { entry -> runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { it.year to it.monthValue } }
     }
+    // Hoisted above LazyColumn: its content lambda is LazyListScope.() -> Unit, not @Composable,
+    // so stringResource() can only be called out here (or inside an item{}/items{} block).
+    val unknownDateLabel = stringResource(com.songsit.fuellogpro.R.string.unknown_date)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
@@ -1468,7 +1471,7 @@ private fun FuelList(
         if (entries.isEmpty()) item { EmptyFuelState() }
         groups.forEach { (yearMonth, groupEntries) ->
             item {
-                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: "ไม่ทราบวันที่"
+                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: unknownDateLabel
                 Text(
                     label,
                     style = MaterialTheme.typography.titleSmall,
@@ -1492,9 +1495,10 @@ private fun ExpenseList(
     onEdit: ((Expense) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val categoryTotals = remember(expenses) {
+    val otherCategoryLabel = stringResource(com.songsit.fuellogpro.R.string.expense_category_other)
+    val categoryTotals = remember(expenses, otherCategoryLabel) {
         expenses.filterNot(Expense::income)
-            .groupBy { it.category.ifBlank { "อื่นๆ" } }
+            .groupBy { it.category.ifBlank { otherCategoryLabel } }
             .mapValues { (_, items) -> items.sumOf { it.amount } }
             .entries.sortedByDescending { it.value }
     }
@@ -1502,6 +1506,7 @@ private fun ExpenseList(
     val groups = remember(expenses) {
         expenses.groupBy { expense -> runCatching { LocalDate.parse(expense.date) }.getOrNull()?.let { it.year to it.monthValue } }
     }
+    val unknownDateLabel = stringResource(com.songsit.fuellogpro.R.string.unknown_date)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
@@ -1513,10 +1518,14 @@ private fun ExpenseList(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text("สุทธิหลังรายรับ", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(com.songsit.fuellogpro.R.string.expense_net_after_income), style = MaterialTheme.typography.labelLarge)
                     Text(thaiCurrency.format(netExpense), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "รายจ่าย ${thaiCurrency.format(totalExpense)} • รายรับ ${thaiCurrency.format(totalIncome)}",
+                        stringResource(
+                            com.songsit.fuellogpro.R.string.expense_summary_line,
+                            thaiCurrency.format(totalExpense),
+                            thaiCurrency.format(totalIncome),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -1526,7 +1535,7 @@ private fun ExpenseList(
             item {
                 Card(shape = RoundedCornerShape(20.dp)) {
                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("แยกตามหมวดหมู่", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.expense_by_category), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         categoryTotals.take(6).forEach { (category, total) ->
                             val fraction = if (categoryTotalSum > 0) (total / categoryTotalSum).toFloat() else 0f
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1548,15 +1557,15 @@ private fun ExpenseList(
             item {
                 Card(shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีค่าใช้จ่าย", fontWeight = FontWeight.SemiBold)
-                        Text("แตะ + เพื่อเพิ่มรายการแรก", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.expense_empty_title), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.expense_empty_subtitle), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
         groups.forEach { (yearMonth, groupExpenses) ->
             item {
-                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: "ไม่ทราบวันที่"
+                val label = yearMonth?.let { (year, month) -> "${fuelListThaiMonthNames[month - 1]} $year" } ?: unknownDateLabel
                 Text(
                     label,
                     style = MaterialTheme.typography.titleSmall,
@@ -1595,13 +1604,13 @@ private fun ExpenseRow(
                     Text("${number.format(it)} กม.", style = MaterialTheme.typography.labelSmall)
                 }
                 val notes = listOfNotNull(
-                    "รายการประจำ".takeIf { expense.recurring },
-                    expense.reminderDate?.let { "เตือน $it" },
+                    stringResource(com.songsit.fuellogpro.R.string.expense_recurring_label).takeIf { expense.recurring },
+                    expense.reminderDate?.let { stringResource(com.songsit.fuellogpro.R.string.expense_reminder_label, it) },
                 )
                 if (notes.isNotEmpty()) {
                     Text(notes.joinToString(" • "), style = MaterialTheme.typography.labelSmall)
                 }
-                
+
                 // photoUrls is just the parsed form of photoUri (PhotoUris.split), not a second
                 // set of photos — adding both here counted every attachment twice.
                 val photoCount = expense.photoUrls.size
@@ -1610,7 +1619,11 @@ private fun ExpenseRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(4.dp))
-                        Text("รูปภาพ: $photoCount", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            stringResource(com.songsit.fuellogpro.R.string.expense_photo_count, photoCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -1622,10 +1635,13 @@ private fun ExpenseRow(
                 )
                 Box {
                     IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "เมนู")
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_menu))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(text = { Text("ลบ") }, onClick = { menuExpanded = false; onDelete(expense.id) })
+                        DropdownMenuItem(
+                            text = { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) },
+                            onClick = { menuExpanded = false; onDelete(expense.id) },
+                        )
                     }
                 }
             }
@@ -1660,7 +1676,14 @@ private fun TripList(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                        Text(if (recording.paused) "หยุดชั่วคราว" else "กำลังบันทึกการเดินทาง", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (recording.paused) {
+                                stringResource(com.songsit.fuellogpro.R.string.trip_recording_paused)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.trip_recording_active)
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
                         Text(
                             "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
                             style = MaterialTheme.typography.headlineSmall,
@@ -1668,8 +1691,18 @@ private fun TripList(
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = {
                                 sendTripAction(if (recording.paused) com.songsit.fuellogpro.trip.TripRecordingService.ACTION_RESUME else com.songsit.fuellogpro.trip.TripRecordingService.ACTION_PAUSE)
-                            }) { Text(if (recording.paused) "ดำเนินการต่อ" else "หยุด") }
-                            Button(onClick = { sendTripAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_FINISH) }) { Text("เสร็จสิ้น") }
+                            }) {
+                                Text(
+                                    if (recording.paused) {
+                                        stringResource(com.songsit.fuellogpro.R.string.trip_resume)
+                                    } else {
+                                        stringResource(com.songsit.fuellogpro.R.string.trip_pause)
+                                    },
+                                )
+                            }
+                            Button(onClick = { sendTripAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_FINISH) }) {
+                                Text(stringResource(com.songsit.fuellogpro.R.string.trip_finish))
+                            }
                         }
                     }
                 }
@@ -1678,14 +1711,18 @@ private fun TripList(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                        Text("บันทึกการเดินทางเสร็จสิ้น", fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.trip_recording_done_title), fontWeight = FontWeight.Bold)
                         Text(
                             "%.2f กม. • %d:%02d".format(Locale.US, recording.distanceKm, recording.elapsedSeconds / 60, recording.elapsedSeconds % 60),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { com.songsit.fuellogpro.trip.TripRecordingState.reset() }) { Text("ยกเลิก") }
-                            Button(onClick = { onSaveRecordedTrip?.invoke(recording.distanceKm) }) { Text("เพิ่มเป็นทริป") }
+                            TextButton(onClick = { com.songsit.fuellogpro.trip.TripRecordingState.reset() }) {
+                                Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel))
+                            }
+                            Button(onClick = { onSaveRecordedTrip?.invoke(recording.distanceKm) }) {
+                                Text(stringResource(com.songsit.fuellogpro.R.string.trip_add_as_trip))
+                            }
                         }
                     }
                 }
@@ -1695,7 +1732,7 @@ private fun TripList(
                 ) {
                     Icon(Icons.Filled.Route, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("เริ่มบันทึกการเดินทาง (GPS)")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.trip_start_recording))
                 }
             }
         }
@@ -1705,14 +1742,14 @@ private fun TripList(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text("${summary.tripCount} ทริป • ${number.format(summary.totalDistanceKm)} กม.")
+                    Text(stringResource(com.songsit.fuellogpro.R.string.trip_summary_line, summary.tripCount, number.format(summary.totalDistanceKm)))
                     Text(
                         thaiCurrency.format(summary.totalCost),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     summary.costPerKm?.let {
-                        Text("${number.format(it)} บาท/กม.", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.trip_cost_per_km, number.format(it)), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -1721,8 +1758,8 @@ private fun TripList(
             item {
                 Card(shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีทริป", fontWeight = FontWeight.Bold)
-                        Text("แตะ + เพื่อบันทึกการเดินทาง")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.trip_empty_title), fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.trip_empty_subtitle))
                     }
                 }
             }
@@ -1735,10 +1772,13 @@ private fun TripList(
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(trip.name, fontWeight = FontWeight.Bold)
-                        Text("${trip.date} • ${number.format(trip.distanceKm)} กม.", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(com.songsit.fuellogpro.R.string.trip_distance_line, trip.date, number.format(trip.distanceKm)),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                     Text(thaiCurrency.format(trip.totalCost), fontWeight = FontWeight.Bold)
-                    TextButton(onClick = { onDelete(trip.id) }) { Text("ลบ") }
+                    TextButton(onClick = { onDelete(trip.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) }
                 }
             }
         }
@@ -1764,8 +1804,8 @@ private fun MaintenanceList(
             item {
                 Card(shape = RoundedCornerShape(20.dp)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ยังไม่มีรายการดูแลรถ", fontWeight = FontWeight.Bold)
-                        Text("แตะ + เพื่อเพิ่มภาษี ประกัน หรืองานบำรุงรักษา")
+                        Text(stringResource(com.songsit.fuellogpro.R.string.maintenance_empty_title), fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.songsit.fuellogpro.R.string.maintenance_empty_subtitle))
                     }
                 }
             }
@@ -1791,13 +1831,13 @@ private fun MaintenanceList(
                         Text(status.label, fontWeight = FontWeight.SemiBold)
                     }
                     val due = listOfNotNull(
-                        task.nextDate?.let { "วันที่ $it" },
-                        task.nextOdometerKm?.let { "ที่ ${number.format(it)} กม." },
+                        task.nextDate?.let { stringResource(com.songsit.fuellogpro.R.string.maintenance_due_date, it) },
+                        task.nextOdometerKm?.let { stringResource(com.songsit.fuellogpro.R.string.maintenance_due_at_odo, number.format(it)) },
                     ).joinToString(" • ")
                     if (due.isNotBlank()) Text(due, style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { onDelete(task.id) }) { Text("ลบ") }
-                        Button(onClick = { onComplete(task.id) }) { Text("เสร็จแล้ว") }
+                        TextButton(onClick = { onDelete(task.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) }
+                        Button(onClick = { onComplete(task.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_done)) }
                     }
                 }
             }
@@ -1825,12 +1865,12 @@ private fun FuelRow(
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.station.ifBlank { "เติมน้ำมัน" }, fontWeight = FontWeight.SemiBold)
+                        Text(entry.station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.fuel_default_label) }, fontWeight = FontWeight.SemiBold)
                         if (!entry.photoUri.isNullOrBlank()) {
                             Spacer(Modifier.width(4.dp))
                             Icon(
                                 Icons.Filled.Image,
-                                contentDescription = "มีรูปแนบ",
+                                contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_has_photo),
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1847,11 +1887,11 @@ private fun FuelRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("${number.format(entry.liters)} ลิตร • ${number.format(entry.pricePerLiter)}/ลิตร")
-                    kmPerLiter?.let { Text("${number.format(it)} กม./ลิตร", style = MaterialTheme.typography.labelSmall) }
+                    Text(stringResource(com.songsit.fuellogpro.R.string.fuel_liters_price_line, number.format(entry.liters), number.format(entry.pricePerLiter)))
+                    kmPerLiter?.let { Text(stringResource(com.songsit.fuellogpro.R.string.fuel_efficiency_line, number.format(it)), style = MaterialTheme.typography.labelSmall) }
                 }
-                if (entry.fullTank) Text("เต็มถัง", color = MaterialTheme.colorScheme.tertiary)
-                onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text("ลบ") } }
+                if (entry.fullTank) Text(stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank), color = MaterialTheme.colorScheme.tertiary)
+                onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) } }
             }
         }
     }

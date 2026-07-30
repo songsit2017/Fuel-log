@@ -58,9 +58,9 @@ class MaintenanceReminderWorker(
                 val days = dueDate?.let { ChronoUnit.DAYS.between(today, it) }
                 if (days != null && days <= task.warningDays) {
                     messages += if (days < 0) {
-                        "เกินกำหนด ${-days} วัน"
+                        applicationContext.getString(R.string.maint_overdue_days, -days)
                     } else {
-                        "ถึงกำหนดใน $days วัน"
+                        applicationContext.getString(R.string.maint_due_in_days, days)
                     }
                 }
             }
@@ -71,9 +71,9 @@ class MaintenanceReminderWorker(
                     val remaining = dueOdometer - currentOdometer
                     if (remaining <= task.warningOdometerKm) {
                         messages += if (remaining < 0) {
-                            "เกินกำหนด ${formatKm(-remaining)} กม."
+                            applicationContext.getString(R.string.maint_overdue_km, formatKm(-remaining))
                         } else {
-                            "อีก ${formatKm(remaining)} กม."
+                            applicationContext.getString(R.string.maint_due_in_km, formatKm(remaining))
                         }
                     }
                 }
@@ -97,9 +97,9 @@ class MaintenanceReminderWorker(
                     id = notificationId,
                     title = expense.description.ifBlank { expense.category },
                     message = when {
-                        days < 0 -> "เลยวันเตือนชำระ ${-days} วัน"
-                        days == 0L -> "ถึงวันเตือนชำระวันนี้"
-                        else -> "ถึงวันเตือนชำระใน $days วัน"
+                        days < 0 -> applicationContext.getString(R.string.payment_overdue_days, -days)
+                        days == 0L -> applicationContext.getString(R.string.payment_due_today)
+                        else -> applicationContext.getString(R.string.payment_due_in_days, days)
                     },
                 )
                 activeNotificationIds += notificationId
@@ -145,10 +145,10 @@ class MaintenanceReminderWorker(
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "กำหนดดูแลรถ",
+                    context.getString(R.string.notification_channel_maintenance_name),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
-                    description = "แจ้งเตือนตามวันที่ เลขไมล์ และกำหนดชำระ"
+                    description = context.getString(R.string.notification_channel_maintenance_desc)
                 },
             )
             val request = PeriodicWorkRequestBuilder<MaintenanceReminderWorker>(1, TimeUnit.DAYS)

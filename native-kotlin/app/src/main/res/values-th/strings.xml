@@ -436,6 +436,17 @@
     <string name="station_your_visits">การเยี่ยมชมของคุณ: x%1$d</string>
     <string name="station_favorites_empty">ยังไม่มีรายการโปรด</string>
     <string name="station_map_coming_soon">ฟังก์ชันแผนที่กำลังมาเร็วๆ นี้</string>
+
+    <!-- MaintenanceReminderWorker (notifications) -->
+    <string name="maint_overdue_days">เกินกำหนด %1$d วัน</string>
+    <string name="maint_due_in_days">ถึงกำหนดใน %1$d วัน</string>
+    <string name="maint_overdue_km">เกินกำหนด %1$s กม.</string>
+    <string name="maint_due_in_km">อีก %1$s กม.</string>
+    <string name="payment_overdue_days">เลยวันเตือนชำระ %1$d วัน</string>
+    <string name="payment_due_today">ถึงวันเตือนชำระวันนี้</string>
+    <string name="payment_due_in_days">ถึงวันเตือนชำระใน %1$d วัน</string>
+    <string name="notification_channel_maintenance_name">กำหนดดูแลรถ</string>
+    <string name="notification_channel_maintenance_desc">แจ้งเตือนตามวันที่ เลขไมล์ และกำหนดชำระ</string>
     <string-array name="month_names_full">
         <item>มกราคม</item>
         <item>กุมภาพันธ์</item>

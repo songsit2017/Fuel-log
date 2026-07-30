@@ -458,6 +458,17 @@
     <string name="station_your_visits">Your visits: x%1$d</string>
     <string name="station_favorites_empty">No favorites yet</string>
     <string name="station_map_coming_soon">Map view is coming soon</string>
+
+    <!-- MaintenanceReminderWorker (notifications) -->
+    <string name="maint_overdue_days">%1$d day(s) overdue</string>
+    <string name="maint_due_in_days">Due in %1$d day(s)</string>
+    <string name="maint_overdue_km">%1$s km overdue</string>
+    <string name="maint_due_in_km">%1$s km remaining</string>
+    <string name="payment_overdue_days">%1$d day(s) past the reminder date</string>
+    <string name="payment_due_today">Payment reminder due today</string>
+    <string name="payment_due_in_days">Payment reminder due in %1$d day(s)</string>
+    <string name="notification_channel_maintenance_name">Vehicle maintenance</string>
+    <string name="notification_channel_maintenance_desc">Alerts based on due dates, odometer readings, and payment reminders</string>
     <string-array name="month_names_full">
         <item>January</item>
         <item>February</item>

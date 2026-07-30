@@ -59,4 +59,40 @@
     <string name="dialog_currency_title">Select currency</string>
     <string name="dialog_decimals_title">Decimal places</string>
     <string name="dialog_theme_title">Choose theme</string>
+
+    <!-- OtherSettingsScreen -->
+    <string name="other_settings_category_logging">Logging</string>
+    <string name="other_settings_full_tank_default_title">Full tank by default</string>
+    <string name="other_settings_full_tank_default_subtitle">Turn on the full-tank option automatically for new fill-ups</string>
+    <string name="other_settings_confirm_delete_title">Confirm before deleting</string>
+    <string name="other_settings_confirm_delete_subtitle">Ask for confirmation before deleting a vehicle, fill-up, expense, maintenance task, or trip</string>
+
+    <!-- ImportExportScreen -->
+    <string name="backup_json_title">Backup (JSON)</string>
+    <string name="backup_json_subtitle">Export all vehicle data to keep locally or share</string>
+    <string name="export_csv_title">Export CSV report</string>
+    <string name="export_csv_subtitle">Export report data as a CSV file for use in Excel</string>
+    <string name="import_data_title">Import data (.fuelio/JSON)</string>
+    <string name="import_data_subtitle">Supports Fuelio backup files (.fuelio) or this app\'s own JSON files</string>
+    <string name="drive_backup_title">Back up to Google Drive</string>
+    <string name="drive_backup_subtitle">Upload JSON and original photos to Drive/Android/FuelLog Pro (same layout as Fuelio)</string>
+    <string name="drive_restore_title">Restore from Google Drive</string>
+    <string name="drive_restore_subtitle">Fetch the latest backup; only matching records are updated, nothing existing is deleted</string>
+    <string name="drive_autosync_title">Automatic Google Drive sync</string>
+    <string name="drive_autosync_subtitle">Back up to Drive every time you add or edit data</string>
+    <string name="google_sync_category">Sync with Google</string>
+    <string name="google_signing_in">Signing in…</string>
+    <string name="google_sign_in_title">Sign in to Google Sync</string>
+    <string name="google_sync_subtitle">Sync vehicle data with your Google account</string>
+    <string name="google_connected_default">Connected to Google</string>
+    <string name="google_syncing">Syncing…</string>
+    <string name="google_tap_to_sync">Tap to sync now</string>
+    <string name="google_sign_out">Sign out</string>
+    <string name="sync_conflicts_category">Conflicts</string>
+    <string name="sync_conflicts_found">Found %1$d differing record(s); neither side has been overwritten yet</string>
+    <string name="use_all_local">Use all local data</string>
+    <string name="use_all_cloud">Use all cloud data</string>
+    <string name="sync_conflicts_showing_n_of">Showing 5 of %1$d</string>
+    <string name="use_local">Use local</string>
+    <string name="use_cloud">Use cloud</string>
 </resources>

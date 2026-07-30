@@ -2563,10 +2563,10 @@ private fun OtherSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("การตั้งค่าอื่น ๆ") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_other_title)) },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back))
                     }
                 },
             )
@@ -2576,11 +2576,11 @@ private fun OtherSettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader("การบันทึก") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_logging)) }
             item {
                 PreferenceListItem(
-                    title = "เติมเต็มถังเป็นค่าเริ่มต้น",
-                    subtitle = "เปิดตัวเลือกเต็มถังอัตโนมัติเมื่อเพิ่มรายการเติมน้ำมันใหม่",
+                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_subtitle),
                     trailing = {
                         Switch(
                             checked = settings.defaultFullTank,
@@ -2596,8 +2596,8 @@ private fun OtherSettingsScreen(
             }
             item {
                 PreferenceListItem(
-                    title = "ยืนยันก่อนลบ",
-                    subtitle = "ถามยืนยันก่อนลบรถ การเติมน้ำมัน ค่าใช้จ่าย งานบำรุงรักษา และทริป",
+                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_subtitle),
                     trailing = {
                         Switch(
                             checked = settings.confirmBeforeDelete,
@@ -2640,9 +2640,9 @@ private fun ImportExportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("แบ็คอัพข้อมูล (Import/Export options)") },
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_back)) }
                 },
             )
         },
@@ -2651,27 +2651,27 @@ private fun ImportExportScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader("สร้าง/กู้คืน") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title)) }
             item {
                 PreferenceListItem(
-                    title = "สำรองข้อมูล (JSON)",
-                    subtitle = "ส่งออกข้อมูลรถทั้งหมดเก็บไว้ในเครื่องหรือแชร์ต่อ",
+                    title = stringResource(com.songsit.fuellogpro.R.string.backup_json_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.backup_json_subtitle),
                     leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = onExportBackup,
                 )
             }
             item {
                 PreferenceListItem(
-                    title = "ส่งออกรายงาน CSV",
-                    subtitle = "ส่งออกข้อมูลรายงานเป็นไฟล์ CSV เพื่อนำไปใช้ต่อใน Excel",
+                    title = stringResource(com.songsit.fuellogpro.R.string.export_csv_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.export_csv_subtitle),
                     leading = { Icon(Icons.Filled.ListAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = onExportCsv,
                 )
             }
             item {
                 PreferenceListItem(
-                    title = "นำเข้าข้อมูล (.fuelio/JSON)",
-                    subtitle = "รองรับไฟล์สำรองจาก Fuelio (.fuelio) หรือไฟล์ JSON ของแอปนี้",
+                    title = stringResource(com.songsit.fuellogpro.R.string.import_data_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.import_data_subtitle),
                     leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = onImportBackup,
                 )
@@ -2679,8 +2679,8 @@ private fun ImportExportScreen(
             if (onDriveBackup != null) {
                 item {
                     PreferenceListItem(
-                        title = "สำรองข้อมูล Google ไดรฟ์",
-                        subtitle = "อัปโหลด JSON และรูปต้นฉบับไปที่ Drive/Android/FuelLog Pro (แบบเดียวกับ Fuelio)",
+                        title = stringResource(com.songsit.fuellogpro.R.string.drive_backup_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_backup_subtitle),
                         leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = onDriveBackup,
                     )
@@ -2689,8 +2689,8 @@ private fun ImportExportScreen(
             if (onDriveRestore != null) {
                 item {
                     PreferenceListItem(
-                        title = "ดาวน์โหลดจาก Google ไดรฟ์",
-                        subtitle = "ดึงไฟล์สำรองล่าสุด อัปเดตทับเฉพาะรายการเดียวกัน ไม่ลบข้อมูลเดิม",
+                        title = stringResource(com.songsit.fuellogpro.R.string.drive_restore_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_restore_subtitle),
                         leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = onDriveRestore,
                     )
@@ -2699,8 +2699,8 @@ private fun ImportExportScreen(
             if (onDriveAutoSyncChange != null) {
                 item {
                     PreferenceListItem(
-                        title = "ซิงค์อัตโนมัติ Google ไดรฟ์",
-                        subtitle = "สำรองไปไดรฟ์ทุกครั้งที่เพิ่ม/แก้ไขข้อมูล",
+                        title = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_subtitle),
                         leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailing = {
                             Switch(
@@ -2714,12 +2714,16 @@ private fun ImportExportScreen(
             }
 
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader("ซิงก์กับ Google") }
+            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.google_sync_category)) }
             if (cloudState.uid == null) {
                 item {
                     PreferenceListItem(
-                        title = if (cloudState.syncing) "กำลังเข้าสู่ระบบ…" else "เข้าสู่ระบบ Google Sync",
-                        subtitle = "ซิงก์ข้อมูลรถกับบัญชี Google ของคุณ",
+                        title = if (cloudState.syncing) {
+                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                        },
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.google_sync_subtitle),
                         leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = if (!cloudState.syncing) onGoogleSignIn else null,
                     )
@@ -2727,15 +2731,19 @@ private fun ImportExportScreen(
             } else {
                 item {
                     PreferenceListItem(
-                        title = cloudState.email ?: "เชื่อมต่อ Google แล้ว",
-                        subtitle = if (cloudState.syncing) "กำลังซิงก์…" else "แตะเพื่อซิงก์ตอนนี้",
+                        title = cloudState.email ?: stringResource(com.songsit.fuellogpro.R.string.google_connected_default),
+                        subtitle = if (cloudState.syncing) {
+                            stringResource(com.songsit.fuellogpro.R.string.google_syncing)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.google_tap_to_sync)
+                        },
                         leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = if (!cloudState.syncing) onCloudSync else null,
                     )
                 }
                 item {
                     PreferenceListItem(
-                        title = "ออกจากระบบ",
+                        title = stringResource(com.songsit.fuellogpro.R.string.google_sign_out),
                         leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                         onClick = onSignOut,
                     )
@@ -2754,10 +2762,10 @@ private fun ImportExportScreen(
 
             if (syncConflicts.isNotEmpty()) {
                 item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-                item { PreferenceCategoryHeader("รายการที่ขัดแย้งกัน") }
+                item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_category)) }
                 item {
                     Text(
-                        "พบ ${syncConflicts.size} รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง",
+                        stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -2772,18 +2780,18 @@ private fun ImportExportScreen(
                             onClick = { onResolveAllConflicts(true) },
                             enabled = !cloudState.syncing,
                             modifier = Modifier.weight(1f),
-                        ) { Text("ใช้ข้อมูลในเครื่องทั้งหมด") }
+                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_local)) }
                         OutlinedButton(
                             onClick = { onResolveAllConflicts(false) },
                             enabled = !cloudState.syncing,
                             modifier = Modifier.weight(1f),
-                        ) { Text("ใช้ข้อมูล Cloud ทั้งหมด") }
+                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_cloud)) }
                     }
                 }
                 if (syncConflicts.size > 5) {
                     item {
                         Text(
-                            "แสดง 5 จากทั้งหมด ${syncConflicts.size} รายการ",
+                            stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_showing_n_of, syncConflicts.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -2804,11 +2812,11 @@ private fun ImportExportScreen(
                                 TextButton(
                                     onClick = { onResolveConflict(conflict.key, true) },
                                     enabled = !cloudState.syncing,
-                                ) { Text("ใช้ข้อมูลในเครื่อง") }
+                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_local)) }
                                 TextButton(
                                     onClick = { onResolveConflict(conflict.key, false) },
                                     enabled = !cloudState.syncing,
-                                ) { Text("ใช้ข้อมูล Cloud") }
+                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_cloud)) }
                             }
                         }
                     }

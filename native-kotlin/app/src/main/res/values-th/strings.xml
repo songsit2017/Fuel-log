@@ -53,4 +53,38 @@
     <string name="dialog_currency_title">เลือกสกุลเงิน</string>
     <string name="dialog_decimals_title">จำนวนทศนิยม</string>
     <string name="dialog_theme_title">เลือกธีม</string>
+
+    <string name="other_settings_category_logging">การบันทึก</string>
+    <string name="other_settings_full_tank_default_title">เติมเต็มถังเป็นค่าเริ่มต้น</string>
+    <string name="other_settings_full_tank_default_subtitle">เปิดตัวเลือกเต็มถังอัตโนมัติเมื่อเพิ่มรายการเติมน้ำมันใหม่</string>
+    <string name="other_settings_confirm_delete_title">ยืนยันก่อนลบ</string>
+    <string name="other_settings_confirm_delete_subtitle">ถามยืนยันก่อนลบรถ การเติมน้ำมัน ค่าใช้จ่าย งานบำรุงรักษา และทริป</string>
+
+    <string name="backup_json_title">สำรองข้อมูล (JSON)</string>
+    <string name="backup_json_subtitle">ส่งออกข้อมูลรถทั้งหมดเก็บไว้ในเครื่องหรือแชร์ต่อ</string>
+    <string name="export_csv_title">ส่งออกรายงาน CSV</string>
+    <string name="export_csv_subtitle">ส่งออกข้อมูลรายงานเป็นไฟล์ CSV เพื่อนำไปใช้ต่อใน Excel</string>
+    <string name="import_data_title">นำเข้าข้อมูล (.fuelio/JSON)</string>
+    <string name="import_data_subtitle">รองรับไฟล์สำรองจาก Fuelio (.fuelio) หรือไฟล์ JSON ของแอปนี้</string>
+    <string name="drive_backup_title">สำรองข้อมูล Google ไดรฟ์</string>
+    <string name="drive_backup_subtitle">อัปโหลด JSON และรูปต้นฉบับไปที่ Drive/Android/FuelLog Pro (แบบเดียวกับ Fuelio)</string>
+    <string name="drive_restore_title">ดาวน์โหลดจาก Google ไดรฟ์</string>
+    <string name="drive_restore_subtitle">ดึงไฟล์สำรองล่าสุด อัปเดตทับเฉพาะรายการเดียวกัน ไม่ลบข้อมูลเดิม</string>
+    <string name="drive_autosync_title">ซิงค์อัตโนมัติ Google ไดรฟ์</string>
+    <string name="drive_autosync_subtitle">สำรองไปไดรฟ์ทุกครั้งที่เพิ่ม/แก้ไขข้อมูล</string>
+    <string name="google_sync_category">ซิงก์กับ Google</string>
+    <string name="google_signing_in">กำลังเข้าสู่ระบบ…</string>
+    <string name="google_sign_in_title">เข้าสู่ระบบ Google Sync</string>
+    <string name="google_sync_subtitle">ซิงก์ข้อมูลรถกับบัญชี Google ของคุณ</string>
+    <string name="google_connected_default">เชื่อมต่อ Google แล้ว</string>
+    <string name="google_syncing">กำลังซิงก์…</string>
+    <string name="google_tap_to_sync">แตะเพื่อซิงก์ตอนนี้</string>
+    <string name="google_sign_out">ออกจากระบบ</string>
+    <string name="sync_conflicts_category">รายการที่ขัดแย้งกัน</string>
+    <string name="sync_conflicts_found">พบ %1$d รายการที่ต่างกัน ระบบยังไม่เขียนทับทั้งสองฝั่ง</string>
+    <string name="use_all_local">ใช้ข้อมูลในเครื่องทั้งหมด</string>
+    <string name="use_all_cloud">ใช้ข้อมูล Cloud ทั้งหมด</string>
+    <string name="sync_conflicts_showing_n_of">แสดง 5 จากทั้งหมด %1$d รายการ</string>
+    <string name="use_local">ใช้ข้อมูลในเครื่อง</string>
+    <string name="use_cloud">ใช้ข้อมูล Cloud</string>
 </resources>

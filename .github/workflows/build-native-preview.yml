@@ -16,12 +16,20 @@ jobs:
     timeout-minutes: 35
     env:
       FUELLOG_VERSION_NAME: ${{ format('9.0.0-native-preview.{0}', github.run_number) }}
-      FUELLOG_VERSION_CODE: ${{ github.run_number }}
       RELEASE_TAG: ${{ format('v9.0.0-native-preview.{0}', github.run_number) }}
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute version code
+        # Shared across ALL native-kotlin workflows (preview + stable release) so it only ever
+        # goes up, regardless of which workflow's own run_number produced the last install —
+        # a per-workflow run_number caused a stable release to look like a downgrade to Android
+        # after a preview build with a higher run_number had been installed.
+        run: echo "FUELLOG_VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up Java
         uses: actions/setup-java@v5

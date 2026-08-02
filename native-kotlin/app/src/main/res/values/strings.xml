@@ -44,6 +44,16 @@
     <string name="settings_weather_title">Weather at fill-up</string>
     <string name="settings_ocr_title">Automatic receipt scanning</string>
     <string name="settings_source_code_title">Project source code</string>
+    <string name="settings_update_check_source_title">Update check</string>
+    <string name="settings_check_update_title">Check for updates</string>
+    <string name="settings_check_update_subtitle">Tap to check for a new version</string>
+    <string name="settings_check_update_checking">Checking…</string>
+    <string name="settings_check_update_up_to_date">You\'re on the latest version</string>
+    <string name="settings_check_update_found">Update available: %s</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">A new version (%s) is ready to download. Update now?</string>
+    <string name="action_download">Download</string>
+    <string name="action_skip_version">Skip this version</string>
 
     <!-- Settings dialogs: units / currency / decimals / theme -->
     <string name="action_ok">OK</string>

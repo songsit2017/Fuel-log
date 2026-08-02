@@ -281,6 +281,18 @@ fun FuelLogApp(
     var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var homeTab by remember { mutableIntStateOf(0) }
     var viewingImagePath by remember { mutableStateOf<String?>(null) }
+    var availableUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
+    val updateContext = LocalContext.current
+    LaunchedEffect(Unit) {
+        val prefs = com.songsit.fuellogpro.settings.UpdateCheckPreferences(updateContext)
+        val oneDayMillis = 24L * 60 * 60 * 1000
+        if (System.currentTimeMillis() - prefs.lastCheckedAtMillis() < oneDayMillis) return@LaunchedEffect
+        prefs.recordCheck(System.currentTimeMillis())
+        val update = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(com.songsit.fuellogpro.BuildConfig.VERSION_CODE)
+        if (update != null && update.versionCode != prefs.skippedVersionCode()) {
+            availableUpdate = update
+        }
+    }
     // Remembers which homeTab (e.g. 1=Timeline) the user jumped FROM when tapping a record card
     // to go to the FuelList (tab=1). null means the user arrived via normal bottom-nav/drawer tap,
     // so Back should return to homeTab=0 (Overview) as usual. Set to non-null only by the
@@ -379,6 +391,26 @@ fun FuelLogApp(
                     )
                     Text(stringResource(com.songsit.fuellogpro.R.string.drive_backup_progress, percent))
                 }
+            },
+        )
+    }
+    availableUpdate?.let { update ->
+        val updateUriHandler = LocalUriHandler.current
+        AlertDialog(
+            onDismissRequest = { availableUpdate = null },
+            title = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_title)) },
+            text = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_message, update.versionName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateUriHandler.openUri(update.downloadUrl)
+                    availableUpdate = null
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_download)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    com.songsit.fuellogpro.settings.UpdateCheckPreferences(updateContext).skipVersion(update.versionCode)
+                    availableUpdate = null
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_skip_version)) }
             },
         )
     }
@@ -2368,6 +2400,35 @@ private fun SettingsScreen(
                 )
             }
             item {
+                val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
+                var checkingUpdate by remember { mutableStateOf(false) }
+                var checkResult by remember { mutableStateOf<String?>(null) }
+                val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
+                val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
+                PreferenceListItem(
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
+                    subtitle = when {
+                        checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
+                        checkResult != null -> checkResult!!
+                        else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
+                    },
+                    onClick = {
+                        if (checkingUpdate) return@PreferenceListItem
+                        checkingUpdate = true
+                        checkResult = null
+                        checkUpdateScope.launch {
+                            val update = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
+                            checkingUpdate = false
+                            checkResult = if (update != null) {
+                                updateFoundFormat.format(update.versionName)
+                            } else {
+                                upToDateMessage
+                            }
+                        }
+                    },
+                )
+            }
+            item {
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
                     subtitle = "songsit2017 • songsit2017@gmail.com",
@@ -2391,6 +2452,7 @@ private fun SettingsScreen(
             item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API") }
             item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo") }
             item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI") }
+            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_update_check_source_title), subtitle = "GitHub Releases API") }
             item {
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),

@@ -39,6 +39,16 @@
     <string name="settings_weather_title">สภาพอากาศขณะเติมน้ำมัน</string>
     <string name="settings_ocr_title">สแกนใบเสร็จอัตโนมัติ</string>
     <string name="settings_source_code_title">ซอร์สโค้ดโปรเจกต์</string>
+    <string name="settings_update_check_source_title">ตรวจสอบอัปเดต</string>
+    <string name="settings_check_update_title">ตรวจสอบอัปเดต</string>
+    <string name="settings_check_update_subtitle">แตะเพื่อตรวจสอบเวอร์ชันใหม่</string>
+    <string name="settings_check_update_checking">กำลังตรวจสอบ…</string>
+    <string name="settings_check_update_up_to_date">เป็นเวอร์ชันล่าสุดแล้ว</string>
+    <string name="settings_check_update_found">มีอัปเดต: %s</string>
+    <string name="update_available_title">มีอัปเดตใหม่</string>
+    <string name="update_available_message">มีเวอร์ชันใหม่ (%s) พร้อมให้ดาวน์โหลด อัปเดตตอนนี้เลยไหม?</string>
+    <string name="action_download">ดาวน์โหลด</string>
+    <string name="action_skip_version">ข้ามเวอร์ชันนี้</string>
 
     <string name="action_ok">ตกลง</string>
     <string name="action_cancel">ยกเลิก</string>

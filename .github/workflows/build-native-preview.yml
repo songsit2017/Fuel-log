@@ -2,12 +2,6 @@ name: Build Native Kotlin Preview
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "native-kotlin/**"
-      - ".github/workflows/build-native-preview.yml"
 
 permissions:
   contents: write

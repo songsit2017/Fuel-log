@@ -17,11 +17,13 @@ data class UpdateInfo(
 /**
  * Checks GitHub Releases for a build newer than [currentVersionCode].
  *
- * Every release published by build-native-preview.yml is a prerelease tagged
- * `v9.0.0-native-preview.<run_number>`, where run_number IS the app's versionCode
- * (see FUELLOG_VERSION_CODE in the workflow). So `/releases/latest` (which ignores
- * prereleases) can't be used — this hits the releases list and takes the first
- * entry, which GitHub always returns most-recent-first.
+ * Both build-native-preview.yml (prerelease) and build-native-release.yml (stable) stamp
+ * their release body with a `<!-- versionCode: N -->` marker holding the real
+ * FUELLOG_VERSION_CODE (git rev-list count) baked into that build — the tag name can't be
+ * used since preview tags carry github.run_number, an unrelated counter, and stable tags
+ * (`v1.0.3`) don't carry any number at all. `/releases/latest` (which ignores prereleases)
+ * can't be used either — this hits the releases list and takes the first entry, which
+ * GitHub always returns most-recent-first regardless of prerelease status.
  */
 class UpdateChecker {
 
@@ -43,8 +45,9 @@ class UpdateChecker {
         if (releases.length() == 0) return null
         val latest = releases.getJSONObject(0)
         val tagName = latest.optString("tag_name", "")
-        val runNumber = VERSION_CODE_REGEX.find(tagName)?.groupValues?.get(1)?.toIntOrNull() ?: return null
-        if (runNumber <= currentVersionCode) return null
+        val releaseBody = latest.optString("body", "")
+        val versionCode = VERSION_CODE_REGEX.find(releaseBody)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        if (versionCode <= currentVersionCode) return null
 
         val assets = latest.optJSONArray("assets")
         val apkUrl = (0 until (assets?.length() ?: 0))
@@ -54,7 +57,7 @@ class UpdateChecker {
             ?: latest.optString("html_url")
 
         return UpdateInfo(
-            versionCode = runNumber,
+            versionCode = versionCode,
             versionName = latest.optString("name", tagName),
             downloadUrl = apkUrl,
             releaseNotesUrl = latest.optString("html_url"),
@@ -63,6 +66,6 @@ class UpdateChecker {
 
     private companion object {
         const val RELEASES_URL = "https://api.github.com/repos/songsit2017/Fuel-log/releases"
-        val VERSION_CODE_REGEX = Regex("""native-preview\.(\d+)""")
+        val VERSION_CODE_REGEX = Regex("""versionCode:\s*(\d+)""")
     }
 }

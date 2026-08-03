@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -79,7 +81,7 @@ private sealed class TimelineRow(val date: String, val sortKey: String) {
 fun TimelineScreen(
     state: NativeAppState,
     modifier: Modifier = Modifier,
-    onImageClick: (String) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onFuelRecordClick: (FuelEntry) -> Unit = {},
 ) {
     val rows = remember(state.entries, state.expenses) {
@@ -136,7 +138,7 @@ fun TimelineScreen(
 @Composable
 private fun TimelineEntryRow(
     row: TimelineRow,
-    onImageClick: (String) -> Unit,
+    onImageClick: (List<String>, Int) -> Unit,
     onFuelRecordClick: (FuelEntry) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -175,7 +177,7 @@ private fun TimelineEntryRow(
 }
 
 @Composable
-private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (String) -> Unit) {
+private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, Int) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
@@ -193,7 +195,7 @@ private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (String) -> Unit
 }
 
 @Composable
-private fun ExpenseTimelineContent(expense: Expense, onImageClick: (String) -> Unit) {
+private fun ExpenseTimelineContent(expense: Expense, onImageClick: (List<String>, Int) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -219,8 +221,9 @@ private fun ExpenseTimelineContent(expense: Expense, onImageClick: (String) -> U
 // Reuses the same decode-a-local-file-path pattern as PhotoAttachmentRow in FuelLogApp.kt,
 // but read-only and capped at 3 thumbnails per Item C/E.
 @Composable
-internal fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) -> Unit) {
+internal fun TimelineThumbnails(photoUris: List<String>, onImageClick: (List<String>, Int) -> Unit) {
     val context = LocalContext.current
+    val viewablePhotos = remember(photoUris) { photoUris.filterNot { isPdfPath(it) } }
     Row(
         modifier = Modifier.padding(top = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -230,7 +233,7 @@ internal fun TimelineThumbnails(photoUris: List<String>, onImageClick: (String) 
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.size(52.dp).clickable {
-                    if (isPdfPath(uri)) openPdfExternally(context, uri) else onImageClick(uri)
+                    if (isPdfPath(uri)) openPdfExternally(context, uri) else onImageClick(viewablePhotos, viewablePhotos.indexOf(uri))
                 },
             ) {
                 if (isPdfPath(uri)) {
@@ -269,28 +272,52 @@ fun openPdfExternally(context: android.content.Context, path: String) {
 // screens are toggled boolean/state like the rest of FuelLogApp.kt). dismissOnBackPress is the
 // Dialog default, so the system Back button already closes this without extra wiring.
 @Composable
-fun FullScreenImageViewer(imagePath: String, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null) {
+fun FullScreenImageViewer(
+    imagePaths: List<String>,
+    initialIndex: Int = 0,
+    onDismiss: () -> Unit,
+    onDelete: ((String) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(initialPage = initialIndex.coerceIn(0, (imagePaths.size - 1).coerceAtLeast(0))) { imagePaths.size }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            AsyncImage(
-                model = if (imagePath.startsWith("/")) java.io.File(imagePath) else imagePath,
-                contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_attached_photo),
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-            )
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                val imagePath = imagePaths[page]
+                AsyncImage(
+                    model = if (imagePath.startsWith("/")) java.io.File(imagePath) else imagePath,
+                    contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_attached_photo),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
             IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_close), tint = Color.White)
             }
             Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 if (onDelete != null) {
-                    IconButton(onClick = { onDelete(); onDismiss() }) {
+                    IconButton(onClick = { onDelete(imagePaths[pagerState.currentPage]); onDismiss() }) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_delete_photo), tint = Color.White)
                     }
                 }
-                IconButton(onClick = { scope.launch { shareTimelineImage(context, imagePath) } }) {
+                IconButton(onClick = { scope.launch { shareTimelineImage(context, imagePaths[pagerState.currentPage]) } }) {
                     Icon(Icons.Filled.Share, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_share), tint = Color.White)
+                }
+            }
+            if (imagePaths.size > 1) {
+                Row(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    repeat(imagePaths.size) { i ->
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (i == pagerState.currentPage) Color.White else Color.White.copy(alpha = 0.4f)),
+                        )
+                    }
                 }
             }
         }

@@ -280,7 +280,8 @@ fun FuelLogApp(
     var dashboardFabExpanded by remember { mutableStateOf(false) }
     var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var homeTab by remember { mutableIntStateOf(0) }
-    var viewingImagePath by remember { mutableStateOf<String?>(null) }
+    var viewingImages by remember { mutableStateOf<List<String>>(emptyList()) }
+    var viewingImageIndex by remember { mutableIntStateOf(0) }
     var availableUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
     val updateContext = LocalContext.current
     LaunchedEffect(Unit) {
@@ -678,11 +679,11 @@ fun FuelLogApp(
         ) { padding ->
             when (tab) {
                 0 -> when (homeTab) {
-                    0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding), onImageClick = { viewingImagePath = it })
+                    0 -> Dashboard(state, onExportCsv, oilPriceInfo, Modifier.padding(padding), onImageClick = { images, index -> viewingImages = images; viewingImageIndex = index })
                     1 -> TimelineScreen(
                         state,
                         Modifier.padding(padding),
-                        onImageClick = { viewingImagePath = it },
+                        onImageClick = { images, index -> viewingImages = images; viewingImageIndex = index },
                         onFuelRecordClick = { fuelListReturnHomeTab = homeTab; tab = 1 },
                     )
                     2 -> TripCalculatorScreen(state, Modifier.padding(padding))
@@ -693,7 +694,7 @@ fun FuelLogApp(
                     { id -> requestDelete { onDeleteFuel(id) } },
                     { editingFuel = it },
                     Modifier.padding(padding),
-                    onImageClick = { viewingImagePath = it },
+                    onImageClick = { images, index -> viewingImages = images; viewingImageIndex = index },
                 )
                 2 -> ExpenseList(
                     expenses = state.expenses,
@@ -803,8 +804,12 @@ fun FuelLogApp(
         }
         }
     }
-    viewingImagePath?.let { path ->
-        FullScreenImageViewer(imagePath = path, onDismiss = { viewingImagePath = null })
+    if (viewingImages.isNotEmpty()) {
+        FullScreenImageViewer(
+            imagePaths = viewingImages,
+            initialIndex = viewingImageIndex,
+            onDismiss = { viewingImages = emptyList() },
+        )
     }
     }
     }
@@ -1116,7 +1121,7 @@ private fun Dashboard(
     onExportCsv: () -> Unit,
     oilPriceInfo: OilPriceInfo? = null,
     modifier: Modifier = Modifier,
-    onImageClick: ((String) -> Unit)? = null,
+    onImageClick: ((List<String>, Int) -> Unit)? = null,
 ) {
     val displaySettings = LocalDisplaySettings.current
     val kmPerLiterByEntry = remember(state.entries) { calculatePerEntryKmPerLiter(state.entries) }
@@ -1484,7 +1489,7 @@ private fun FuelList(
     onDelete: (String) -> Unit,
     onEdit: ((FuelEntry) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    onImageClick: ((String) -> Unit)? = null,
+    onImageClick: ((List<String>, Int) -> Unit)? = null,
 ) {
     val kmPerLiterByEntry = remember(entries) { calculatePerEntryKmPerLiter(entries) }
     // Grouped by month like the Timeline screen, so a long fuel history reads in the same
@@ -1901,7 +1906,7 @@ private fun FuelRow(
     // calculatePerEntryKmPerLiter() (domain/FuelSummary.kt) — the same formula the dashboard's
     // overall average uses, just keyed per entry instead of summed.
     kmPerLiter: Double? = null,
-    onImageClick: ((String) -> Unit)? = null,
+    onImageClick: ((List<String>, Int) -> Unit)? = null,
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -1918,7 +1923,7 @@ private fun FuelRow(
                 Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
             }
             if (entry.photoUrls.isNotEmpty()) {
-                TimelineThumbnails(entry.photoUrls, onImageClick ?: {})
+                TimelineThumbnails(entry.photoUrls, onImageClick ?: { _, _ -> })
             }
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
@@ -4181,7 +4186,8 @@ private fun PhotoAttachmentRow(
     onPickPdf: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    var fullScreenImageUri by remember { mutableStateOf<String?>(null) }
+    var fullScreenIndex by remember { mutableStateOf<Int?>(null) }
+    val viewablePhotos = remember(photoUris) { photoUris.filterNot { isPdfPath(it) } }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -4193,7 +4199,7 @@ private fun PhotoAttachmentRow(
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 modifier = Modifier.size(64.dp).clickable {
-                    if (isPdfPath(uri)) openPdfExternally(context, uri) else fullScreenImageUri = uri
+                    if (isPdfPath(uri)) openPdfExternally(context, uri) else fullScreenIndex = viewablePhotos.indexOf(uri)
                 },
             ) {
                 if (isPdfPath(uri)) {
@@ -4252,11 +4258,12 @@ private fun PhotoAttachmentRow(
         }
     }
 
-    fullScreenImageUri?.let { uri ->
+    fullScreenIndex?.let { index ->
         FullScreenImageViewer(
-            imagePath = uri,
-            onDismiss = { fullScreenImageUri = null },
-            onDelete = { onRemove(uri) },
+            imagePaths = viewablePhotos,
+            initialIndex = index,
+            onDismiss = { fullScreenIndex = null },
+            onDelete = { uri -> onRemove(uri) },
         )
     }
 }

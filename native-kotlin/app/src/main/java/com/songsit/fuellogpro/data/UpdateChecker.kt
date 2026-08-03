@@ -14,6 +14,14 @@ data class UpdateInfo(
     val releaseNotesUrl: String,
 )
 
+/** One published stable release, for the in-app changelog screen. */
+data class ReleaseNote(
+    val versionName: String,
+    val tagName: String,
+    val publishedAt: String,
+    val body: String,
+)
+
 /**
  * Checks GitHub Releases for a build newer than [currentVersionCode].
  *
@@ -39,6 +47,39 @@ class UpdateChecker {
             parse(body, currentVersionCode)
         }.getOrNull()
     }
+
+    /** All stable (non-prerelease) releases, newest first, for the in-app changelog screen. */
+    suspend fun fetchStableReleases(): List<ReleaseNote> = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL(RELEASES_URL).openConnection() as HttpURLConnection)
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 8_000
+            connection.readTimeout = 10_000
+            connection.setRequestProperty("Accept", "application/vnd.github+json")
+            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            connection.disconnect()
+            val releases = JSONArray(body)
+            (0 until releases.length())
+                .map { releases.getJSONObject(it) }
+                .filterNot { it.optBoolean("prerelease", false) }
+                .map { release ->
+                    val tagName = release.optString("tag_name", "")
+                    ReleaseNote(
+                        versionName = release.optString("name", tagName),
+                        tagName = tagName,
+                        publishedAt = release.optString("published_at", ""),
+                        body = cleanReleaseBody(release.optString("body", "")),
+                    )
+                }
+        }.getOrElse { emptyList() }
+    }
+
+    // Strips the machine-readable bits (versionCode marker, workflow-run link) that don't belong
+    // in a user-facing changelog — everything else in the body is meant to be read as-is.
+    private fun cleanReleaseBody(body: String): String = body.lineSequence()
+        .filterNot { it.contains("versionCode:") || it.contains("ดู workflow run") }
+        .joinToString("\n")
+        .trim()
 
     private fun parse(body: String, currentVersionCode: Int): UpdateInfo? {
         val releases = JSONArray(body)

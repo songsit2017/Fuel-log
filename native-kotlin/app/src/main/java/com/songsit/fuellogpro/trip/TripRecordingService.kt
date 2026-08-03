@@ -31,6 +31,7 @@ import java.util.Locale
 class TripRecordingService : Service() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var preferences: TripRecordingPreferences
     private var lastLocation: Location? = null
     private var distanceMeters = 0.0
     private var segmentStartElapsedMs = 0L
@@ -38,11 +39,17 @@ class TripRecordingService : Service() {
     private var recording = false
     private var paused = false
 
+    override fun onCreate() {
+        super.onCreate()
+        preferences = TripRecordingPreferences(this)
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private val tickRunnable = object : Runnable {
         override fun run() {
             publishState()
             updateNotification()
+            persistState()
             if (recording && !paused) handler.postDelayed(this, 1_000L)
         }
     }
@@ -61,6 +68,7 @@ class TripRecordingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startRecording()
+            ACTION_RESTORE -> restoreRecording()
             ACTION_PAUSE -> pauseRecording()
             ACTION_RESUME -> resumeRecording()
             ACTION_FINISH -> finishRecording()
@@ -87,6 +95,29 @@ class TripRecordingService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         requestLocationUpdates()
         handler.post(tickRunnable)
+        persistState()
+    }
+
+    // Restores counters from TripRecordingPreferences after the process was killed mid-trip and
+    // the user chose "resume" on the recovery dialog. Deliberately doesn't try to resume location
+    // updates from where they left off — like pause/resume, the gap since the last persisted tick
+    // just isn't counted, so a fresh lastLocation baseline (below) is correct, not a bug.
+    private fun restoreRecording() {
+        if (recording) return
+        val persisted = preferences.load()
+        if (!persisted.active) return
+        recording = true
+        paused = false
+        distanceMeters = persisted.distanceMeters
+        accumulatedElapsedMs = persisted.accumulatedElapsedMs
+        lastLocation = null
+        segmentStartElapsedMs = SystemClock.elapsedRealtime()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        ensureChannel()
+        startForeground(NOTIFICATION_ID, buildNotification())
+        requestLocationUpdates()
+        handler.post(tickRunnable)
+        persistState()
     }
 
     private fun pauseRecording() {
@@ -97,6 +128,7 @@ class TripRecordingService : Service() {
         lastLocation = null
         publishState()
         updateNotification()
+        persistState()
     }
 
     private fun resumeRecording() {
@@ -107,6 +139,7 @@ class TripRecordingService : Service() {
         handler.post(tickRunnable)
         publishState()
         updateNotification()
+        persistState()
     }
 
     private fun finishRecording() {
@@ -117,8 +150,25 @@ class TripRecordingService : Service() {
         handler.removeCallbacks(tickRunnable)
         runCatching { fusedLocationClient.removeLocationUpdates(locationCallback) }
         publishState()
+        // Not cleared here on purpose: distanceMeters/accumulatedElapsedMs stay persisted,
+        // representing "finished, not yet saved" — mirrors TripRecordingState's own
+        // active==false && distanceKm>0 convention — so that state also survives a kill before
+        // the user gets to tap "save as trip". Cleared once the user actually saves or discards
+        // (see the TripRecordingState.reset() call sites in FuelLogApp.kt).
+        persistState()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun persistState() {
+        preferences.save(
+            PersistedTripState(
+                active = recording,
+                paused = paused,
+                distanceMeters = distanceMeters,
+                accumulatedElapsedMs = elapsedMs(),
+            ),
+        )
     }
 
     private fun requestLocationUpdates() {
@@ -196,6 +246,7 @@ class TripRecordingService : Service() {
         private const val CHANNEL_ID = "trip-recording"
         private const val NOTIFICATION_ID = 9001
         const val ACTION_START = "com.songsit.fuellogpro.trip.START"
+        const val ACTION_RESTORE = "com.songsit.fuellogpro.trip.RESTORE"
         const val ACTION_PAUSE = "com.songsit.fuellogpro.trip.PAUSE"
         const val ACTION_RESUME = "com.songsit.fuellogpro.trip.RESUME"
         const val ACTION_FINISH = "com.songsit.fuellogpro.trip.FINISH"

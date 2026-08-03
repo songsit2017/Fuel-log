@@ -7,6 +7,9 @@ on:
         description: "Version name (semver, e.g. 1.0.0)"
         required: true
         default: "1.0.0"
+      changelog:
+        description: "What's new in this version (shown in the GitHub release and the app's in-app changelog)"
+        required: true
 
 permissions:
   contents: write
@@ -94,7 +97,8 @@ jobs:
           body: |
             ## FuelLog Pro ${{ env.FUELLOG_VERSION_NAME }} — Stable Release
 
-            รุ่น stable ตัวแรก ผ่านการทดสอบต่อเนื่องหลายวันโดยไม่พบบั๊กใหม่
+            ## มีอะไรใหม่ในเวอร์ชันนี้
+            ${{ github.event.inputs.changelog }}
 
             **ฟีเจอร์หลัก**
             - บันทึกการเติมน้ำมัน คำนวณอัตราสิ้นเปลืองและค่าใช้จ่ายอัตโนมัติ

@@ -32,6 +32,9 @@
     <string name="settings_developer_title">ผู้พัฒนา</string>
     <string name="settings_licenses_title">ใบอนุญาตเปิดแหล่งที่มา</string>
     <string name="settings_licenses_subtitle">ไลบรารีโอเพนซอร์สที่ใช้ในแอปพลิเคชันนี้</string>
+    <string name="settings_changelog_title">มีอะไรใหม่</string>
+    <string name="settings_changelog_subtitle">ประวัติเวอร์ชันและรายละเอียดการอัปเดต</string>
+    <string name="changelog_error">โหลดประวัติการอัปเดตไม่สำเร็จ ตรวจสอบการเชื่อมต่อแล้วลองใหม่</string>
     <string name="settings_category_data_sources">แหล่งที่มาข้อมูล</string>
     <string name="settings_oil_price_title">ราคาน้ำมันวันนี้</string>
     <string name="settings_oil_price_subtitle">บางจาก, ปตท., เชลล์ (Bangchak Open API)</string>
@@ -155,6 +158,9 @@
     <string name="trip_empty_title">ยังไม่มีทริป</string>
     <string name="trip_empty_subtitle">แตะ + เพื่อบันทึกการเดินทาง</string>
     <string name="trip_distance_line">%1$s • %2$s กม.</string>
+    <string name="trip_recovery_title">พบทริปที่บันทึกค้างไว้</string>
+    <string name="trip_recovery_message">แอปถูกปิดระหว่างบันทึกการเดินทาง (ระยะทาง %1$s กม.) ต้องการดำเนินการต่อ บันทึกเป็นทริปที่เสร็จแล้ว หรือทิ้งไป?</string>
+    <string name="trip_recovery_discard">ทิ้ง</string>
     <string name="maintenance_empty_title">ยังไม่มีรายการดูแลรถ</string>
     <string name="maintenance_empty_subtitle">แตะ + เพื่อเพิ่มภาษี ประกัน หรืองานบำรุงรักษา</string>
     <string name="maintenance_due_date">วันที่ %1$s</string>
@@ -475,6 +481,7 @@
     <string name="error_location_permission_nearby">กรุณาอนุญาตตำแหน่งเพื่อค้นหาปั๊มใกล้ฉัน</string>
     <string name="error_location_permission_weather">กรุณาอนุญาตตำแหน่งเพื่อดึงสภาพอากาศ</string>
     <string name="error_location_permission_trip">กรุณาอนุญาตตำแหน่งเพื่อบันทึกการเดินทาง</string>
+    <string name="error_trip_coarse_location_warning">อนุญาตเฉพาะตำแหน่งโดยประมาณ ระยะทางที่บันทึกอาจไม่แม่นยำ</string>
     <string name="error_open_destination_file">ไม่สามารถเปิดไฟล์ปลายทางได้</string>
     <string name="backup_success">สำรองข้อมูลเรียบร้อย</string>
     <string name="backup_failed">สำรองข้อมูลไม่สำเร็จ</string>

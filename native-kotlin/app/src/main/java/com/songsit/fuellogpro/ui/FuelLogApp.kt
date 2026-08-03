@@ -294,6 +294,17 @@ fun FuelLogApp(
             availableUpdate = update
         }
     }
+    // If TripRecordingService was killed along with the whole app process mid-trip, its counters
+    // only survive in TripRecordingPreferences — TripRecordingState (in-memory) comes back up
+    // blank on a cold start. Only prompt when the live state is genuinely inactive, so this never
+    // interrupts a trip that's still actively being recorded by a service that's still alive.
+    var tripRecoveryPrompt by remember { mutableStateOf<com.songsit.fuellogpro.trip.PersistedTripState?>(null) }
+    LaunchedEffect(Unit) {
+        val persisted = com.songsit.fuellogpro.trip.TripRecordingPreferences(updateContext).load()
+        if (persisted.active && !com.songsit.fuellogpro.trip.TripRecordingState.status.value.active) {
+            tripRecoveryPrompt = persisted
+        }
+    }
     // Remembers which homeTab (e.g. 1=Timeline) the user jumped FROM when tapping a record card
     // to go to the FuelList (tab=1). null means the user arrived via normal bottom-nav/drawer tap,
     // so Back should return to homeTab=0 (Overview) as usual. Set to non-null only by the
@@ -732,6 +743,7 @@ fun FuelLogApp(
                         prefillTripDistanceKm = distanceKm
                         showAddTrip = true
                         com.songsit.fuellogpro.trip.TripRecordingState.reset()
+                        com.songsit.fuellogpro.trip.TripRecordingPreferences(updateContext).clear()
                     },
                     modifier = Modifier.padding(padding),
                 )
@@ -771,6 +783,47 @@ fun FuelLogApp(
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingDeleteAction = null }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) }
+                },
+            )
+        }
+        tripRecoveryPrompt?.let { persisted ->
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(com.songsit.fuellogpro.R.string.trip_recovery_title)) },
+                text = {
+                    Text(
+                        stringResource(
+                            com.songsit.fuellogpro.R.string.trip_recovery_message,
+                            "%.2f".format(Locale.US, persisted.distanceMeters / 1000.0),
+                        ),
+                    )
+                },
+                confirmButton = {
+                    Row {
+                        TextButton(onClick = {
+                            tripRecoveryPrompt = null
+                            com.songsit.fuellogpro.trip.TripRecordingState.update {
+                                it.copy(
+                                    active = false,
+                                    paused = false,
+                                    distanceKm = persisted.distanceMeters / 1000.0,
+                                    elapsedSeconds = persisted.accumulatedElapsedMs / 1000,
+                                )
+                            }
+                        }) { Text(stringResource(com.songsit.fuellogpro.R.string.trip_add_as_trip)) }
+                        TextButton(onClick = {
+                            tripRecoveryPrompt = null
+                            val intent = android.content.Intent(updateContext, com.songsit.fuellogpro.trip.TripRecordingService::class.java)
+                                .setAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_RESTORE)
+                            androidx.core.content.ContextCompat.startForegroundService(updateContext, intent)
+                        }) { Text(stringResource(com.songsit.fuellogpro.R.string.trip_resume)) }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        tripRecoveryPrompt = null
+                        com.songsit.fuellogpro.trip.TripRecordingPreferences(updateContext).clear()
+                    }) { Text(stringResource(com.songsit.fuellogpro.R.string.trip_recovery_discard), color = MaterialTheme.colorScheme.error) }
                 },
             )
         }
@@ -987,6 +1040,7 @@ private fun NearbyStationsMapScreen(
     oilPriceInfo: OilPriceInfo?,
     modifier: Modifier = Modifier,
 ) {
+    val displaySettings = LocalDisplaySettings.current
     var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1033,7 +1087,7 @@ private fun NearbyStationsMapScreen(
                                 shadowElevation = 3.dp,
                             ) {
                                 Text(
-                                    text = "฿" + "%.2f".format(Locale.US, price),
+                                    text = formatCurrencyAmount(price, displaySettings),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
@@ -1756,7 +1810,10 @@ private fun TripList(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { com.songsit.fuellogpro.trip.TripRecordingState.reset() }) {
+                            TextButton(onClick = {
+                                com.songsit.fuellogpro.trip.TripRecordingState.reset()
+                                com.songsit.fuellogpro.trip.TripRecordingPreferences(context).clear()
+                            }) {
                                 Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel))
                             }
                             Button(onClick = { onSaveRecordedTrip?.invoke(recording.distanceKm) }) {
@@ -2231,6 +2288,7 @@ private fun SettingsScreen(
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
     var showOpenSourceLicenses by remember { mutableStateOf(false) }
+    var showChangelog by remember { mutableStateOf(false) }
     var showOtherSettings by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
@@ -2447,6 +2505,13 @@ private fun SettingsScreen(
                     onClick = { showOpenSourceLicenses = true }
                 )
             }
+            item {
+                PreferenceListItem(
+                    title = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_title),
+                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_subtitle),
+                    onClick = { showChangelog = true },
+                )
+            }
             item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) }
             item {
                 PreferenceListItem(
@@ -2471,6 +2536,12 @@ private fun SettingsScreen(
     if (showOpenSourceLicenses) {
         OpenSourceLicensesScreen(
             onDismiss = { showOpenSourceLicenses = false }
+        )
+    }
+
+    if (showChangelog) {
+        ChangelogScreen(
+            onDismiss = { showChangelog = false },
         )
     }
 

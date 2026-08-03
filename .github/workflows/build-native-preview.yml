@@ -2,6 +2,11 @@ name: Build Native Kotlin Preview
 
 on:
   workflow_dispatch:
+    inputs:
+      changelog:
+        description: "What's new in this build (optional — leave blank for the generic preview note)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -99,7 +104,7 @@ jobs:
           # The trailing HTML comment is parsed by UpdateChecker.kt to compare against
           # BuildConfig.VERSION_CODE — it can't reuse github.run_number from the tag name,
           # since versionCode is git rev-list count (see "Compute version code" step above).
-          body: "Native Kotlin Preview สำหรับทดสอบเท่านั้น ยังไม่แทน Stable APK ([ดู workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))\n\n<!-- versionCode: ${{ env.FUELLOG_VERSION_CODE }} -->"
+          body: "${{ github.event.inputs.changelog != '' && format('Native Kotlin Preview สำหรับทดสอบเท่านั้น ยังไม่แทน Stable APK\n\nมีอะไรใหม่: {0}', github.event.inputs.changelog) || 'Native Kotlin Preview สำหรับทดสอบเท่านั้น ยังไม่แทน Stable APK' }} ([ดู workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))\n\n<!-- versionCode: ${{ env.FUELLOG_VERSION_CODE }} -->"
           prerelease: true
           generate_release_notes: true
           files: FuelLog-Pro-*.apk

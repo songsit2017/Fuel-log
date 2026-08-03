@@ -37,6 +37,9 @@
     <string name="settings_developer_title">Developer</string>
     <string name="settings_licenses_title">Open-source licenses</string>
     <string name="settings_licenses_subtitle">Open-source libraries used in this app</string>
+    <string name="settings_changelog_title">What\'s new</string>
+    <string name="settings_changelog_subtitle">Version history and release notes</string>
+    <string name="changelog_error">Couldn\'t load update history — check your connection and try again</string>
     <string name="settings_category_data_sources">Data sources</string>
     <string name="settings_oil_price_title">Today\'s fuel prices</string>
     <string name="settings_oil_price_subtitle">Bangchak, PTT, Shell (Bangchak Open API)</string>
@@ -166,6 +169,9 @@
     <string name="trip_empty_title">No trips yet</string>
     <string name="trip_empty_subtitle">Tap + to log a trip</string>
     <string name="trip_distance_line">%1$s • %2$s km</string>
+    <string name="trip_recovery_title">Interrupted trip found</string>
+    <string name="trip_recovery_message">The app was closed while recording a trip (%1$s km so far). Resume tracking, save it as a finished trip, or discard it?</string>
+    <string name="trip_recovery_discard">Discard</string>
     <string name="maintenance_empty_title">No maintenance items yet</string>
     <string name="maintenance_empty_subtitle">Tap + to add tax, insurance, or a maintenance task</string>
     <string name="maintenance_due_date">Due %1$s</string>
@@ -497,6 +503,7 @@
     <string name="error_location_permission_nearby">Allow location access to find nearby stations</string>
     <string name="error_location_permission_weather">Allow location access to fetch weather</string>
     <string name="error_location_permission_trip">Allow location access to record a trip</string>
+    <string name="error_trip_coarse_location_warning">Only approximate location was granted — recorded trip distance may be inaccurate</string>
     <string name="error_open_destination_file">Couldn\'t open the destination file</string>
     <string name="backup_success">Backup saved</string>
     <string name="backup_failed">Backup failed</string>

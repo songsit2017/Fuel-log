@@ -410,6 +410,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startTripRecordingService() {
+        if (!hasFineLocationPermission()) {
+            Toast.makeText(this, getString(R.string.error_trip_coarse_location_warning), Toast.LENGTH_LONG).show()
+        }
         val intent = Intent(this, com.songsit.fuellogpro.trip.TripRecordingService::class.java)
             .setAction(com.songsit.fuellogpro.trip.TripRecordingService.ACTION_START)
         androidx.core.content.ContextCompat.startForegroundService(this, intent)
@@ -858,6 +861,11 @@ class MainActivity : AppCompatActivity() {
         val coarse = androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
         return fine == android.content.pm.PackageManager.PERMISSION_GRANTED ||
             coarse == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasFineLocationPermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     // Gets the device location, then queries the Overpass API for nearby amenity=fuel points.

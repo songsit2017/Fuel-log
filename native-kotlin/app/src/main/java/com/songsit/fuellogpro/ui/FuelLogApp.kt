@@ -286,9 +286,6 @@ fun FuelLogApp(
     val updateContext = LocalContext.current
     LaunchedEffect(Unit) {
         val prefs = com.songsit.fuellogpro.settings.UpdateCheckPreferences(updateContext)
-        val oneDayMillis = 24L * 60 * 60 * 1000
-        if (System.currentTimeMillis() - prefs.lastCheckedAtMillis() < oneDayMillis) return@LaunchedEffect
-        prefs.recordCheck(System.currentTimeMillis())
         val update = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(com.songsit.fuellogpro.BuildConfig.VERSION_CODE)
         if (update != null && update.versionCode != prefs.skippedVersionCode()) {
             availableUpdate = update
@@ -2465,28 +2462,35 @@ private fun SettingsScreen(
             item {
                 val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
                 var checkingUpdate by remember { mutableStateOf(false) }
-                var checkResult by remember { mutableStateOf<String?>(null) }
+                var checkedUpToDate by remember { mutableStateOf(false) }
+                var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
                 val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
+                val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
                 val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
                 PreferenceListItem(
                     title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
                     subtitle = when {
                         checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
-                        checkResult != null -> checkResult!!
+                        foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
+                        checkedUpToDate -> upToDateMessage
                         else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
                     },
                     onClick = {
                         if (checkingUpdate) return@PreferenceListItem
+                        // Once a check has found an update, tapping again downloads it instead of
+                        // re-checking — the row's subtitle already makes this action explicit.
+                        val update = foundUpdate
+                        if (update != null) {
+                            uriHandler.openUri(update.downloadUrl)
+                            return@PreferenceListItem
+                        }
                         checkingUpdate = true
-                        checkResult = null
+                        checkedUpToDate = false
                         checkUpdateScope.launch {
-                            val update = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
+                            val result = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
                             checkingUpdate = false
-                            checkResult = if (update != null) {
-                                updateFoundFormat.format(update.versionName)
-                            } else {
-                                upToDateMessage
-                            }
+                            checkedUpToDate = result == null
+                            foundUpdate = result
                         }
                     },
                 )

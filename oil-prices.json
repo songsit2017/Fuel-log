@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-08-06T14:58:31.641975+00:00",
+  "fetchedAt": "2026-08-07T00:43:57.437868+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -8,7 +8,7 @@
       "BannerUrl": "",
       "BannerPoint": "https://webbcpopaprd001.azurewebsites.net/ApiGetImages?FileName=133786018442015734.png",
       "BannerUrlPoint": "https://www.bcpgreenmiles.com/th/promotions/180/SamePrice_Jul2025",
-      "OilDateNow": "06/08/2569",
+      "OilDateNow": "07/08/2569",
       "OilPriceDate": "05/08/2569",
       "OilPriceTime": "20:10",
       "OilMessageDate": "05/08/2569",
@@ -36,7 +36,7 @@
     },
     "shell": {
       "source": "https://www.pcauto.com/th/fuel-price/shell",
-      "updatedAt": "2026-08-06T14:58:31.624520+00:00",
+      "updatedAt": "2026-08-07T00:43:57.232798+00:00",
       "grades": {
         "gasohol_95": 37.95,
         "gasohol_91": 37.58,

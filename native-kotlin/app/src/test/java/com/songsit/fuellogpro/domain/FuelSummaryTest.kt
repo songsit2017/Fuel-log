@@ -29,6 +29,25 @@ class FuelSummaryTest {
 
         assertEquals(null, calculateFuelSummary(entries).averageKmPerLiter)
     }
+
+    @Test
+    fun partialFillUpsBetweenFullTanksCountTowardLiters() {
+        // full -> partial (not topped up) -> full: the partial's liters were still burned over
+        // the distance, so they must count even though the partial entry isn't itself an
+        // interval endpoint — this is the exact scenario a user hit where skipping them
+        // inflated km/L to an implausible 33+ km/L.
+        val entries = listOf(
+            fuel(id = "1", odometer = 10_000.0, liters = 30.0, amount = 1_000.0),
+            fuel(id = "2", odometer = 10_200.0, liters = 10.0, amount = 350.0, full = false),
+            fuel(id = "3", odometer = 10_450.0, liters = 20.0, amount = 700.0),
+        )
+
+        val summary = calculateFuelSummary(entries)
+
+        // distance 450 km / liters (10 partial + 20 full) = 15.0 km/L, not 450/20 = 22.5 km/L
+        assertEquals(15.0, summary.averageKmPerLiter!!, 0.001)
+        assertEquals(15.0, calculatePerEntryKmPerLiter(entries)["3"]!!, 0.001)
+    }
 }
 
 private fun fuel(

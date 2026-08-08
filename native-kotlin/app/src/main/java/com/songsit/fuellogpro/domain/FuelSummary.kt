@@ -9,23 +9,39 @@ data class FuelSummary(
     val averageKmPerLiter: Double?,
 )
 
-private fun orderedFullTankEntries(entries: List<FuelEntry>): List<FuelEntry> =
-    entries.sortedWith(compareBy<FuelEntry>({ it.date }, { it.time }, { it.odometerKm })).filter { it.fullTank }
+private fun orderedEntries(entries: List<FuelEntry>): List<FuelEntry> =
+    entries.sortedWith(compareBy({ it.date }, { it.time }, { it.odometerKm }))
 
-fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
-    val fullEntries = orderedFullTankEntries(entries)
-    var distance = 0.0
-    var liters = 0.0
-    for (index in 1 until fullEntries.size) {
-        val previous = fullEntries[index - 1]
-        val current = fullEntries[index]
-        if (current.missedPreviousFillUp) continue
+/**
+ * Full-to-full km/L intervals: distance between two full-tank fill-ups, but liters summed
+ * across EVERY fill-up in between (partial fill-ups included), not just the closing full
+ * tank's own liters. The full-to-full method only works because a partial fill-up's liters
+ * still went into the tank and got burned over that distance — dropping them understates
+ * liters used and inflates km/L (e.g. a partial fill-up skipped, then a full one right after,
+ * used to report an implausibly high figure).
+ */
+private fun fullTankIntervals(entries: List<FuelEntry>): List<Triple<FuelEntry, Double, Double>> {
+    val ordered = orderedEntries(entries)
+    val fullIndices = ordered.withIndex().filter { it.value.fullTank }.map { it.index }
+    val result = mutableListOf<Triple<FuelEntry, Double, Double>>()
+    for (i in 1 until fullIndices.size) {
+        val previous = ordered[fullIndices[i - 1]]
+        val current = ordered[fullIndices[i]]
+        val segment = ordered.subList(fullIndices[i - 1] + 1, fullIndices[i] + 1)
+        if (segment.any { it.missedPreviousFillUp }) continue
         val intervalDistance = current.odometerKm - previous.odometerKm
-        if (intervalDistance > 0 && current.liters > 0) {
-            distance += intervalDistance
-            liters += current.liters
+        val segmentLiters = segment.sumOf { it.liters }
+        if (intervalDistance > 0 && segmentLiters > 0) {
+            result += Triple(current, intervalDistance, segmentLiters)
         }
     }
+    return result
+}
+
+fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
+    val intervals = fullTankIntervals(entries)
+    val distance = intervals.sumOf { it.second }
+    val liters = intervals.sumOf { it.third }
     return FuelSummary(
         totalSpent = entries.sumOf { it.amount },
         totalLiters = entries.sumOf { it.liters },
@@ -35,25 +51,12 @@ fun calculateFuelSummary(entries: List<FuelEntry>): FuelSummary {
 }
 
 /**
- * Item A (per-entry km/L): keyed by fill-up id instead of summed across all fill-ups, using
- * the exact same "distance since previous full-tank fill-up / liters of the current fill-up"
- * formula calculateFuelSummary() aggregates above — so a fuel-list row can show its own figure
- * without reimplementing the math.
+ * Item A (per-entry km/L): keyed by the closing full-tank fill-up's id, using the same
+ * full-to-full interval calculateFuelSummary() aggregates above — so a fuel-list row can show
+ * its own figure without reimplementing the math.
  */
-fun calculatePerEntryKmPerLiter(entries: List<FuelEntry>): Map<String, Double> {
-    val fullEntries = orderedFullTankEntries(entries)
-    val result = mutableMapOf<String, Double>()
-    for (index in 1 until fullEntries.size) {
-        val previous = fullEntries[index - 1]
-        val current = fullEntries[index]
-        if (current.missedPreviousFillUp) continue
-        val intervalDistance = current.odometerKm - previous.odometerKm
-        if (intervalDistance > 0 && current.liters > 0) {
-            result[current.id] = intervalDistance / current.liters
-        }
-    }
-    return result
-}
+fun calculatePerEntryKmPerLiter(entries: List<FuelEntry>): Map<String, Double> =
+    fullTankIntervals(entries).associate { (current, distance, liters) -> current.id to distance / liters }
 
 data class FuelEfficiencyAlert(
     val latestKmPerLiter: Double,
@@ -77,7 +80,8 @@ fun checkFuelEfficiencyDrop(
     if (!newEntry.fullTank || newEntry.missedPreviousFillUp) return null
     val kmPerLiterById = calculatePerEntryKmPerLiter(priorEntries + newEntry)
     val latest = kmPerLiterById[newEntry.id] ?: return null
-    val priorValues = orderedFullTankEntries(priorEntries)
+    val priorValues = orderedEntries(priorEntries)
+        .filter { it.fullTank }
         .mapNotNull { kmPerLiterById[it.id] }
         .takeLast(5)
     if (priorValues.size < minPriorSamples) return null

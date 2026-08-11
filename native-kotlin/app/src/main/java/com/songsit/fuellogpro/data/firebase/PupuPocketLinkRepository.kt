@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: CROSS-APP PAIRING SECURITY BOUNDARY
+// This client calls the authenticated Firebase pairing adapter. Read
+// /ARCHITECTURE.md before changing region, code format, auth, or vehicle IDs.
+// Never move server credentials or Supabase service-role access into the APK.
+// ============================================================================
 package com.songsit.fuellogpro.data.firebase
 
 import com.google.firebase.auth.FirebaseAuth

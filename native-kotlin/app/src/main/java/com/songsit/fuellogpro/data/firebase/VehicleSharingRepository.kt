@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: VEHICLE FAMILY-SHARING AUTHORIZATION CONTRACT
+// members/memberUids/roles/invites must stay aligned with firestore.rules and the
+// PU Pocket pairing membership check. Read /ARCHITECTURE.md before changing them.
+// This is separate from PU Pocket's finance-family sharing; never merge the two.
+// ============================================================================
 package com.songsit.fuellogpro.data.firebase
 
 import android.content.Context

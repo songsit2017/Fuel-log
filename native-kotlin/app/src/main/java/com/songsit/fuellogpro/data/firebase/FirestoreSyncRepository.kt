@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: CROSS-APP SYNC CRITICAL PATH
+// This file owns Fuel Log's Room <-> Firestore mapping. Firestore entry writes
+// also trigger the PU Pocket bridge. Read /ARCHITECTURE.md before changing fields,
+// IDs, conflicts, tombstones, photo URLs, or pushFuelEntry save semantics.
+// ============================================================================
 package com.songsit.fuellogpro.data.firebase
 
 import android.content.Context

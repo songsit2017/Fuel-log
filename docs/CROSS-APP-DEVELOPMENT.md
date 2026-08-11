@@ -4,6 +4,8 @@ Last updated: 2026-08-11 (Asia/Bangkok)
 
 This is the shared operating agreement for `songsit2017/PUPU-Pocket` and `songsit2017/Fuel-log`. Keep a copy in both repositories and update both copies in the same change when the process or integration contract changes.
 
+Read the repository-root [`ARCHITECTURE.md`](../ARCHITECTURE.md) before changing any sync service, adapter, model, database contract, or sharing rule. This file defines the Git workflow; `ARCHITECTURE.md` defines how the production data flow works.
+
 ## Branch map
 
 | Repository | Production | Integration | Feature examples |

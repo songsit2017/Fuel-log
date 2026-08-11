@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: DO NOT MODIFY WITHOUT CROSS-APP SYNC IMPACT ANALYSIS
+// This is the server-side Firebase -> Supabase adapter for Fuel Log and PU Pocket.
+// Read /ARCHITECTURE.md before changing Firestore paths, mappings, IDs, money,
+// dates, deletes, receipt handling, authorization, RPCs, regions, or secrets.
+// ============================================================================
 'use strict';
 
 const { initializeApp } = require('firebase-admin/app');

@@ -1,6 +1,8 @@
 # Cross-app worktree workflow
 
-Use paired Git worktrees for every new feature so PU Pocket and Fuel Log can change together without switching branches or touching the clean `develop` control checkouts.
+Use a Codex-managed worktree for work contained to this repository. Create it as a Codex task so the worktree is managed by and visible in the Codex app. Codex Desktop uses the root `.worktreeinclude` only when creating these managed worktrees; in Fuel Log it copies the Git-ignored `native-kotlin/app/google-services.json` local build file.
+
+Use the command-line helper below when a feature needs paired PU Pocket and Fuel Log worktrees. It creates both worktrees together without switching branches or touching the clean `develop` control checkouts.
 
 ## Directory and branch convention
 
@@ -17,7 +19,7 @@ The control checkouts stay here and remain clean:
 
 Do not develop in the control checkouts. Never put one repository's worktree inside the other repository.
 
-## Create a paired worktree
+## Create paired command-line worktrees
 
 From either control checkout, run its tracked helper script:
 
@@ -30,7 +32,7 @@ Use `-BranchPrefix feature` for a human-created branch. Codex uses the default `
 
 The script refuses to proceed when a control checkout is dirty or not on `develop`, `origin/develop` is missing, a local/remote branch already exists, the slug is unsafe, or a target path already exists. It validates both repositories before creating either worktree.
 
-It also copies only the required, Git-ignored local build configuration into the new worktrees: PU Pocket's `local.properties` and Fuel Log's `native-kotlin/app/google-services.json`. It verifies that Git ignores each source before copying. Release keystores, signing properties, and passwords are never copied.
+The helper copies only the required, Git-ignored local build configuration into the new worktrees: PU Pocket's `local.properties` and Fuel Log's `native-kotlin/app/google-services.json`. It verifies that Git ignores each source before copying. This is separate from `.worktreeinclude`, which applies only to Codex-managed worktree copies. Release keystores, signing properties, and passwords are never copied.
 
 Manual equivalent:
 

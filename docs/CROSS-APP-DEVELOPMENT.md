@@ -18,18 +18,18 @@ Production branches contain only code intended for real users. Do not develop or
 For every feature:
 
 1. Fetch and verify a clean worktree with `git status -sb`.
-2. Create a feature branch from the latest `origin/develop`.
+2. Create paired feature worktrees from the latest `origin/develop` by following [`WORKTREE-WORKFLOW.md`](WORKTREE-WORKFLOW.md).
 3. If both apps change, use the same feature slug in both repositories.
 4. Open a Draft PR to `develop`; link the companion PR when there is one.
 5. Require CI, code review, and the relevant local/ADB checks before merge.
 6. Release only through a reviewed PR from `develop` to the production branch.
 7. Tag and publish only from the production commit.
 
-Example:
+Example (run from either clean control checkout):
 
 ```powershell
-git fetch origin --prune
-git switch -c agent/fuel-bridge-v2 --track origin/develop
+.\scripts\New-CrossAppWorktree.ps1 -FeatureSlug fuel-bridge-v2 -PlanOnly
+.\scripts\New-CrossAppWorktree.ps1 -FeatureSlug fuel-bridge-v2
 ```
 
 ## Ownership and integration contract

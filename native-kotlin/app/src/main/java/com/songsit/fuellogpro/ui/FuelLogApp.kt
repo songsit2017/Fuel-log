@@ -448,6 +448,7 @@ fun FuelLogApp(
             onDriveRestore = onDriveRestore,
             driveAutoSyncEnabled = driveAutoSyncEnabled,
             onDriveAutoSyncChange = onDriveAutoSyncChange,
+            vehicles = state.vehicles,
         )
     } else if (showAddVehicle || editingVehicle != null) {
         VehicleEditScreen(
@@ -1037,6 +1038,16 @@ private fun NearbyStationsMapScreen(
     oilPriceInfo: OilPriceInfo?,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val hasLocationPermission =
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     val displaySettings = LocalDisplaySettings.current
     var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
@@ -1062,8 +1073,12 @@ private fun NearbyStationsMapScreen(
         com.google.maps.android.compose.GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = com.google.maps.android.compose.MapProperties(isMyLocationEnabled = true),
-            uiSettings = com.google.maps.android.compose.MapUiSettings(myLocationButtonEnabled = true),
+            properties = com.google.maps.android.compose.MapProperties(
+                isMyLocationEnabled = hasLocationPermission,
+            ),
+            uiSettings = com.google.maps.android.compose.MapUiSettings(
+                myLocationButtonEnabled = hasLocationPermission,
+            ),
         ) {
             stations.forEach { station ->
                 val brand = remember(station.name) { detectStationBrand(station.name) }
@@ -2274,6 +2289,7 @@ private fun SettingsScreen(
     onDriveRestore: (() -> Unit)? = null,
     driveAutoSyncEnabled: Boolean = false,
     onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
+    vehicles: List<Vehicle> = emptyList(),
 ) {
     var showUnitDialog by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
@@ -2287,6 +2303,7 @@ private fun SettingsScreen(
     var showOpenSourceLicenses by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
     var showOtherSettings by remember { mutableStateOf(false) }
+    var showPupuPocketLink by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
 
@@ -2326,6 +2343,13 @@ private fun SettingsScreen(
             onDismiss = { showOtherSettings = false },
             reminderSettings = reminderSettings,
             onReminderSettingsChange = onReminderSettingsChange,
+        )
+        return
+    }
+    if (showPupuPocketLink) {
+        PupuPocketLinkDialog(
+            vehicles = vehicles,
+            onDismiss = { showPupuPocketLink = false },
         )
         return
     }
@@ -2444,13 +2468,61 @@ private fun SettingsScreen(
                         } else {
                             stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
                         },
-                        leading = { Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        leading = {
+                            Icon(
+                                Icons.Filled.People,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
                         onClick = { showFamilySharing = true },
                     )
                 }
             }
 
             // ── Category 3: about ───────────────────────────────────────────────
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item {
+                PreferenceCategoryHeader(
+                    stringResource(com.songsit.fuellogpro.R.string.settings_category_pupu_pocket),
+                )
+            }
+            if (cloudState.uid == null) {
+                item {
+                    PreferenceListItem(
+                        title = if (cloudState.syncing) {
+                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                        },
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_sign_in_subtitle),
+                        leading = {
+                            Icon(
+                                Icons.Filled.AccountCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                    )
+                }
+            } else {
+                item {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_subtitle),
+                        leading = {
+                            Icon(
+                                Icons.Filled.Sync,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        onClick = { showPupuPocketLink = true },
+                    )
+                }
+            }
+
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) }
             item {
@@ -3061,9 +3133,164 @@ private fun ImportExportScreen(
     }
 }
 
-// Dedicated family-sharing screen — pulled out of Settings' main list into its own screen (was
-// previously one cramped card mixed in with backup/sync controls) and restyled with real M3
-// list rows/cards to match the rest of the app.
+@Composable
+private fun VehicleSharingCard(
+    members: List<VehicleMember>,
+    onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+) {
+    var inviteEmail by remember { mutableStateOf("") }
+    var inviteRole by remember { mutableStateOf("editor") }
+    var inviteResult by remember { mutableStateOf<String?>(null) }
+    var inviteError by remember { mutableStateOf<String?>(null) }
+    var inviteBusy by remember { mutableStateOf(false) }
+    var joinCode by remember { mutableStateOf("") }
+    var joinResult by remember { mutableStateOf<String?>(null) }
+    var joinError by remember { mutableStateOf<String?>(null) }
+    var joinBusy by remember { mutableStateOf(false) }
+    val joinSuccessTemplate = stringResource(com.songsit.fuellogpro.R.string.family_join_success)
+    val inviteResultText = stringResource(
+        com.songsit.fuellogpro.R.string.family_invite_code_result,
+        inviteResult ?: "",
+    )
+
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(com.songsit.fuellogpro.R.string.family_share_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            if (members.isNotEmpty()) {
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.family_current_members),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                members.forEach { member ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(member.displayName.ifBlank { member.email }, fontWeight = FontWeight.SemiBold)
+                            if (member.email.isNotBlank()) {
+                                Text(member.email, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Text(member.role, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            } else {
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.family_no_members),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            if (onCreateInvite != null) {
+                HorizontalDivider()
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.family_create_invite),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                OutlinedTextField(
+                    value = inviteEmail,
+                    onValueChange = { inviteEmail = it },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.family_invite_email_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "editor" to stringResource(com.songsit.fuellogpro.R.string.family_role_editor),
+                        "viewer" to stringResource(com.songsit.fuellogpro.R.string.family_role_viewer),
+                    ).forEach { (value, label) ->
+                        if (inviteRole == value) {
+                            Button(onClick = { inviteRole = value }) { Text(label) }
+                        } else {
+                            TextButton(onClick = { inviteRole = value }) { Text(label) }
+                        }
+                    }
+                }
+                Button(
+                    enabled = !inviteBusy && inviteEmail.isNotBlank(),
+                    onClick = {
+                        inviteBusy = true
+                        inviteError = null
+                        inviteResult = null
+                        onCreateInvite(
+                            inviteEmail,
+                            inviteRole,
+                            { code -> inviteBusy = false; inviteResult = code },
+                            { message -> inviteBusy = false; inviteError = message },
+                        )
+                    },
+                ) {
+                    Text(
+                        if (inviteBusy) {
+                            stringResource(com.songsit.fuellogpro.R.string.family_creating_invite)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.family_create_invite_code)
+                        },
+                    )
+                }
+                if (inviteResult != null) {
+                    Text(inviteResultText, fontWeight = FontWeight.Bold)
+                }
+                inviteError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            if (onJoinByCode != null) {
+                HorizontalDivider()
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.family_join_by_code),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                OutlinedTextField(
+                    value = joinCode,
+                    onValueChange = { joinCode = it },
+                    label = { Text(stringResource(com.songsit.fuellogpro.R.string.family_invite_code_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    enabled = !joinBusy && joinCode.isNotBlank(),
+                    onClick = {
+                        joinBusy = true
+                        joinError = null
+                        joinResult = null
+                        onJoinByCode(
+                            joinCode,
+                            { vehicleName ->
+                                joinBusy = false
+                                joinResult = joinSuccessTemplate.format(vehicleName)
+                                joinCode = ""
+                            },
+                            { message -> joinBusy = false; joinError = message },
+                        )
+                    },
+                ) {
+                    Text(
+                        if (joinBusy) {
+                            stringResource(com.songsit.fuellogpro.R.string.family_joining)
+                        } else {
+                            stringResource(com.songsit.fuellogpro.R.string.family_join_action)
+                        },
+                    )
+                }
+                joinResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                joinError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+// Kept for compatibility with older navigation state. The Settings flow now uses the original
+// inline VehicleSharingCard again.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FamilySharingScreen(

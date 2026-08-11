@@ -711,4 +711,8 @@
     <string name="fuel_efficiency_alert_body_maintenance">Your last fill-up got %2$s km/L, %1$s%% below your average — and you have overdue maintenance, which is a likely cause. Worth checking tire pressure too.</string>
     <string name="other_settings_fuel_efficiency_alerts_title">Fuel efficiency alerts</string>
     <string name="other_settings_fuel_efficiency_alerts_subtitle">Notify when a fill-up\'s efficiency drops well below your average</string>
+    <string name="settings_category_pupu_pocket">PU Pocket</string>
+    <string name="settings_pupu_connect_title">Connect to PU Pocket</string>
+    <string name="settings_pupu_connect_subtitle">Automatically send fuel entries and receipt images</string>
+    <string name="settings_pupu_sign_in_subtitle">Sign in with Google before connecting to PU Pocket</string>
 </resources>

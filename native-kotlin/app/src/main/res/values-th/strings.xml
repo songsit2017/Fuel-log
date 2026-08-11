@@ -689,4 +689,8 @@
     <string name="fuel_efficiency_alert_body_maintenance">การเติมน้ำมันครั้งล่าสุดได้ %2$s กม./ลิตร ต่ำกว่าค่าเฉลี่ย %1$s%% และมีงานบำรุงรักษาที่เลยกำหนดอยู่ ซึ่งน่าจะเป็นสาเหตุหลัก ลองเช็คลมยางด้วย</string>
     <string name="other_settings_fuel_efficiency_alerts_title">แจ้งเตือนอัตราสิ้นเปลือง</string>
     <string name="other_settings_fuel_efficiency_alerts_subtitle">แจ้งเตือนเมื่ออัตราสิ้นเปลืองของการเติมน้ำมันครั้งล่าสุดต่ำกว่าค่าเฉลี่ยมาก</string>
+    <string name="settings_category_pupu_pocket">PU Pocket</string>
+    <string name="settings_pupu_connect_title">เชื่อมต่อกับ PU Pocket</string>
+    <string name="settings_pupu_connect_subtitle">ส่งรายการเติมน้ำมันและรูปใบเสร็จอัตโนมัติ</string>
+    <string name="settings_pupu_sign_in_subtitle">เข้าสู่ระบบ Google ก่อนเชื่อมต่อกับ PU Pocket</string>
 </resources>

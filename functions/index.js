@@ -2,11 +2,18 @@
 
 const { initializeApp } = require('firebase-admin/app');
 const { defineSecret } = require('firebase-functions/params');
+const { getFirestore } = require('firebase-admin/firestore');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const crypto = require('crypto');
 
 initializeApp();
 
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
+// The service-role key is used only inside Cloud Functions. It must be set with
+// `firebase functions:secrets:set SUPABASE_SERVICE_ROLE_KEY`, never in either APK.
+const supabaseUrl = defineSecret('SUPABASE_URL');
+const supabaseServiceRoleKey = defineSecret('SUPABASE_SERVICE_ROLE_KEY');
 const allowedMediaTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const requestWindows = new Map();
 let lastRateLimitSweep = 0;
@@ -61,6 +68,204 @@ exports.scanReceipt = onCall({
     console.warn('scanReceipt rejected', err?.code || 'unknown', err?.message || String(err));
     throw err;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Fuel Log -> PU Pocket bridge
+// ---------------------------------------------------------------------------
+
+const BRIDGE_REGION = 'asia-southeast1';
+const IMPORT_SOURCE = 'fuel_log';
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+
+function bridgeHeaders(contentType = 'application/json') {
+  return {
+    apikey: supabaseServiceRoleKey.value(),
+    Authorization: `Bearer ${supabaseServiceRoleKey.value()}`,
+    'Content-Type': contentType,
+  };
+}
+
+async function supabase(path, options = {}) {
+  const response = await fetch(`${supabaseUrl.value().replace(/\/$/, '')}${path}`, {
+    ...options,
+    headers: { ...bridgeHeaders(options.contentType), ...(options.headers || {}) },
+  });
+  const body = await response.text();
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${body.slice(0, 400)}`);
+  return body ? JSON.parse(body) : null;
+}
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function receiptUrls(entry) {
+  // Firestore already contains download URLs after Fuel Log's normal photo
+  // upload pass. A local path is deliberately never copied out of the device.
+  return String(entry.photoUri || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => /^https:\/\//i.test(value));
+}
+
+function transactionDate(entry) {
+  const date = String(entry.date || '');
+  const time = /^\d{2}:\d{2}$/.test(String(entry.time || '')) ? entry.time : '00:00';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Fuel entry has no valid date');
+  // Fuel Log dates are entered in Thailand, not in UTC.
+  return `${date}T${time}:00+07:00`;
+}
+
+function entryNote(entry, vehicle) {
+  const details = [
+    vehicle?.name || vehicle?.registration || 'Fuel Log',
+    entry.station,
+    Number.isFinite(Number(entry.liters)) ? `${Number(entry.liters)} L` : null,
+    Number.isFinite(Number(entry.price)) ? `฿${Number(entry.price)}/L` : null,
+  ].filter(Boolean);
+  return `เติมน้ำมัน • ${details.join(' • ')}`;
+}
+
+async function copyReceiptUrls(link, entryId, urls) {
+  const copied = [];
+  for (let index = 0; index < urls.length; index += 1) {
+    const source = urls[index];
+    try {
+      const download = await fetch(source);
+      if (!download.ok) throw new Error(`source returned ${download.status}`);
+      const length = Number(download.headers.get('content-length') || 0);
+      if (length > MAX_RECEIPT_BYTES) throw new Error('source image is too large');
+      const bytes = Buffer.from(await download.arrayBuffer());
+      if (bytes.length > MAX_RECEIPT_BYTES) throw new Error('source image is too large');
+      const contentType = download.headers.get('content-type') || 'image/jpeg';
+      if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(contentType)) {
+        throw new Error(`unsupported content type ${contentType}`);
+      }
+      const extension = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : contentType.includes('pdf') ? 'pdf' : 'jpg';
+      const path = `fuel-log/${link.user_id}/${link.vehicle_id}/${entryId}/${index + 1}.${extension}`;
+      const upload = await fetch(
+        `${supabaseUrl.value().replace(/\/$/, '')}/storage/v1/object/pupu-receipts/${path}`,
+        {
+          method: 'POST',
+          headers: { ...bridgeHeaders(contentType), 'x-upsert': 'true' },
+          body: bytes,
+        },
+      );
+      if (!upload.ok) throw new Error(`upload returned ${upload.status}: ${(await upload.text()).slice(0, 200)}`);
+      // A signed URL is intentionally not persisted: it expires. Store the
+      // private object path in metadata; PU Pocket resolves it when displaying.
+      copied.push(path);
+    } catch (error) {
+      console.warn('Could not copy Fuel Log receipt', { entryId, index, error: error.message });
+    }
+  }
+  return copied;
+}
+
+async function upsertEntryForLink(link, vehicle, entryId, entry) {
+  const localReceiptUrls = receiptUrls(entry);
+  const receiptPaths = await copyReceiptUrls(link, entryId, localReceiptUrls);
+  const metadata = {
+    vehicleId: link.vehicle_id,
+    vehicleName: vehicle?.name || null,
+    registration: vehicle?.registration || null,
+    station: entry.station || null,
+    liters: Number(entry.liters || 0),
+    pricePerLiter: Number(entry.price || 0),
+    odometerKm: Number(entry.odometer || 0),
+    fullTank: Boolean(entry.full),
+    receiptPaths,
+    importedAt: new Date().toISOString(),
+  };
+  await supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_link_id: link.id,
+      p_source_id: entryId,
+      p_amount_minor: Math.round(Number(entry.total || 0) * 100),
+      p_transaction_date: transactionDate(entry),
+      p_note: entryNote(entry, vehicle),
+      p_receipt_url: receiptPaths[0] || null,
+      p_metadata: metadata,
+      p_deleted: false,
+    }),
+  });
+}
+
+async function activeLinksForVehicle(vehicleId) {
+  return supabase(`/rest/v1/fuel_log_import_links?select=*&vehicle_id=eq.${encodeURIComponent(vehicleId)}&active=eq.true`);
+}
+
+async function assertVehicleMember(uid, vehicleId) {
+  const vehicle = (await getFirestore().collection('vehicles').doc(vehicleId).get()).data();
+  const member = vehicle?.members?.[uid];
+  const isListedMember = Array.isArray(vehicle?.memberUids) && vehicle.memberUids.includes(uid);
+  if (!vehicle || (vehicle.ownerUid !== uid && !member && !isListedMember)) {
+    throw new HttpsError('permission-denied', 'You do not have access to this vehicle');
+  }
+}
+
+async function syncEntry(vehicleId, entryId, before, after) {
+  const links = await activeLinksForVehicle(vehicleId);
+  if (!links.length) return;
+  const vehicle = (await getFirestore().collection('vehicles').doc(vehicleId).get()).data() || null;
+  if (after) {
+    await Promise.all(links.map(link => upsertEntryForLink(link, vehicle, entryId, after)));
+  } else {
+    await Promise.all(links.map(link => supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_link_id: link.id,
+        p_source_id: entryId,
+        p_amount_minor: 0,
+        p_transaction_date: new Date().toISOString(),
+        p_note: null,
+        p_receipt_url: null,
+        p_metadata: { vehicleId, deletedFromFuelLogAt: new Date().toISOString() },
+        p_deleted: true,
+      }),
+    })));
+  }
+}
+
+exports.syncFuelEntryToPupu = onDocumentWritten({
+  region: BRIDGE_REGION,
+  document: 'vehicles/{vehicleId}/entries/{entryId}',
+  secrets: [supabaseUrl, supabaseServiceRoleKey],
+}, async event => {
+  const before = event.data?.before.exists ? event.data.before.data() : null;
+  const after = event.data?.after.exists ? event.data.after.data() : null;
+  await syncEntry(event.params.vehicleId, event.params.entryId, before, after);
+});
+
+exports.redeemPupuLink = onCall({
+  region: BRIDGE_REGION,
+  secrets: [supabaseUrl, supabaseServiceRoleKey],
+}, async request => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in to Fuel Log first');
+  const code = String(request.data?.code || '').trim().toUpperCase();
+  const vehicleIds = [...new Set(asArray(request.data?.vehicleIds).filter(value => typeof value === 'string' && value))];
+  if (!/^[A-Z2-9]{10}$/.test(code)) throw new HttpsError('invalid-argument', 'Invalid PU Pocket link code');
+  if (!vehicleIds.length) throw new HttpsError('invalid-argument', 'Select at least one vehicle');
+  await Promise.all(vehicleIds.map(vehicleId => assertVehicleMember(request.auth.uid, vehicleId)));
+
+  const links = await supabase('/rest/v1/rpc/redeem_fuel_log_link', {
+    method: 'POST',
+    body: JSON.stringify({ p_code_hash: sha256(code), p_firebase_uid: request.auth.uid, p_vehicle_ids: vehicleIds }),
+  });
+  // Import existing fill-ups immediately. New/updated items continue through
+  // the Firestore trigger above.
+  for (const link of links) {
+    const vehicle = (await getFirestore().collection('vehicles').doc(link.vehicle_id).get()).data() || null;
+    const entries = await getFirestore().collection('vehicles').doc(link.vehicle_id).collection('entries').get();
+    for (const entry of entries.docs) await upsertEntryForLink(link, vehicle, entry.id, entry.data());
+  }
+  return { importedVehicles: links.map(link => link.vehicle_id) };
 });
 
 async function handleScanReceipt(request) {

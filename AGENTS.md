@@ -10,7 +10,7 @@ Before changing this repository, read [`ARCHITECTURE.md`](ARCHITECTURE.md) and [
 - Use `agent/<feature-slug>` for Codex work and `feature/<feature-slug>` for human-created feature branches.
 - Feature PRs target `develop`; only coordinated release PRs go from `develop` to `main`.
 - If PU Pocket also changes, use the same feature slug in both repositories and link both PRs.
-- Use a paired feature worktree created from `origin/develop`; do not develop in the `D:\App Projects\Fuel-log` control checkout. Follow [`docs/WORKTREE-WORKFLOW.md`](docs/WORKTREE-WORKFLOW.md).
+- Work in the normal checkout on a dedicated feature branch created from the latest `origin/develop`. Worktrees are optional and must be used only when the user explicitly requests parallel work.
 - Do not publish stable tags/releases from a feature branch or from `develop`.
 - Before switching branches, run `git status -sb`; never discard or stage unrelated user changes.
 - Never commit Firebase configuration, `local.properties`, signing properties, keystores, credentials, access tokens, or build output.

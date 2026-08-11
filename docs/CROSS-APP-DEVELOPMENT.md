@@ -17,20 +17,24 @@ Production branches contain only code intended for real users. Do not develop or
 
 For every feature:
 
-1. Fetch and verify a clean worktree with `git status -sb`.
-2. Create paired feature worktrees from the latest `origin/develop` by following [`WORKTREE-WORKFLOW.md`](WORKTREE-WORKFLOW.md).
-3. If both apps change, use the same feature slug in both repositories.
+1. Fetch and verify a clean checkout with `git status -sb`.
+2. Create a dedicated `agent/<feature-slug>` or `feature/<feature-slug>` branch from the latest `origin/develop` in the normal repository checkout.
+3. If both apps change, use the same feature slug in both repositories and switch each repository independently.
 4. Open a Draft PR to `develop`; link the companion PR when there is one.
 5. Require code review and the relevant local/ADB checks before merge. Cloud CI is an optional manual clean-room check.
 6. Release only through a reviewed PR from `develop` to the production branch.
 7. Tag and publish only from the production commit.
 
-Example (run from either clean control checkout):
+Example (run once in each repository that the feature changes):
 
 ```powershell
-.\scripts\New-CrossAppWorktree.ps1 -FeatureSlug fuel-bridge-v2 -PlanOnly
-.\scripts\New-CrossAppWorktree.ps1 -FeatureSlug fuel-bridge-v2
+git -C "<repository-path>" fetch origin --prune
+git -C "<repository-path>" switch develop
+git -C "<repository-path>" pull --ff-only origin develop
+git -C "<repository-path>" switch -c agent/fuel-bridge-v2
 ```
+
+Worktrees are not the default workflow. Use one only when the user explicitly requests parallel work and the existing checkout cannot be switched safely.
 
 ## Ownership and integration contract
 

@@ -16,14 +16,16 @@ class LocalFuelRepository(
     fun observe(vehicleId: String): Flow<List<FuelEntry>> =
         dao.observeForVehicle(vehicleId).map { entries -> entries.map(FuelEntryEntity::toDomain) }
 
-    suspend fun add(vehicleId: String, values: FuelEntryFormValues) {
+    suspend fun add(vehicleId: String, values: FuelEntryFormValues): String {
+        val id = UUID.randomUUID().toString()
         dao.upsert(
             values.toEntity(
-                id = UUID.randomUUID().toString(),
+                id = id,
                 vehicleId = vehicleId,
                 createdAt = System.currentTimeMillis(),
             ),
         )
+        return id
     }
 
     suspend fun update(id: String, vehicleId: String, values: FuelEntryFormValues) {

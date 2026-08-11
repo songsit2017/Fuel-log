@@ -608,6 +608,15 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     },
+                    onFuelEntrySaved = { entryId ->
+                        MaintenanceReminderWorker.refresh(applicationContext)
+                        if (backupSettings.driveAutoSyncEnabled) performDriveBackup(silent = true)
+                        if (authRepository.currentUid != null) {
+                            composeScope.launch {
+                                runCatching { cloudRepository.pushFuelEntry(entryId) }
+                            }
+                        }
+                    },
                 ),
             )
             val state by viewModel.state.collectAsState()

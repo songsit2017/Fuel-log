@@ -52,6 +52,27 @@ class FirestoreSyncRepository(
     // Serializing them here removes that race for every call site at once.
     private val syncMutex = Mutex()
 
+    /**
+     * Pushes the fill-up the user just saved without running the two-way conflict detector.
+     *
+     * A normal full sync must treat two different copies as a conflict because it cannot know
+     * which device changed the record last. At save time we do know: the local edit is the new
+     * authoritative value. Sending that one record directly also makes the PU Pocket bridge's
+     * Firestore trigger run immediately instead of leaving every edit as an unresolved conflict.
+     */
+    suspend fun pushFuelEntry(entryId: String) = syncMutex.withLock {
+        val current = database.fuelEntryDao().getById(entryId) ?: return@withLock
+        val uploadedPhotoUri = uploadLocalPhotos(current.vehicleId, current.id, current.photoUri)
+        val ready = if (uploadedPhotoUri != null) current.copy(photoUri = uploadedPhotoUri) else current
+        if (uploadedPhotoUri != null) database.fuelEntryDao().upsert(ready)
+        val upload = fuelCloudMap(ready).toMutableMap().apply {
+            put("updatedAt", FieldValue.serverTimestamp())
+        }
+        firestore.collection("vehicles").document(ready.vehicleId).collection("entries")
+            .document(ready.id).set(upload, SetOptions.merge()).await()
+        clearConflict("entries", ready.vehicleId, ready.id)
+    }
+
     suspend fun sync(uid: String, email: String?, displayName: String?, photoUrl: String? = null): CloudSyncResult = syncMutex.withLock {
         normalizeLegacyVehicleId()
         val deletedVehicleIds = applyVehicleDeletionTombstones(uid)

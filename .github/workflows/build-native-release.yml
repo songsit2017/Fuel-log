@@ -66,6 +66,35 @@ jobs:
         working-directory: native-kotlin
         run: echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > local.properties
 
+      - name: Verify Firebase login certificate
+        working-directory: native-kotlin
+        env:
+          FUELLOG_KEYSTORE_PASSWORD: ${{ secrets.FUELLOG_KEYSTORE_PASSWORD }}
+          FUELLOG_KEY_ALIAS: ${{ secrets.FUELLOG_KEY_ALIAS }}
+        run: |
+          RELEASE_SHA1="$(
+            keytool -list -v \
+              -keystore app/fuellog-release.keystore \
+              -storepass "$FUELLOG_KEYSTORE_PASSWORD" \
+              -alias "$FUELLOG_KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA1: //p' \
+            | tr -d ':' \
+            | tr '[:upper:]' '[:lower:]'
+          )"
+          test -n "$RELEASE_SHA1" || (echo "::error::Could not read SHA-1 from the release keystore" && exit 1)
+          jq -e \
+            --arg package_name "com.songsit.fuellogpro" \
+            --arg release_sha1 "$RELEASE_SHA1" \
+            'any(.client[];
+              .client_info.android_client_info.package_name == $package_name and
+              any(.oauth_client[]?;
+                .client_type == 1 and
+                (.android_info.certificate_hash | ascii_downcase) == $release_sha1
+              )
+            )' \
+            app/google-services.json \
+            || (echo "::error::Firebase config does not contain the release signing SHA-1 ($RELEASE_SHA1)" && exit 1)
+
       - name: Test and build release APK
         working-directory: native-kotlin
         env:

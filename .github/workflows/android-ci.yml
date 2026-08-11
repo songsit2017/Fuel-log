@@ -1,10 +1,6 @@
-name: Android CI
+name: Optional Android Cloud Build
 
 on:
-  push:
-    branches: ["develop"]
-  pull_request:
-    branches: ["develop", "main"]
   workflow_dispatch:
 
 permissions:

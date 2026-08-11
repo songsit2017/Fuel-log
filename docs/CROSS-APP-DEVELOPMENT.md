@@ -21,7 +21,7 @@ For every feature:
 2. Create paired feature worktrees from the latest `origin/develop` by following [`WORKTREE-WORKFLOW.md`](WORKTREE-WORKFLOW.md).
 3. If both apps change, use the same feature slug in both repositories.
 4. Open a Draft PR to `develop`; link the companion PR when there is one.
-5. Require CI, code review, and the relevant local/ADB checks before merge.
+5. Require code review and the relevant local/ADB checks before merge. Cloud CI is an optional manual clean-room check.
 6. Release only through a reviewed PR from `develop` to the production branch.
 7. Tag and publish only from the production commit.
 
@@ -80,7 +80,7 @@ Versions remain independent. Record the compatible pair in both release notes, f
 
 ## CI and automation exception
 
-- Feature CI builds/tests debug artifacts only; it does not publish a stable release.
+- Local Gradle build/tests are the default development gate. The manual cloud workflow is an optional clean-room check and does not publish a stable release.
 - Stable release workflows must run from the production branch and use the existing release key.
 - Fuel Log's scheduled oil-price workflow currently commits `oil-prices.json` directly to `main`. Account for this automation before enabling strict branch protection; later it can be changed to open an automated PR.
 

@@ -43,6 +43,19 @@ function Test-GitRef {
     throw "Could not inspect Git ref '$Ref' in '$Repository'."
 }
 
+function Test-GitIgnored {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repository,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    & git -C $Repository check-ignore --quiet -- $RelativePath
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0) { return $true }
+    if ($exitCode -eq 1) { return $false }
+    throw "Could not inspect ignore rules for '$RelativePath' in '$Repository'."
+}
+
 $branch = "$BranchPrefix/$FeatureSlug"
 $featureRoot = Join-Path ([IO.Path]::GetFullPath($WorktreeRoot)) $FeatureSlug
 $repositories = @(
@@ -50,11 +63,13 @@ $repositories = @(
         Name = 'PU-Pocket'
         Repository = [IO.Path]::GetFullPath($PuPocketRepository)
         Target = Join-Path $featureRoot 'PU-Pocket'
+        LocalBuildFiles = @('local.properties')
     },
     [pscustomobject]@{
         Name = 'Fuel-log'
         Repository = [IO.Path]::GetFullPath($FuelLogRepository)
         Target = Join-Path $featureRoot 'Fuel-log'
+        LocalBuildFiles = @('native-kotlin/app/google-services.json')
     }
 )
 
@@ -90,6 +105,15 @@ foreach ($item in $repositories) {
     if (Test-Path -LiteralPath $item.Target) {
         throw "Target path already exists: '$($item.Target)'."
     }
+    foreach ($relativePath in $item.LocalBuildFiles) {
+        $source = Join-Path $item.Repository $relativePath
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "$($item.Name) requires local build file '$relativePath' before creating a worktree."
+        }
+        if (-not (Test-GitIgnored -Repository $item.Repository -RelativePath $relativePath)) {
+            throw "Refusing to copy '$relativePath' because it is not ignored by Git in $($item.Name)."
+        }
+    }
 }
 
 $plan = $repositories | Select-Object Name, Repository, @{Name = 'Branch'; Expression = { $branch }}, Target
@@ -103,6 +127,12 @@ foreach ($item in $repositories) {
     Invoke-Git -Repository $item.Repository -Arguments @(
         'worktree', 'add', '-b', $branch, $item.Target, 'origin/develop'
     ) | Out-Host
+    foreach ($relativePath in $item.LocalBuildFiles) {
+        $source = Join-Path $item.Repository $relativePath
+        $destination = Join-Path $item.Target $relativePath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination
+    }
 }
 
 $plan | Format-Table -AutoSize

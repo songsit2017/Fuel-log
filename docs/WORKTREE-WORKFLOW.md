@@ -28,7 +28,9 @@ From either control checkout, run its tracked helper script:
 
 Use `-BranchPrefix feature` for a human-created branch. Codex uses the default `agent` prefix.
 
-The script refuses to proceed when a control checkout is dirty, `origin/develop` is missing, a local/remote branch already exists, the slug is unsafe, or a target path already exists. It validates both repositories before creating either worktree.
+The script refuses to proceed when a control checkout is dirty or not on `develop`, `origin/develop` is missing, a local/remote branch already exists, the slug is unsafe, or a target path already exists. It validates both repositories before creating either worktree.
+
+It also copies only the required, Git-ignored local build configuration into the new worktrees: PU Pocket's `local.properties` and Fuel Log's `native-kotlin/app/google-services.json`. It verifies that Git ignores each source before copying. Release keystores, signing properties, and passwords are never copied.
 
 Manual equivalent:
 
@@ -47,7 +49,7 @@ git -C "D:\App Projects\Fuel-log" worktree add -b agent/fuel-bridge-v2 "D:\App P
 3. Commit each repository independently with a focused message.
 4. Push the matching branch from each worktree.
 5. Open companion Draft PRs into `develop` and link them to each other.
-6. Require local checks, GitHub CI, and relevant ADB E2E checks before merge.
+6. Require local build/tests and relevant ADB E2E checks before merge. GitHub cloud build is an optional manual clean-room check, normally used before a release or when local results are suspicious.
 
 One branch can be checked out in only one worktree. If a branch already exists, resume its registered worktree instead of creating a duplicate.
 

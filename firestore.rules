@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: FIREBASE SYNC AND FAMILY-SHARING SECURITY BOUNDARY
+// These rules must stay aligned with FirestoreSyncRepository, vehicle sharing,
+// Cloud Function membership checks, and /ARCHITECTURE.md. A schema change without
+// matching rules can expose data or break the Fuel Log -> PU Pocket bridge.
+// ============================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

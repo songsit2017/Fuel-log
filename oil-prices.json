@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-08-12T23:54:50.677638+00:00",
+  "fetchedAt": "2026-08-13T02:42:23.015914+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -36,7 +36,7 @@
     },
     "shell": {
       "source": "https://www.pcauto.com/th/fuel-price/shell",
-      "updatedAt": "2026-08-12T23:54:50.574548+00:00",
+      "updatedAt": "2026-08-13T02:42:22.936686+00:00",
       "grades": {
         "gasohol_95": 37.95,
         "gasohol_91": 37.58,

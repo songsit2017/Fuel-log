@@ -10,6 +10,8 @@
     <string name="nav_timeline">ไทม์ไลน์</string>
     <string name="nav_calculator">เครื่องคิดเลข</string>
     <string name="nav_map">แผนที่</string>
+    <string name="nav_dashboard">หน้าแรก</string>
+    <string name="nav_more">เพิ่มเติม</string>
 
     <string name="action_back">ย้อนกลับ</string>
     <string name="settings_title">ตั้งค่า</string>
@@ -132,6 +134,29 @@
     <string name="dashboard_no_data">ยังไม่มีข้อมูล</string>
     <string name="dashboard_record_count">จำนวนรายการ</string>
     <string name="dashboard_recent_entries">รายการล่าสุด</string>
+
+    <!-- Pro theme: onboarding + More hub (ui/pro/*) -->
+    <string name="pro_badge">PRO</string>
+    <string name="onboarding_headline">คุมทุกน้ำมัน\nคุมทุกบาท</string>
+    <string name="onboarding_subtitle">บันทึกการเติมน้ำมันและค่าใช้จ่ายรถในที่เดียว ง่าย รวดเร็ว แม่นยำ</string>
+    <string name="onboarding_feature_log_fuel">บันทึกเติมน้ำมัน</string>
+    <string name="onboarding_feature_track_expenses">ติดตามค่าใช้จ่าย</string>
+    <string name="onboarding_feature_maintenance_alerts">แจ้งเตือนซ่อมบำรุง</string>
+    <string name="onboarding_sign_in_google">เข้าสู่ระบบด้วย Google</string>
+    <string name="onboarding_skip">ข้ามไปก่อน</string>
+    <string name="more_hub_expenses">ค่าใช้จ่าย</string>
+    <string name="more_hub_maintenance">ซ่อมบำรุง</string>
+    <string name="more_hub_vehicles">รถของฉัน</string>
+    <string name="more_hub_map">ปั๊มใกล้ฉัน</string>
+    <string name="more_hub_settings">ตั้งค่า</string>
+    <string name="dashboard_trend_up">+%1$s%% ดีขึ้น</string>
+    <string name="dashboard_trend_down">-%1$s%% ลดลง</string>
+    <string name="dashboard_distance_this_month">ระยะทางเดือนนี้ %1$s</string>
+    <string name="shared_photo_chooser_title">บันทึกรูปนี้เป็น</string>
+    <string name="shared_photo_chooser_message">รูปที่แชร์มา ต้องการบันทึกไว้ที่ไหน?</string>
+    <string name="shared_photo_choose_vehicle">รถ</string>
+    <string name="action_scan_receipt">สแกนเป็นใบเสร็จ</string>
+    <string name="action_scan_odometer">สแกนเป็นเลขไมล์</string>
 
     <string name="unknown_date">ไม่ทราบวันที่</string>
     <string name="expense_net_after_income">สุทธิหลังรายรับ</string>

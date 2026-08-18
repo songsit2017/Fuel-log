@@ -29,11 +29,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -60,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.songsit.fuellogpro.data.local.isPdfPath
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
+import com.songsit.fuellogpro.ui.LocalDisplaySettings
 import com.songsit.fuellogpro.ui.NativeAppState
 import com.songsit.fuellogpro.ui.categoryDisplayLabel
 import kotlinx.coroutines.Dispatchers
@@ -99,7 +102,11 @@ fun TimelineScreen(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        // No inter-item spacing here: each row's own padding provides visual breathing room
+        // (month header has vertical padding, each card has bottom padding) while the
+        // connector line drawn inside each row spans the row's full height — any spacing
+        // added here would sit outside that line and break the connecting rail between rows.
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         if (rows.isEmpty()) {
             item {
@@ -141,24 +148,41 @@ private fun TimelineEntryRow(
     onImageClick: (List<String>, Int) -> Unit,
     onFuelRecordClick: (FuelEntry) -> Unit,
 ) {
+    // Pro theme distinguishes entry types by color (fuel = amber/primary, expense/maintenance =
+    // teal/secondary, per the redesign concept) instead of coloring every row the same accent —
+    // the default theme keeps its original single-accent look untouched.
+    val isPro = LocalDisplaySettings.current.themePalette == "pro"
+    val rowAccent = if (isPro && row is TimelineRow.FuelRow) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.secondary
+    }
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        // Simple vertical line + dot, built from plain Box/Column (no external library).
-        Column(
+        // Simple vertical line + dot, built from plain Box (no external library).
+        // The line is drawn as one Box spanning the row's FULL height (not just below the
+        // dot) and the dot is layered on top of it — so row N's line ends exactly where row
+        // N+1's line begins, forming one continuous rail across every entry instead of
+        // separate stubs that only trailed below each dot.
+        Box(
             modifier = Modifier.width(24.dp).fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            contentAlignment = Alignment.TopCenter,
         ) {
+            // outline (not surfaceContainer) — surfaceContainer is meant to sit close to the
+            // background/card tone (e.g. Pro's nav bar), so on Pro it made this connecting line
+            // blend invisibly into the background in both light and dark. outline is the token
+            // actually meant to read as a visible-but-subtle line.
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.outline),
+            )
             Box(
                 modifier = Modifier
                     .padding(top = 18.dp)
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondary),
-            )
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                    .background(rowAccent),
             )
         }
         Spacer(Modifier.width(8.dp))
@@ -169,7 +193,7 @@ private fun TimelineEntryRow(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
             when (row) {
-                is TimelineRow.FuelRow -> FuelTimelineContent(row.entry, onImageClick)
+                is TimelineRow.FuelRow -> FuelTimelineContent(row.entry, onImageClick, rowAccent)
                 is TimelineRow.ExpenseRow -> ExpenseTimelineContent(row.expense, onImageClick)
             }
         }
@@ -177,13 +201,13 @@ private fun TimelineEntryRow(
 }
 
 @Composable
-private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, Int) -> Unit) {
+private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, Int) -> Unit, accent: Color) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(entry.date, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text(timelineCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            Text(timelineCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = accent)
         }
         val detail = listOfNotNull(
             entry.station.takeIf(String::isNotBlank),
@@ -277,6 +301,14 @@ fun FullScreenImageViewer(
     initialIndex: Int = 0,
     onDismiss: () -> Unit,
     onDelete: ((String) -> Unit)? = null,
+    // Lets the caller offer "scan this photo" for an already-attached image (e.g. one shared in
+    // from another app, which skipped the pick-flow's automatic OCR) — only shown when the
+    // caller passes a non-null handler, same opt-in pattern as onDelete. Only AddFuelScreen
+    // passes onScanOdometer (mileage OCR only makes sense for fuel entries); AddExpenseScreen
+    // passes onScanReceipt only. Fires and dismisses immediately — the caller's own "scanning..."
+    // spinner (already used for the pick-flow scans) takes over from there.
+    onScanReceipt: ((String) -> Unit)? = null,
+    onScanOdometer: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -296,6 +328,16 @@ fun FullScreenImageViewer(
                 Icon(Icons.Filled.Close, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_close), tint = Color.White)
             }
             Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                if (onScanReceipt != null) {
+                    IconButton(onClick = { onScanReceipt(imagePaths[pagerState.currentPage]); onDismiss() }) {
+                        Icon(Icons.Filled.DocumentScanner, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_scan_receipt), tint = Color.White)
+                    }
+                }
+                if (onScanOdometer != null) {
+                    IconButton(onClick = { onScanOdometer(imagePaths[pagerState.currentPage]); onDismiss() }) {
+                        Icon(Icons.Filled.Speed, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_scan_odometer), tint = Color.White)
+                    }
+                }
                 if (onDelete != null) {
                     IconButton(onClick = { onDelete(imagePaths[pagerState.currentPage]); onDismiss() }) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(com.songsit.fuellogpro.R.string.content_desc_delete_photo), tint = Color.White)

@@ -49,7 +49,9 @@ import com.songsit.fuellogpro.settings.DisplaySettings
 import android.widget.Toast
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
@@ -565,6 +567,51 @@ class MainActivity : AppCompatActivity() {
             LaunchedEffect(Unit) {
                 oilPriceInfo = oilPriceRepository.fetchTodayPrices()
             }
+            // Dev-build-only share target (src/debug/AndroidManifest.xml registers ACTION_SEND
+            // and ACTION_SEND_MULTIPLE for image/* on this Activity — some gallery apps fire
+            // SEND_MULTIPLE even for a single selected photo) — photos shared in from
+            // Gallery/Camera/LINE/etc. get copied into app storage the same way pickPhoto above
+            // does, then handed to ProAppShell's "save as" chooser via the sharedPhotoPaths param.
+            var sharedPhotoPaths by remember { mutableStateOf<List<String>>(emptyList()) }
+            LaunchedEffect(Unit) {
+                val sharedIntent = intent
+                val isImageShare = sharedIntent?.type?.startsWith("image/") == true &&
+                    (sharedIntent.action == Intent.ACTION_SEND || sharedIntent.action == Intent.ACTION_SEND_MULTIPLE)
+                val sharedUris = if (isImageShare && sharedIntent?.action == Intent.ACTION_SEND) {
+                    val single = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        sharedIntent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        sharedIntent.getParcelableExtra(Intent.EXTRA_STREAM)
+                    }
+                    listOfNotNull(single)
+                } else if (isImageShare) {
+                    val multiple = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        sharedIntent?.getParcelableArrayListExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        sharedIntent?.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+                    }
+                    multiple.orEmpty()
+                } else {
+                    emptyList()
+                }
+                if (sharedUris.isNotEmpty()) {
+                    val copiedPaths = withContext(Dispatchers.IO) {
+                        sharedUris.take(MAX_PICK_PHOTOS).mapNotNull { uri ->
+                            runCatching {
+                                val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+                                val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
+                                contentResolver.openInputStream(uri)?.use { input ->
+                                    destFile.outputStream().use { output -> input.copyTo(output) }
+                                } ?: error("cannot open shared image stream")
+                                destFile.absolutePath
+                            }.getOrNull()
+                        }
+                    }
+                    sharedPhotoPaths = copiedPaths
+                }
+            }
             // Pull the latest family-shared data as soon as the app opens (if already signed
             // in), so a vehicle another member edited elsewhere shows up without the user
             // having to remember to tap "ซิงก์ตอนนี้" first. Runs once per process launch.
@@ -645,6 +692,8 @@ class MainActivity : AppCompatActivity() {
                     backupSettings = backupSettings.copy(driveAutoSyncEnabled = enabled)
                     backupPreferences.save(backupSettings)
                 },
+                sharedPhotoPaths = sharedPhotoPaths,
+                onSharedPhotoConsumed = { sharedPhotoPaths = emptyList() },
                 onAddFuel = viewModel::addFuel,
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,
@@ -728,6 +777,12 @@ class MainActivity : AppCompatActivity() {
                     if (type == "fuel" || type == "expense") launchDocumentScan(type, onPicked) else launchCameraCapture(type, onPicked)
                 },
                 onPickPdf = { onPicked -> launchPdfPicker(onPicked) },
+                onScanExistingPhoto = { path, type, onResult ->
+                    composeScope.launch {
+                        val result = runCatching { scanFirstPhoto(path, type) }.getOrNull()
+                        onResult(result)
+                    }
+                },
                 oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->

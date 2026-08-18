@@ -70,6 +70,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -147,8 +152,10 @@ import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
 import com.songsit.fuellogpro.ui.timeline.TimelineThumbnails
 import com.songsit.fuellogpro.ui.timeline.openPdfExternally
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import java.util.Locale
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -248,6 +255,9 @@ fun FuelLogApp(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
+    // Dev-build-only "scan an already-attached photo" entry point — see ProAppShell's param of
+    // the same name for the full explanation. Unused (always null) in the default shell.
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -261,7 +271,90 @@ fun FuelLogApp(
     onDriveRestore: (() -> Unit)? = null,
     driveAutoSyncEnabled: Boolean = false,
     onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
+    // Dev-build-only "share receipt photo(s) into the app" entry point — see ProAppShell's param
+    // of the same name for the full explanation. Unused (always empty) in the default shell.
+    sharedPhotoPaths: List<String> = emptyList(),
+    onSharedPhotoConsumed: () -> Unit = {},
 ) {
+    // The "Pro" theme (FuelLog Pro Redesign concept, see FuelLogTheme.kt's ProLight/ProDark)
+    // swaps in a different navigation shell (5-tab bottom nav + More hub instead of this
+    // function's drawer) — everything below this branch is the default experience and is
+    // untouched by that theme. See ui/pro/ProAppShell.kt.
+    // BuildConfig.FORCE_PRO_THEME is only true for the ".dev" build variant (see
+    // build.gradle.kts) — that variant exists solely to preview this redesign, so it always
+    // opens straight into Pro regardless of the palette saved in DisplaySettings.
+    val effectiveThemePalette = if (com.songsit.fuellogpro.BuildConfig.FORCE_PRO_THEME) "pro" else displaySettings.themePalette
+    if (effectiveThemePalette == "pro") {
+        // FuelLogApp's own MaterialTheme wrapper lives further down (around the FuelLogTheme(...)
+        // call below, for the default shell) — this early-return branch would otherwise render
+        // with no ColorScheme ancestor at all (Compose's stock M3 baseline purple) since it exits
+        // before reaching that wrapper. Wrap explicitly here so ProAppShell actually gets
+        // ProLight/ProDark instead of the default baseline scheme.
+        // Font stays a real user choice (Settings > แบบอักษร, now including the explicit
+        // "System default" option — see AppFonts.kt) rather than force-locked to Kanit: Pro only
+        // fixes the color palette, same as every other theme in this app leaves font independent.
+        FuelLogTheme(
+            themeMode = displaySettings.themeMode,
+            themePalette = effectiveThemePalette,
+            fontFamily = displaySettings.fontFamily,
+        ) {
+        com.songsit.fuellogpro.ui.pro.ProAppShell(
+            state = state,
+            onAddFuel = onAddFuel,
+            onUpdateFuel = onUpdateFuel,
+            onDeleteFuel = onDeleteFuel,
+            onAddExpense = onAddExpense,
+            onUpdateExpense = onUpdateExpense,
+            onDeleteExpense = onDeleteExpense,
+            onAddMaintenance = onAddMaintenance,
+            onUpdateMaintenance = onUpdateMaintenance,
+            onCompleteMaintenance = onCompleteMaintenance,
+            onDeleteMaintenance = onDeleteMaintenance,
+            onAddTrip = onAddTrip,
+            onUpdateTrip = onUpdateTrip,
+            onDeleteTrip = onDeleteTrip,
+            onStartTripRecording = onStartTripRecording,
+            onExportCsv = onExportCsv,
+            reminderSettings = reminderSettings,
+            onReminderSettingsChange = onReminderSettingsChange,
+            onExportBackup = onExportBackup,
+            onImportBackup = onImportBackup,
+            cloudState = cloudState,
+            onGoogleSignIn = onGoogleSignIn,
+            onCloudSync = onCloudSync,
+            onSignOut = onSignOut,
+            syncConflicts = syncConflicts,
+            onResolveConflict = onResolveConflict,
+            onResolveAllConflicts = onResolveAllConflicts,
+            onSelectVehicle = onSelectVehicle,
+            onAddVehicle = onAddVehicle,
+            onUpdateVehicle = onUpdateVehicle,
+            onDeleteVehicle = onDeleteVehicle,
+            onFindNearbyStations = onFindNearbyStations,
+            onFetchWeather = onFetchWeather,
+            onPickPhoto = onPickPhoto,
+            onPickCameraPhoto = onPickCameraPhoto,
+            onPickPdf = onPickPdf,
+            onScanExistingPhoto = onScanExistingPhoto,
+            oilPriceInfo = oilPriceInfo,
+            vehicleMembers = vehicleMembers,
+            onCreateInvite = onCreateInvite,
+            onJoinByCode = onJoinByCode,
+            displaySettings = displaySettings,
+            onDisplaySettingsChange = onDisplaySettingsChange,
+            importSummaryResult = importSummaryResult,
+            onDismissImportSummary = onDismissImportSummary,
+            onDriveBackup = onDriveBackup,
+            onDriveRestore = onDriveRestore,
+            driveAutoSyncEnabled = driveAutoSyncEnabled,
+            onDriveAutoSyncChange = onDriveAutoSyncChange,
+            sharedPhotoPaths = sharedPhotoPaths,
+            onSharedPhotoConsumed = onSharedPhotoConsumed,
+        )
+        }
+        return
+    }
+
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
     var addFuelAutoScan by remember { mutableStateOf(false) }
@@ -903,7 +996,7 @@ private fun QuickPickField(
 }
 
 @Composable
-private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Modifier) {
+internal fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     var modeExpanded by remember { mutableStateOf(false) }
     var mode by remember { mutableIntStateOf(0) }
     var distanceKm by remember { mutableStateOf("") }
@@ -1033,7 +1126,7 @@ private fun matchOilPrice(brand: StationBrand, oilPriceInfo: OilPriceInfo?): Dou
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NearbyStationsMapScreen(
+internal fun NearbyStationsMapScreen(
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)?,
     oilPriceInfo: OilPriceInfo?,
     modifier: Modifier = Modifier,
@@ -1336,7 +1429,7 @@ private fun oilBrandLogoRes(brand: String): Int? = when {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OilPriceCard(info: OilPriceInfo) {
+internal fun OilPriceCard(info: OilPriceInfo) {
     // Brand selection state lives only inside this card — never propagates upward.
     var selectedIndex by remember { mutableIntStateOf(0) }
     val safeIndex = selectedIndex.coerceIn(0, info.brands.lastIndex)
@@ -1523,7 +1616,7 @@ internal fun StationBadge(stationName: String, modifier: Modifier = Modifier, si
 }
 
 @Composable
-private fun SectionHeader(icon: ImageVector, title: String) {
+internal fun SectionHeader(icon: ImageVector, title: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         IconBadge(icon, size = 26.dp)
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1531,7 +1624,7 @@ private fun SectionHeader(icon: ImageVector, title: String) {
 }
 
 @Composable
-private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+internal fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
@@ -1550,7 +1643,7 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun FuelList(
+internal fun FuelList(
     entries: List<FuelEntry>,
     onDelete: (String) -> Unit,
     onEdit: ((FuelEntry) -> Unit)? = null,
@@ -1590,7 +1683,7 @@ private fun FuelList(
 }
 
 @Composable
-private fun ExpenseList(
+internal fun ExpenseList(
     expenses: List<Expense>,
     totalExpense: Double,
     totalIncome: Double,
@@ -1755,7 +1848,7 @@ private fun ExpenseRow(
 }
 
 @Composable
-private fun TripList(
+internal fun TripList(
     trips: List<Trip>,
     summary: com.songsit.fuellogpro.domain.TripSummary,
     onDelete: (String) -> Unit,
@@ -1894,7 +1987,7 @@ private fun TripList(
 }
 
 @Composable
-private fun MaintenanceList(
+internal fun MaintenanceList(
     tasks: List<MaintenanceTask>,
     currentOdometerKm: Double?,
     onComplete: (String) -> Unit,
@@ -1967,7 +2060,7 @@ private fun MaintenanceList(
 }
 
 @Composable
-private fun FuelRow(
+internal fun FuelRow(
     entry: FuelEntry,
     onDelete: ((String) -> Unit)? = null,
     onEdit: ((FuelEntry) -> Unit)? = null,
@@ -2004,7 +2097,18 @@ private fun FuelRow(
                     Text(stringResource(com.songsit.fuellogpro.R.string.fuel_liters_price_line, number.format(entry.liters), number.format(entry.pricePerLiter)))
                     kmPerLiter?.let { Text(stringResource(com.songsit.fuellogpro.R.string.fuel_efficiency_line, number.format(it)), style = MaterialTheme.typography.labelSmall) }
                 }
-                if (entry.fullTank) Text(stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank), color = MaterialTheme.colorScheme.tertiary)
+                if (entry.fullTank) {
+                    // Pro's tertiary role stays teal for other uses (Stats donut slices need a
+                    // color distinct from primary; Maintenance due-soon/OK stay as-is) — this one
+                    // badge specifically reads as amber in the Pro theme per user feedback, since
+                    // teal here looked like a stray "mint" accent against the rest of the amber UI.
+                    val fullTankColor = if (LocalDisplaySettings.current.themePalette == "pro") {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    }
+                    Text(stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank), color = fullTankColor)
+                }
                 onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) } }
             }
         }
@@ -2109,7 +2213,7 @@ private fun DisplaySettingsCard(
 }
 
 @Composable
-private fun VehiclesListScreen(
+internal fun VehiclesListScreen(
     vehicles: List<Vehicle>,
     selectedVehicleId: String?,
     onSelect: (String) -> Unit,
@@ -2265,7 +2369,7 @@ private fun PreferenceListItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(
+internal fun SettingsScreen(
     onDismiss: () -> Unit,
     onExportBackup: () -> Unit,
     onExportCsv: () -> Unit,
@@ -2413,12 +2517,19 @@ private fun SettingsScreen(
                 )
             }
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title),
-                    subtitle = themePaletteLabel(displaySettings.themePalette),
-                    onClick = { showThemePaletteDialog = true },
-                )
+            // The ".dev" build (BuildConfig.FORCE_PRO_THEME, see build.gradle.kts) always renders
+            // the Pro theme regardless of this setting — showing the palette picker there would
+            // be a dead control that looks broken (pick any other palette, nothing visibly
+            // changes), so it's hidden entirely rather than left selectable-but-inert. The
+            // production app (FORCE_PRO_THEME=false) is unaffected.
+            if (!com.songsit.fuellogpro.BuildConfig.FORCE_PRO_THEME) {
+                item {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title),
+                        subtitle = themePaletteLabel(displaySettings.themePalette),
+                        onClick = { showThemePaletteDialog = true },
+                    )
+                }
             }
             item {
                 val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
@@ -3498,7 +3609,7 @@ private fun NotificationSettingRow(
 }
 
 @Composable
-private fun EmptyFuelState() {
+internal fun EmptyFuelState() {
     Card(shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(com.songsit.fuellogpro.R.string.fuel_list_empty_title), fontWeight = FontWeight.SemiBold)
@@ -3549,7 +3660,7 @@ private fun UnitDropdownField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleEditScreen(
+internal fun VehicleEditScreen(
     saving: Boolean,
     editing: Vehicle?,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)?,
@@ -3792,7 +3903,7 @@ private fun VehicleEditScreen(
 // AddFuelDialog / AddFuelScreen (full-screen add/edit fuel entry)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddFuelScreen(
+internal fun AddFuelScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: FuelEntry? = null,
@@ -3805,6 +3916,15 @@ private fun AddFuelScreen(
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     autoOpenScan: Boolean = false,
     defaultFullTank: Boolean = true,
+    // Pre-attaches photo(s) already copied into app storage (e.g. shared in from another app via
+    // Android's share sheet — see MainActivity's ACTION_SEND/SEND_MULTIPLE handling) without
+    // needing a full `editing` entity. Ignored when `editing` is set, since that already
+    // supplies photoUrls.
+    initialPhotoPaths: List<String> = emptyList(),
+    // Runs OCR on a photo that's already attached (skipped the pick-flow's automatic scan) —
+    // same underlying scan MainActivity's pick callbacks use, just addressable by path instead
+    // of only firing right after a fresh pick/capture. type is "fuel" or "odometer".
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdate: ((String, FuelEntryFormValues, () -> Unit) -> Unit)? = null,
@@ -3880,7 +4000,7 @@ private fun AddFuelScreen(
     var nearbyStations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
-    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: initialPhotoPaths) }
     // Photo pick + OCR scan is one round trip (see MainActivity.scanFirstPhoto) that can take a
     // few seconds over the network — without this the "สแกนบิล/ใบเสร็จด้วย AI" button and camera
     // icons looked like they'd done nothing until the fields suddenly populated. Kept as two
@@ -4158,20 +4278,8 @@ private fun AddFuelScreen(
                 }
                 item {
                     FormRow(Icons.Filled.CalendarToday) {
-                        OutlinedTextField(
-                            date,
-                            { date = it },
-                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlinedTextField(
-                            time,
-                            { time = it },
-                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
+                        DateField(date, { date = it }, modifier = Modifier.weight(1f))
+                        TimeField(time, { time = it }, modifier = Modifier.weight(1f))
                     }
                 }
                 if (onPickPhoto != null) {
@@ -4183,6 +4291,12 @@ private fun AddFuelScreen(
                             onPickGallery = { isScanningReceipt = true; onPickPhoto(null, handlePicked) },
                             onPickCamera = onPickCameraPhoto?.let { pick -> { isScanningReceipt = true; pick(null, handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
+                            onScanReceipt = onScanExistingPhoto?.let { scan ->
+                                { path -> isScanningReceipt = true; scan(path, "fuel") { result -> handlePicked(emptyList(), result) } }
+                            },
+                            onScanOdometer = onScanExistingPhoto?.let { scan ->
+                                { path -> isScanningOdometer = true; scan(path, "odometer") { result -> handlePicked(emptyList(), result) } }
+                            },
                         )
                     }
                     item {
@@ -4353,6 +4467,84 @@ private fun AddFuelScreen(
     }
 }
 
+// Both fields were plain typed-text OutlinedTextFields (no calendar/clock UI at all) — readOnly
+// + a tap-to-open Material3 DatePicker/TimePicker dialog instead. Stored format stays exactly
+// what the rest of the app already persists/parses: date as ISO "yyyy-MM-dd"
+// (LocalDate.toString()), time as ISO "HH:mm" (LocalTime.toString() with zero seconds).
+// DatePickerDialog's selectedDateMillis is UTC-midnight-of-day, so it's converted via
+// ZoneOffset.UTC specifically (not the device zone) per Compose's own recommendation — using the
+// local zone here would shift the parsed date by a day near midnight in zones ahead of UTC.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showPicker by remember { mutableStateOf(false) }
+    // A plain Modifier.clickable on a readOnly OutlinedTextField doesn't fire — the field's own
+    // pointer input (cursor placement / text selection) consumes the tap first even when
+    // readOnly. Same fix already used elsewhere in this file (see UnitDropdownField above): an
+    // invisible Box the same size laid on top to actually catch the tap.
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { showPicker = true })
+    }
+    if (showPicker) {
+        val initialMillis = remember(value) {
+            runCatching { LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull()
+        }
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        onValueChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    showPicker = false
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
+        ) { DatePicker(state = pickerState) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showPicker by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { showPicker = true })
+    }
+    if (showPicker) {
+        val parsed = remember(value) { runCatching { LocalTime.parse(value) }.getOrNull() ?: LocalTime.now() }
+        val pickerState = rememberTimePickerState(initialHour = parsed.hour, initialMinute = parsed.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            text = { TimePicker(state = pickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onValueChange(LocalTime.of(pickerState.hour, pickerState.minute).toString())
+                    showPicker = false
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
+        )
+    }
+}
+
 @Composable
 private fun OdometerField(
     value: String,
@@ -4486,6 +4678,11 @@ private fun PhotoAttachmentRow(
     onRemove: (String) -> Unit,
     onPickCamera: (() -> Unit)? = null,
     onPickPdf: (() -> Unit)? = null,
+    // Offers a "scan this photo" action in the full-screen preview for an already-attached image
+    // that never went through the pick-flow's automatic OCR (e.g. one shared in from another
+    // app). See FullScreenImageViewer's doc comment for the split between the two.
+    onScanReceipt: ((String) -> Unit)? = null,
+    onScanOdometer: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var fullScreenIndex by remember { mutableStateOf<Int?>(null) }
@@ -4566,6 +4763,8 @@ private fun PhotoAttachmentRow(
             initialIndex = index,
             onDismiss = { fullScreenIndex = null },
             onDelete = { uri -> onRemove(uri) },
+            onScanReceipt = onScanReceipt,
+            onScanOdometer = onScanOdometer,
         )
     }
 }
@@ -4577,7 +4776,7 @@ private val expenseCategories = listOf(
 // AddExpenseDialog / AddExpenseScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddExpenseScreen(
+internal fun AddExpenseScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: Expense? = null,
@@ -4586,13 +4785,18 @@ private fun AddExpenseScreen(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
+    // Same purpose as AddFuelScreen's param of the same name — see its doc comment.
+    initialPhotoPaths: List<String> = emptyList(),
+    // Same purpose as AddFuelScreen's param of the same name; only "receipt" scanning applies
+    // here (no odometer field on an expense).
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
     onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
-    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: initialPhotoPaths) }
     var isScanning by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(editing?.category ?: expenseCategories.first()) }
     var description by remember { mutableStateOf(editing?.description ?: "") }
@@ -4708,14 +4912,8 @@ private fun AddExpenseScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        date, { date = it },
-                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
-                        leadingIcon = { Icon(Icons.Filled.CalendarToday, contentDescription = null) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(time, { time = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) }, singleLine = true, modifier = Modifier.weight(1f))
+                    DateField(date, { date = it }, modifier = Modifier.weight(1f))
+                    TimeField(time, { time = it }, modifier = Modifier.weight(1f))
                 }
             }
             item {
@@ -4795,6 +4993,9 @@ private fun AddExpenseScreen(
                             }
                         },
                         onRemove = { uri -> photoUris = photoUris - uri },
+                        onScanReceipt = onScanExistingPhoto?.let { scan ->
+                            { path -> isScanning = true; scan(path, "expense") { result -> expenseHandlePicked(emptyList(), result) } }
+                        },
                     )
                 }
                 item {
@@ -4871,7 +5072,7 @@ private fun AddExpenseScreen(
 }
 
 @Composable
-private fun AddMaintenanceDialog(
+internal fun AddMaintenanceDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: MaintenanceTask? = null,
@@ -4984,7 +5185,7 @@ private fun AddMaintenanceDialog(
 }
 
 @Composable
-private fun AddTripDialog(
+internal fun AddTripDialog(
     saving: Boolean,
     editing: Trip? = null,
     prefillDistanceKm: Double? = null,

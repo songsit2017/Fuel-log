@@ -48,7 +48,10 @@ fun ProOnboardingScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 26.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 24.dp, vertical = 26.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
@@ -82,11 +85,12 @@ fun ProOnboardingScreen(
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 6.dp,
             ) {
-                Box(Modifier.size(160.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(160.dp).padding(12.dp), contentAlignment = Alignment.Center) {
                     Text(
                         averageKmPerLiterLabel ?: "—",
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

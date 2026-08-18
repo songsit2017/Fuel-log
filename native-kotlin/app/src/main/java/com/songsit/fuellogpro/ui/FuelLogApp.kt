@@ -276,26 +276,23 @@ fun FuelLogApp(
     sharedPhotoPaths: List<String> = emptyList(),
     onSharedPhotoConsumed: () -> Unit = {},
 ) {
-    // The "Pro" theme (FuelLog Pro Redesign concept, see FuelLogTheme.kt's ProLight/ProDark)
-    // swaps in a different navigation shell (5-tab bottom nav + More hub instead of this
-    // function's drawer) — everything below this branch is the default experience and is
-    // untouched by that theme. See ui/pro/ProAppShell.kt.
-    // BuildConfig.FORCE_PRO_THEME is only true for the ".dev" build variant (see
-    // build.gradle.kts) — that variant exists solely to preview this redesign, so it always
-    // opens straight into Pro regardless of the palette saved in DisplaySettings.
-    val effectiveThemePalette = if (com.songsit.fuellogpro.BuildConfig.FORCE_PRO_THEME) "pro" else displaySettings.themePalette
-    if (effectiveThemePalette == "pro") {
+    // Pro (FuelLog Pro Redesign concept, see FuelLogTheme.kt's ProLight/ProDark) is the app's
+    // only shell now — everyone always renders ProAppShell below, regardless of any legacy
+    // themePalette value persisted from before the other palettes were removed. The old
+    // drawer-based shell further down in this function is unreachable dead code, kept only
+    // because ProAppShell still reuses many of its supporting composables (ExpenseList,
+    // StatsScreen, SettingsScreen, etc. defined in this file).
+    run {
         // FuelLogApp's own MaterialTheme wrapper lives further down (around the FuelLogTheme(...)
-        // call below, for the default shell) — this early-return branch would otherwise render
-        // with no ColorScheme ancestor at all (Compose's stock M3 baseline purple) since it exits
-        // before reaching that wrapper. Wrap explicitly here so ProAppShell actually gets
-        // ProLight/ProDark instead of the default baseline scheme.
+        // call below, for the unreachable default shell) — this early-return branch would
+        // otherwise render with no ColorScheme ancestor at all (Compose's stock M3 baseline
+        // purple) since it exits before reaching that wrapper. Wrap explicitly here so
+        // ProAppShell actually gets ProLight/ProDark instead of the default baseline scheme.
         // Font stays a real user choice (Settings > แบบอักษร, now including the explicit
         // "System default" option — see AppFonts.kt) rather than force-locked to Kanit: Pro only
-        // fixes the color palette, same as every other theme in this app leaves font independent.
+        // fixes the color palette, font selection is independent.
         FuelLogTheme(
             themeMode = displaySettings.themeMode,
-            themePalette = effectiveThemePalette,
             fontFamily = displaySettings.fontFamily,
         ) {
         com.songsit.fuellogpro.ui.pro.ProAppShell(
@@ -2400,7 +2397,6 @@ internal fun SettingsScreen(
     var showDecimalsDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
-    var showThemePaletteDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
@@ -2517,20 +2513,6 @@ internal fun SettingsScreen(
                 )
             }
 
-            // The ".dev" build (BuildConfig.FORCE_PRO_THEME, see build.gradle.kts) always renders
-            // the Pro theme regardless of this setting — showing the palette picker there would
-            // be a dead control that looks broken (pick any other palette, nothing visibly
-            // changes), so it's hidden entirely rather than left selectable-but-inert. The
-            // production app (FORCE_PRO_THEME=false) is unaffected.
-            if (!com.songsit.fuellogpro.BuildConfig.FORCE_PRO_THEME) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title),
-                        subtitle = themePaletteLabel(displaySettings.themePalette),
-                        onClick = { showThemePaletteDialog = true },
-                    )
-                }
-            }
             item {
                 val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
                 PreferenceListItem(
@@ -2916,38 +2898,6 @@ internal fun SettingsScreen(
         )
     }
 
-    if (showThemePaletteDialog) {
-        AlertDialog(
-            onDismissRequest = { showThemePaletteDialog = false },
-            title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    themePaletteKeys.forEach { key ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clickable {
-                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
-                                    showThemePaletteDialog = false
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = displaySettings.themePalette == key,
-                                onClick = {
-                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
-                                    showThemePaletteDialog = false
-                                },
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(themePaletteLabel(key))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -18,17 +18,23 @@ private fun googleFontFamily(name: String) = FontFamily(Font(GoogleFont(name), f
 
 data class FontOption(val key: String, val label: String, val fontFamily: FontFamily)
 
-// "roboto" intentionally maps to FontFamily.Default (no download) rather than a Google Fonts
-// lookup — it's this app's original typeface, and matching the system default exactly avoids a
-// network fetch for the one option most likely to be picked by users who don't want to change
-// anything.
+// "system" and "roboto" both intentionally map to FontFamily.Default (no download) rather than a
+// Google Fonts lookup — that's the device's actual system typeface, so no network fetch is
+// needed. "system" is the explicit, clearly-labeled "follow system" choice; "roboto" is kept
+// as-is (same underlying font) purely so existing saved settings referencing that key still
+// resolve to what they always did.
 val fontOptions = listOf(
+    FontOption("system", "System default", FontFamily.Default),
     FontOption("ubuntu", "Ubuntu", googleFontFamily("Ubuntu")),
     FontOption("roboto", "Roboto (old default)", FontFamily.Default),
     FontOption("noto_sans", "Noto Sans", googleFontFamily("Noto Sans")),
     FontOption("lato", "Lato", googleFontFamily("Lato")),
     FontOption("open_sans", "Open Sans", googleFontFamily("Open Sans")),
     FontOption("source_sans_pro", "Source Sans Pro", googleFontFamily("Source Sans Pro")),
+    // Paired with the "Pro" theme palette (FuelLogTheme.kt) to match the FuelLog Pro Redesign
+    // concept, which specifies Kanit — kept as an independent font-picker entry rather than
+    // forced by the palette, same as every other font/palette combination in this app.
+    FontOption("kanit", "Kanit", googleFontFamily("Kanit")),
 )
 
 fun resolveFontFamily(key: String): FontFamily =

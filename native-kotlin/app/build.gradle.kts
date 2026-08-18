@@ -31,6 +31,8 @@ android {
         versionCode = providers.environmentVariable("FUELLOG_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("FUELLOG_VERSION_NAME").orNull ?: "9.0.0-native-alpha.1"
         manifestPlaceholders["MAPS_API_KEY"] = secretsProps.getProperty("MAPS_API_KEY", "MISSING")
+        manifestPlaceholders["appLabel"] = "FuelLog Pro"
+        buildConfigField("boolean", "FORCE_PRO_THEME", "false")
     }
     signingConfigs {
         create("release") {
@@ -59,6 +61,21 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = false
+        }
+        // A distinct applicationId so this installs side-by-side with the production app
+        // instead of fighting its version/signature — needed to test the "Pro" redesign
+        // (ui/pro/*) on a device that already has the production build installed. Google
+        // Sign-In/Cloud Sync/Drive backup work here too: this package + the debug keystore's
+        // SHA-1 are registered as their own Android app in the same Firebase project
+        // (fuellog-pro-f2a12), and app/google-services.json now carries both clients.
+        getByName("debug") {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "FuelLog Pro Dev"
+            // This app exists solely to preview the Pro redesign, so it always opens straight
+            // into it (see the FuelLogApp() gate) instead of requiring a trip through
+            // Settings > Theme like the production app.
+            buildConfigField("boolean", "FORCE_PRO_THEME", "true")
         }
     }
     buildFeatures {

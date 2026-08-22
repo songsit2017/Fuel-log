@@ -3,6 +3,7 @@ package com.songsit.fuellogpro.ui.timeline
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -62,8 +64,9 @@ import androidx.compose.ui.layout.ContentScale
 import com.songsit.fuellogpro.data.local.isPdfPath
 import com.songsit.fuellogpro.domain.model.Expense
 import com.songsit.fuellogpro.domain.model.FuelEntry
-import com.songsit.fuellogpro.ui.LocalDisplaySettings
 import com.songsit.fuellogpro.ui.NativeAppState
+import com.songsit.fuellogpro.ui.ProGood
+import com.songsit.fuellogpro.ui.ProGoodDark
 import com.songsit.fuellogpro.ui.categoryDisplayLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,7 +129,7 @@ fun TimelineScreen(
                     label,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
@@ -148,14 +151,14 @@ private fun TimelineEntryRow(
     onImageClick: (List<String>, Int) -> Unit,
     onFuelRecordClick: (FuelEntry) -> Unit,
 ) {
-    // Pro theme distinguishes entry types by color (fuel = amber/primary, expense/maintenance =
-    // teal/secondary, per the redesign concept) instead of coloring every row the same accent —
-    // the default theme keeps its original single-accent look untouched.
-    val isPro = LocalDisplaySettings.current.themePalette == "pro"
-    val rowAccent = if (isPro && row is TimelineRow.FuelRow) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.secondary
+    // Icon/dot accent only — the card itself stays neutral (see the Card below). Fuel = primary
+    // (brand accent), income = the semantic "good" green (kept separate from colorScheme.secondary,
+    // which is the brand orange now, not a semantic color), everything else = neutral.
+    val goodColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) ProGoodDark else ProGood
+    val rowAccent = when {
+        row is TimelineRow.FuelRow -> MaterialTheme.colorScheme.primary
+        row is TimelineRow.ExpenseRow && row.expense.income -> goodColor
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         // Simple vertical line + dot, built from plain Box (no external library).
@@ -186,28 +189,38 @@ private fun TimelineEntryRow(
             )
         }
         Spacer(Modifier.width(8.dp))
+        val amountColor = when {
+            row is TimelineRow.ExpenseRow && row.expense.income -> goodColor
+            else -> MaterialTheme.colorScheme.onSurface
+        }
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 .let { if (row is TimelineRow.FuelRow) it.clickable { onFuelRecordClick(row.entry) } else it },
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         ) {
             when (row) {
-                is TimelineRow.FuelRow -> FuelTimelineContent(row.entry, onImageClick, rowAccent)
-                is TimelineRow.ExpenseRow -> ExpenseTimelineContent(row.expense, onImageClick)
+                is TimelineRow.FuelRow -> FuelTimelineContent(row.entry, onImageClick, rowAccent, amountColor)
+                is TimelineRow.ExpenseRow -> ExpenseTimelineContent(row.expense, onImageClick, rowAccent, amountColor)
             }
         }
     }
 }
 
 @Composable
-private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, Int) -> Unit, accent: Color) {
+private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, Int) -> Unit, accent: Color, amountColor: Color) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(entry.date, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text(timelineCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = accent)
+            Text(
+                timelineCurrency.format(entry.amount),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = amountColor,
+            )
         }
         val detail = listOfNotNull(
             entry.station.takeIf(String::isNotBlank),
@@ -219,21 +232,22 @@ private fun FuelTimelineContent(entry: FuelEntry, onImageClick: (List<String>, I
 }
 
 @Composable
-private fun ExpenseTimelineContent(expense: Expense, onImageClick: (List<String>, Int) -> Unit) {
+private fun ExpenseTimelineContent(expense: Expense, onImageClick: (List<String>, Int) -> Unit, accent: Color, amountColor: Color) {
     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (expense.income) Icons.Filled.Savings else Icons.Filled.Receipt,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
+                tint = accent,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(expense.date, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Text(
                 "${if (expense.income) "+" else "−"}${timelineCurrency.format(expense.amount)}",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary,
+                color = amountColor,
             )
         }
         val detail = listOf(categoryDisplayLabel(expense.category), expense.description).filter(String::isNotBlank).joinToString(" • ")

@@ -299,6 +299,7 @@ class NativeAppViewModel(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.selectedVehicle?.id
@@ -326,6 +327,7 @@ class NativeAppViewModel(
                     recurring,
                     reminderDate,
                     photoUri,
+                    paymentMethod,
                 )
             }.onSuccess {
                 onReminderDataChanged()
@@ -348,6 +350,7 @@ class NativeAppViewModel(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.expenses.firstOrNull { it.id == id }?.vehicleId
@@ -364,7 +367,7 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri)
+                expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri, paymentMethod)
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()

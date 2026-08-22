@@ -9,86 +9,84 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 
-// "Pro" — warm amber/teal palette matching the FuelLog Pro Redesign concept (Claude Design
-// project ea1e0f11-0f7f-400f-8f99-9a0eeb7e3b62). Hex values are sRGB conversions of that
-// mockup's exact oklch() tokens (amber/teal/red, plus warm-neutral bg/surface/text), so this
-// scheme reproduces the concept's colors rather than approximating them by eye. Dark mode uses
-// a near-black (AMOLED-friendly) background/surface.
-// onXContainer intentionally equals the saturated X color (not a darker/neutral tone) because the
-// mockup's status badges render e.g. amber text directly on amberDim background.
+// "Modern Minimal Bento" identity: a unified dual-accent system (electric blue + vibrant orange)
+// on neutral slate surfaces, replacing the earlier per-category rainbow — blue (primary) marks
+// key metrics/highlight numbers/selected states, orange (secondary) marks actions (FAB, "full
+// tank" badges, progress bars). Cards stay MaterialTheme.colorScheme.surface with a subtle
+// outline hairline, not a tinted background. All text/icon pairs below clear at least 3:1
+// (large/bold numerals, icon-on-fill) or 4.5:1 (body text) WCAG contrast against their background.
 private val ProLight = lightColorScheme(
-    primary = Color(0xFFE15F0A),
-    onPrimary = Color(0xFFFCFCFC),
-    primaryContainer = Color(0xFFFBEADF),
-    onPrimaryContainer = Color(0xFFE15F0A),
-    secondary = Color(0xFF00847E),
-    onSecondary = Color(0xFFFCFCFC),
-    secondaryContainer = Color(0xFFE0EEED),
-    onSecondaryContainer = Color(0xFF00847E),
-    tertiary = Color(0xFF00847E),
-    onTertiary = Color(0xFFFCFCFC),
-    tertiaryContainer = Color(0xFFE0EEED),
-    onTertiaryContainer = Color(0xFF00847E),
-    error = Color(0xFFC8393A),
-    onError = Color(0xFFFCFCFC),
-    errorContainer = Color(0xFFF8E5E5),
-    onErrorContainer = Color(0xFFC8393A),
-    background = Color(0xFFF7F5F1),
-    onBackground = Color(0xFF281C17),
-    surface = Color(0xFFFEFDFC),
-    onSurface = Color(0xFF281C17),
-    surfaceVariant = Color(0xFFEFEAE4),
-    onSurfaceVariant = Color(0xFF6D6059),
-    surfaceContainerLowest = Color(0xFFFEFDFC),
-    surfaceContainerLow = Color(0xFFFEFDFC),
-    surfaceContainer = Color(0xFFFEFDFC),
-    surfaceContainerHigh = Color(0xFFEFEAE4),
-    surfaceContainerHighest = Color(0xFFE8E2DA),
-    outline = Color(0xFF6D6059),
-    outlineVariant = Color(0xFFE6E4E0),
+    primary = Color(0xFF0284C7),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFE0F2FE),
+    onPrimaryContainer = Color(0xFF075985),
+    secondary = Color(0xFFEA580C),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFFFEDD5),
+    onSecondaryContainer = Color(0xFF9A3412),
+    tertiary = Color(0xFF0284C7),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFE0F2FE),
+    onTertiaryContainer = Color(0xFF075985),
+    error = Color(0xFFDC2626),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFEE2E2),
+    onErrorContainer = Color(0xFF991B1B),
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF0F172A),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF64748B),
+    surfaceContainerLowest = Color(0xFFF8FAFC),
+    surfaceContainerLow = Color(0xFFFFFFFF),
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFFFFFFF),
+    surfaceContainerHighest = Color(0xFFF1F5F9),
+    outline = Color(0x0F0F172A),
+    outlineVariant = Color(0x0F0F172A),
 )
-// The mockup's literal dark-mode oklch tokens (amber H95 C0.06, teal C0.065, red C0.08) are
-// intentionally low-chroma "night comfort" tones — accurate to the mockup, but on a real AMOLED
-// panel next to a near-black background they read as flat/murky rather than refined. Bumped
-// lightness+chroma here (still oklch, same hue families) for a dark palette that stays true to
-// the concept's warm-amber/teal identity but is actually legible: primary/secondary/error each
-// clear 6.4:1+ contrast against `background` (was ~5-7:1 with the literal mockup values).
 private val ProDark = darkColorScheme(
-    primary = Color(0xFFF28E42),
-    onPrimary = Color(0xFF140B06),
-    primaryContainer = Color(0xFF3B2717),
-    onPrimaryContainer = Color(0xFFF28E42),
-    // First pass (#1DBCB5) was too light/high-chroma and read as bright mint instead of the
-    // mockup's deep teal — pulled lightness down and hue slightly bluer for a richer teal that
-    // still clears 5:1+ contrast on background.
-    secondary = Color(0xFF1F9197),
-    onSecondary = Color(0xFF010C0B),
-    secondaryContainer = Color(0xFF152524),
-    onSecondaryContainer = Color(0xFF1F9197),
-    tertiary = Color(0xFF1F9197),
-    onTertiary = Color(0xFF010C0B),
-    tertiaryContainer = Color(0xFF152524),
-    onTertiaryContainer = Color(0xFF1F9197),
-    error = Color(0xFFEA6A64),
-    onError = Color(0xFF1A0503),
-    errorContainer = Color(0xFF3A201D),
-    onErrorContainer = Color(0xFFEA6A64),
-    background = Color(0xFF080706),
-    onBackground = Color(0xFFBBB6B3),
-    surface = Color(0xFF13100E),
-    onSurface = Color(0xFFBBB6B3),
-    surfaceVariant = Color(0xFF1E1917),
-    // Lightened from the mockup's literal textMuted (#6D6863, 3.65:1 on background — borderline
-    // for body text) to #8A8580 (5.5:1) so secondary labels stay legible on a true-black screen.
-    onSurfaceVariant = Color(0xFF8A8580),
-    surfaceContainerLowest = Color(0xFF080706),
-    surfaceContainerLow = Color(0xFF0E0C0A),
-    surfaceContainer = Color(0xFF0E0C0A),
-    surfaceContainerHigh = Color(0xFF13100E),
-    surfaceContainerHighest = Color(0xFF1E1917),
-    outline = Color(0xFF8A8580),
-    outlineVariant = Color(0xFF141312),
+    primary = Color(0xFF38BDF8),
+    onPrimary = Color(0xFF04283D),
+    primaryContainer = Color(0xFF0C4A6E),
+    onPrimaryContainer = Color(0xFF7DD3FC),
+    secondary = Color(0xFFFB923C),
+    onSecondary = Color(0xFF2B1400),
+    secondaryContainer = Color(0xFF7C2D12),
+    onSecondaryContainer = Color(0xFFFDBA74),
+    tertiary = Color(0xFF38BDF8),
+    onTertiary = Color(0xFF04283D),
+    tertiaryContainer = Color(0xFF0C4A6E),
+    onTertiaryContainer = Color(0xFF7DD3FC),
+    error = Color(0xFFF1746B),
+    onError = Color(0xFF220806),
+    errorContainer = Color(0xFF3A1A18),
+    onErrorContainer = Color(0xFFF1746B),
+    background = Color(0xFF0F1115),
+    onBackground = Color(0xFFF8FAFC),
+    surface = Color(0xFF181B20),
+    onSurface = Color(0xFFF8FAFC),
+    surfaceVariant = Color(0xFF20242B),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    surfaceContainerLowest = Color(0xFF0F1115),
+    surfaceContainerLow = Color(0xFF14171C),
+    surfaceContainer = Color(0xFF14171C),
+    surfaceContainerHigh = Color(0xFF181B20),
+    surfaceContainerHighest = Color(0xFF20242B),
+    outline = Color(0x14FFFFFF),
+    outlineVariant = Color(0x14FFFFFF),
 )
+
+// Semantic "good/positive" green, kept separate from colorScheme.secondary (which is now the
+// brand orange accent, not a semantic color) — used for improving-trend badges and income amounts.
+val ProGood = Color(0xFF16A34A)
+val ProGoodDark = Color(0xFF4ADE80)
+
+// Exact translucent badge fills from the design spec ("Full Tank" style pills) — not expressible
+// as a plain colorScheme role, so kept as named constants.
+val FullTankBadgeLight = Color(0x1FEA580C)
+val FullTankBadgeDark = Color(0x26FB923C)
 
 private fun typographyFor(fontFamily: FontFamily): Typography {
     val base = Typography()

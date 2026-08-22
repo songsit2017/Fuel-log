@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
@@ -95,6 +97,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -2351,11 +2354,41 @@ private fun PreferenceCategoryHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
     )
 }
+
+// Groups related PreferenceListItem rows into a single Bento card: surface background, 20dp
+// rounded corners, 1dp outline border. Pass rows as `content`, separated by HorizontalDivider
+// where a visual break inside the group is wanted.
+@Composable
+private fun BentoGroupCard(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column {
+        if (title != null) {
+            PreferenceCategoryHeader(title)
+        }
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        ) {
+            Column(content = content)
+        }
+    }
+}
+
+// Shared checked-state colors for every settings Switch: primary thumb + track, as opposed to
+// Compose's default (onPrimary thumb / primary track) so the toggle reads as one solid brand-color
+// pill when on.
+@Composable
+private fun bentoSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.primary,
+    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+    checkedBorderColor = MaterialTheme.colorScheme.primary,
+)
 
 @Composable
 private fun PreferenceListItem(
@@ -2385,8 +2418,13 @@ private fun PreferenceListItem(
                 )
             }
         }
-        if (trailing != null) {
-            trailing()
+        when {
+            trailing != null -> trailing()
+            onClick != null -> Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
         }
     }
 }
@@ -2498,233 +2536,213 @@ internal fun SettingsScreen(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             // ── Category 1: general ──────────────────────────────────────────────
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) }
-
             item {
-                val volumeLabel = stringResource(if (displaySettings.volumeUnit == "gal") com.songsit.fuellogpro.R.string.unit_word_gallons else com.songsit.fuellogpro.R.string.unit_word_liters)
-                val distLabel = stringResource(if (displaySettings.distanceUnit == "mi") com.songsit.fuellogpro.R.string.unit_word_mi else com.songsit.fuellogpro.R.string.unit_word_km)
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_units_subtitle, volumeLabel, distLabel),
-                    onClick = { showUnitDialog = true },
-                )
-            }
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) {
+                    val volumeLabel = stringResource(if (displaySettings.volumeUnit == "gal") com.songsit.fuellogpro.R.string.unit_word_gallons else com.songsit.fuellogpro.R.string.unit_word_liters)
+                    val distLabel = stringResource(if (displaySettings.distanceUnit == "mi") com.songsit.fuellogpro.R.string.unit_word_mi else com.songsit.fuellogpro.R.string.unit_word_km)
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_units_subtitle, volumeLabel, distLabel),
+                        onClick = { showUnitDialog = true },
+                    )
 
-            item {
-                val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
-                    subtitle = currencyDisplayLabel(currencyOption.code),
-                    onClick = { showCurrencyDialog = true },
-                )
-            }
+                    val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
+                        subtitle = currencyDisplayLabel(currencyOption.code),
+                        onClick = { showCurrencyDialog = true },
+                    )
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_theme_title),
-                    subtitle = when (displaySettings.themeMode) {
-                        "light" -> stringResource(com.songsit.fuellogpro.R.string.theme_light)
-                        "dark" -> stringResource(com.songsit.fuellogpro.R.string.theme_dark)
-                        else -> stringResource(com.songsit.fuellogpro.R.string.theme_system)
-                    },
-                    onClick = { showThemeDialog = true },
-                )
-                // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
-            }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_theme_title),
+                        subtitle = when (displaySettings.themeMode) {
+                            "light" -> stringResource(com.songsit.fuellogpro.R.string.theme_light)
+                            "dark" -> stringResource(com.songsit.fuellogpro.R.string.theme_dark)
+                            else -> stringResource(com.songsit.fuellogpro.R.string.theme_system)
+                        },
+                        onClick = { showThemeDialog = true },
+                    )
+                    // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_font_title),
-                    subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
-                    onClick = { showFontDialog = true },
-                )
-            }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_font_title),
+                        subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
+                        onClick = { showFontDialog = true },
+                    )
 
-            item {
-                val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label),
-                    subtitle = when (currentLanguageTag) {
-                        "th" -> stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
-                        "en" -> stringResource(com.songsit.fuellogpro.R.string.language_name_english)
-                        else -> stringResource(com.songsit.fuellogpro.R.string.language_system_default)
-                    },
-                    onClick = { showLanguageDialog = true },
-                )
-            }
+                    val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label),
+                        subtitle = when (currentLanguageTag) {
+                            "th" -> stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
+                            "en" -> stringResource(com.songsit.fuellogpro.R.string.language_name_english)
+                            else -> stringResource(com.songsit.fuellogpro.R.string.language_system_default)
+                        },
+                        onClick = { showLanguageDialog = true },
+                    )
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_other_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_other_subtitle),
-                    onClick = { showOtherSettings = true },
-                )
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_other_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_other_subtitle),
+                        onClick = { showOtherSettings = true },
+                    )
+                }
             }
 
             // ── Category 2: backup (import/export) ───────────────────────
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) }
             item {
-                val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
-                val syncSubtitle = when {
-                    syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_summary, syncConflicts.size)
-                    cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
-                    else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) {
+                    val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
+                    val syncSubtitle = when {
+                        syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_summary, syncConflicts.size)
+                        cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
+                        else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
+                    }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
+                        subtitle = syncSubtitle,
+                        leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        onClick = { showImportExport = true },
+                    )
+
+                    if (canShareVehicle) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
+                            subtitle = if (vehicleMembers.isEmpty()) {
+                                stringResource(com.songsit.fuellogpro.R.string.family_share_no_members)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
+                            },
+                            leading = {
+                                Icon(
+                                    Icons.Filled.People,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = { showFamilySharing = true },
+                        )
+                    }
                 }
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
-                    subtitle = syncSubtitle,
-                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = { showImportExport = true },
-                )
             }
 
-            if (canShareVehicle) {
-                item {
+            // ── Category 3: PU Pocket account & cloud ────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_pupu_pocket)) {
+                    if (cloudState.uid == null) {
+                        PreferenceListItem(
+                            title = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                            },
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_sign_in_subtitle),
+                            leading = {
+                                Icon(
+                                    Icons.Filled.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        )
+                    } else {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_subtitle),
+                            leading = {
+                                Icon(
+                                    Icons.Filled.Sync,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = { showPupuPocketLink = true },
+                        )
+                    }
+                }
+            }
+
+            // ── Category 4: about ───────────────────────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) {
                     PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
-                        subtitle = if (vehicleMembers.isEmpty()) {
-                            stringResource(com.songsit.fuellogpro.R.string.family_share_no_members)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
+                        title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_about_subtitle),
+                    )
+
+                    val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
+                    var checkingUpdate by remember { mutableStateOf(false) }
+                    var checkedUpToDate by remember { mutableStateOf(false) }
+                    var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
+                    val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
+                    val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
+                    val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
+                        subtitle = when {
+                            checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
+                            foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
+                            checkedUpToDate -> upToDateMessage
+                            else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
                         },
-                        leading = {
-                            Icon(
-                                Icons.Filled.People,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                        onClick = {
+                            if (checkingUpdate) return@PreferenceListItem
+                            // Once a check has found an update, tapping again downloads it instead of
+                            // re-checking — the row's subtitle already makes this action explicit.
+                            val update = foundUpdate
+                            if (update != null) {
+                                uriHandler.openUri(update.downloadUrl)
+                                return@PreferenceListItem
+                            }
+                            checkingUpdate = true
+                            checkedUpToDate = false
+                            checkUpdateScope.launch {
+                                val result = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
+                                checkingUpdate = false
+                                checkedUpToDate = result == null
+                                foundUpdate = result
+                            }
                         },
-                        onClick = { showFamilySharing = true },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
+                        subtitle = "songsit2017 • songsit2017@gmail.com",
+                        onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_subtitle),
+                        onClick = { showOpenSourceLicenses = true }
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_subtitle),
+                        onClick = { showChangelog = true },
                     )
                 }
             }
 
-            // ── Category 3: about ───────────────────────────────────────────────
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            // ── Category 5: data sources ─────────────────────────────────────────
             item {
-                PreferenceCategoryHeader(
-                    stringResource(com.songsit.fuellogpro.R.string.settings_category_pupu_pocket),
-                )
-            }
-            if (cloudState.uid == null) {
-                item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) {
                     PreferenceListItem(
-                        title = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
-                        },
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_sign_in_subtitle),
-                        leading = {
-                            Icon(
-                                Icons.Filled.AccountCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_subtitle),
+                    )
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_update_check_source_title), subtitle = "GitHub Releases API")
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),
+                        subtitle = "github.com/songsit2017/Fuel-log",
+                        onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
                     )
                 }
-            } else {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_subtitle),
-                        leading = {
-                            Icon(
-                                Icons.Filled.Sync,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        onClick = { showPupuPocketLink = true },
-                    )
-                }
-            }
-
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) }
-            item {
-                PreferenceListItem(
-                    title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_about_subtitle),
-                )
-            }
-            item {
-                val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
-                var checkingUpdate by remember { mutableStateOf(false) }
-                var checkedUpToDate by remember { mutableStateOf(false) }
-                var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
-                val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
-                val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
-                val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
-                    subtitle = when {
-                        checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
-                        foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
-                        checkedUpToDate -> upToDateMessage
-                        else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
-                    },
-                    onClick = {
-                        if (checkingUpdate) return@PreferenceListItem
-                        // Once a check has found an update, tapping again downloads it instead of
-                        // re-checking — the row's subtitle already makes this action explicit.
-                        val update = foundUpdate
-                        if (update != null) {
-                            uriHandler.openUri(update.downloadUrl)
-                            return@PreferenceListItem
-                        }
-                        checkingUpdate = true
-                        checkedUpToDate = false
-                        checkUpdateScope.launch {
-                            val result = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
-                            checkingUpdate = false
-                            checkedUpToDate = result == null
-                            foundUpdate = result
-                        }
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
-                    subtitle = "songsit2017 • songsit2017@gmail.com",
-                    onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_subtitle),
-                    onClick = { showOpenSourceLicenses = true }
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_subtitle),
-                    onClick = { showChangelog = true },
-                )
-            }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_subtitle),
-                )
-            }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_update_check_source_title), subtitle = "GitHub Releases API") }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),
-                    subtitle = "github.com/songsit2017/Fuel-log",
-                    onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
-                )
             }
         }
     }
@@ -2953,58 +2971,62 @@ private fun OtherSettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_logging)) }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = settings.defaultFullTank,
-                            onCheckedChange = {
-                                onSettingsChange(settings.copy(defaultFullTank = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onSettingsChange(settings.copy(defaultFullTank = !settings.defaultFullTank))
-                    },
-                )
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_logging)) {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = settings.defaultFullTank,
+                                onCheckedChange = {
+                                    onSettingsChange(settings.copy(defaultFullTank = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onSettingsChange(settings.copy(defaultFullTank = !settings.defaultFullTank))
+                        },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = settings.confirmBeforeDelete,
+                                onCheckedChange = {
+                                    onSettingsChange(settings.copy(confirmBeforeDelete = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
+                        },
+                    )
+                }
             }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = settings.confirmBeforeDelete,
-                            onCheckedChange = {
-                                onSettingsChange(settings.copy(confirmBeforeDelete = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
-                    },
-                )
-            }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_notifications)) }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = reminderSettings.fuelEfficiencyAlerts,
-                            onCheckedChange = {
-                                onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = !reminderSettings.fuelEfficiencyAlerts))
-                    },
-                )
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_notifications)) {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = reminderSettings.fuelEfficiencyAlerts,
+                                onCheckedChange = {
+                                    onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = !reminderSettings.fuelEfficiencyAlerts))
+                        },
+                    )
+                }
             }
         }
     }
@@ -3046,172 +3068,194 @@ private fun ImportExportScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title)) }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.backup_json_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.backup_json_subtitle),
-                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onExportBackup,
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.export_csv_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.export_csv_subtitle),
-                    leading = { Icon(Icons.Filled.ListAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onExportCsv,
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.import_data_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.import_data_subtitle),
-                    leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onImportBackup,
-                )
-            }
-            if (onDriveBackup != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_backup_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_backup_subtitle),
-                        leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onDriveBackup,
-                    )
-                }
-            }
-            if (onDriveRestore != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_restore_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_restore_subtitle),
-                        leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onDriveRestore,
-                    )
-                }
-            }
-            if (onDriveAutoSyncChange != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_subtitle),
-                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        trailing = {
-                            Switch(
-                                checked = driveAutoSyncEnabled,
-                                onCheckedChange = onDriveAutoSyncChange,
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title)) {
+                    // Export buttons: JSON backup and CSV report side-by-side as outlined actions
+                    // rather than full list rows, since these are the two "produce a file" exports.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onExportBackup,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Filled.CloudUpload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp),
                             )
-                        },
-                        onClick = { onDriveAutoSyncChange(!driveAutoSyncEnabled) },
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.songsit.fuellogpro.R.string.backup_json_title),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onExportCsv,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Filled.ListAlt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.songsit.fuellogpro.R.string.export_csv_title),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.import_data_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.import_data_subtitle),
+                        leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        onClick = onImportBackup,
                     )
+
+                    if (onDriveBackup != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_backup_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_backup_subtitle),
+                            leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = onDriveBackup,
+                        )
+                    }
+                    if (onDriveRestore != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_restore_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_restore_subtitle),
+                            leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = onDriveRestore,
+                        )
+                    }
+                    if (onDriveAutoSyncChange != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_subtitle),
+                            leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            trailing = {
+                                Switch(
+                                    checked = driveAutoSyncEnabled,
+                                    onCheckedChange = onDriveAutoSyncChange,
+                                    colors = bentoSwitchColors(),
+                                )
+                            },
+                            onClick = { onDriveAutoSyncChange(!driveAutoSyncEnabled) },
+                        )
+                    }
                 }
             }
 
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.google_sync_category)) }
-            if (cloudState.uid == null) {
-                item {
-                    PreferenceListItem(
-                        title = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
-                        },
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.google_sync_subtitle),
-                        leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
-                    )
-                }
-            } else {
-                item {
-                    PreferenceListItem(
-                        title = cloudState.email ?: stringResource(com.songsit.fuellogpro.R.string.google_connected_default),
-                        subtitle = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_syncing)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_tap_to_sync)
-                        },
-                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = if (!cloudState.syncing) onCloudSync else null,
-                    )
-                }
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.google_sign_out),
-                        leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = onSignOut,
-                    )
-                }
-            }
-            cloudState.message?.let { message ->
-                item {
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
+            // ── Account & cloud ───────────────────────────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.google_sync_category)) {
+                    if (cloudState.uid == null) {
+                        PreferenceListItem(
+                            title = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                            },
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.google_sync_subtitle),
+                            leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        )
+                    } else {
+                        PreferenceListItem(
+                            title = cloudState.email ?: stringResource(com.songsit.fuellogpro.R.string.google_connected_default),
+                            subtitle = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_syncing)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_tap_to_sync)
+                            },
+                            leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = if (!cloudState.syncing) onCloudSync else null,
+                        )
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.google_sign_out),
+                            leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = onSignOut,
+                        )
+                    }
+                    cloudState.message?.let { message ->
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                 }
             }
 
             if (syncConflicts.isNotEmpty()) {
-                item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-                item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_category)) }
                 item {
-                    Text(
-                        stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-                }
-                item {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = { onResolveAllConflicts(true) },
-                            enabled = !cloudState.syncing,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_local)) }
-                        OutlinedButton(
-                            onClick = { onResolveAllConflicts(false) },
-                            enabled = !cloudState.syncing,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_cloud)) }
-                    }
-                }
-                if (syncConflicts.size > 5) {
-                    item {
+                    BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_category)) {
                         Text(
-                            stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_showing_n_of, syncConflicts.size),
+                            stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size),
+                            color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
-                    }
-                }
-                items(syncConflicts.take(5)) { conflict ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { onResolveAllConflicts(true) },
+                                enabled = !cloudState.syncing,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_local), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) }
+                            OutlinedButton(
+                                onClick = { onResolveAllConflicts(false) },
+                                enabled = !cloudState.syncing,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_cloud), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) }
+                        }
+                        if (syncConflicts.size > 5) {
                             Text(
-                                "${conflict.collectionName} • ${conflict.recordId.take(8)}",
-                                fontWeight = FontWeight.SemiBold,
+                                stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_showing_n_of, syncConflicts.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = { onResolveConflict(conflict.key, true) },
-                                    enabled = !cloudState.syncing,
-                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_local)) }
-                                TextButton(
-                                    onClick = { onResolveConflict(conflict.key, false) },
-                                    enabled = !cloudState.syncing,
-                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_cloud)) }
+                        }
+                        syncConflicts.take(5).forEach { conflict ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text(
+                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, true) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_local)) }
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, false) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_cloud)) }
+                                    }
+                                }
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 package com.songsit.fuellogpro.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -164,6 +165,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -222,8 +224,8 @@ fun FuelLogApp(
     onAddFuel: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdateFuel: (String, FuelEntryFormValues, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
+    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdateMaintenance: (String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
@@ -1432,7 +1434,12 @@ internal fun OilPriceCard(info: OilPriceInfo) {
     val safeIndex = selectedIndex.coerceIn(0, info.brands.lastIndex)
     val selected = info.brands[safeIndex]
 
-    Card(shape = RoundedCornerShape(20.dp)) {
+    // Modern Minimal Bento: neutral surface + subtle outline hairline, not a tinted background.
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -1544,7 +1551,23 @@ private fun OilPriceRow(label: String, price: Double?) {
             thaiCurrency.format(price),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+// "Full tank" status pill — secondary (orange) text on the spec's exact translucent orange fill,
+// full CircleShape corners.
+@Composable
+internal fun FullTankBadge() {
+    val badgeBg = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) FullTankBadgeDark else FullTankBadgeLight
+    Surface(shape = CircleShape, color = badgeBg) {
+        Text(
+            stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank),
+            color = MaterialTheme.colorScheme.secondary,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
 }
@@ -1625,7 +1648,8 @@ internal fun MetricCard(label: String, value: String, modifier: Modifier = Modif
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.padding(16.dp)) {
             if (icon != null) {
@@ -1634,7 +1658,15 @@ internal fun MetricCard(label: String, value: String, modifier: Modifier = Modif
             }
             Text(label, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(6.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            // Matches IconBadge's own icon tint (primary) so the number carries the same accent
+            // as its icon instead of sitting there in plain onSurface — colored icon, gray value
+            // reads inconsistent.
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (icon != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            )
         }
     }
 }
@@ -1670,7 +1702,7 @@ internal fun FuelList(
                     label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )
             }
@@ -1765,7 +1797,7 @@ internal fun ExpenseList(
                     label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )
             }
@@ -1783,9 +1815,12 @@ private fun ExpenseRow(
     onEdit: ((Expense) -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val goodColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) ProGoodDark else ProGood
+    val amountColor = if (expense.income) goodColor else MaterialTheme.colorScheme.onSurface
     Card(
         shape = RoundedCornerShape(18.dp),
         modifier = if (onEdit != null) Modifier.clickable { onEdit(expense) } else Modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
             IconBadge(if (expense.income) Icons.Filled.Savings else Icons.Filled.Receipt)
@@ -1826,7 +1861,7 @@ private fun ExpenseRow(
                 Text(
                     "${if (expense.income) "+" else ""}${thaiCurrency.format(kotlin.math.abs(expense.amount))}",
                     fontWeight = FontWeight.Bold,
-                    color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                    color = amountColor,
                 )
                 Box {
                     IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(28.dp)) {
@@ -2070,6 +2105,7 @@ internal fun FuelRow(
     Card(
         shape = RoundedCornerShape(18.dp),
         modifier = if (onEdit != null) Modifier.clickable { onEdit(entry) } else Modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2079,7 +2115,7 @@ internal fun FuelRow(
                     Text(entry.station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.fuel_default_label) }, fontWeight = FontWeight.SemiBold)
                     Text("${entry.date} • ${number.format(entry.odometerKm)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}", style = MaterialTheme.typography.bodySmall)
                 }
-                Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
+                Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             if (entry.photoUrls.isNotEmpty()) {
                 TimelineThumbnails(entry.photoUrls, onImageClick ?: { _, _ -> })
@@ -2095,16 +2131,7 @@ internal fun FuelRow(
                     kmPerLiter?.let { Text(stringResource(com.songsit.fuellogpro.R.string.fuel_efficiency_line, number.format(it)), style = MaterialTheme.typography.labelSmall) }
                 }
                 if (entry.fullTank) {
-                    // Pro's tertiary role stays teal for other uses (Stats donut slices need a
-                    // color distinct from primary; Maintenance due-soon/OK stay as-is) — this one
-                    // badge specifically reads as amber in the Pro theme per user feedback, since
-                    // teal here looked like a stray "mint" accent against the rest of the amber UI.
-                    val fullTankColor = if (LocalDisplaySettings.current.themePalette == "pro") {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.tertiary
-                    }
-                    Text(stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank), color = fullTankColor)
+                    FullTankBadge()
                 }
                 onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) } }
             }
@@ -3608,6 +3635,84 @@ private fun UnitDropdownField(
     }
 }
 
+// Cash, a spread of Thai banks/credit cards/loan products, or "อื่นๆ" to type any product name
+// not listed — mirrors the maintenance-category dialog's dropdown-plus-custom-field pattern.
+// Bank/card product names are kept as-is in every language (proper nouns), same as station brand
+// names elsewhere in the app — only the field's own label is localized.
+private val paymentMethodOptions = listOf(
+    "เงินสด",
+    "ธนาคารกรุงเทพ",
+    "ธนาคารกสิกรไทย",
+    "ธนาคารไทยพาณิชย์",
+    "ธนาคารกรุงไทย",
+    "ธนาคารกรุงศรีอยุธยา",
+    "ธนาคารทหารไทยธนชาต (ttb)",
+    "ธนาคารออมสิน",
+    "ธนาคารเพื่อการเกษตรและสหกรณ์ (ธ.ก.ส.)",
+    "บัตรเครดิตกสิกรไทย",
+    "บัตรเครดิตกรุงศรี",
+    "บัตรเครดิตไทยพาณิชย์",
+    "บัตรเครดิตกรุงไทย",
+    "บัตรเครดิต KTC",
+    "บัตรเครดิต American Express",
+    "สินเชื่อส่วนบุคคล",
+    "สินเชื่อรถยนต์",
+    "บัตรกดเงินสด",
+    "อื่นๆ",
+)
+
+@Composable
+private fun PaymentMethodField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    // Whether the user is in "custom" mode can't be derived from `value` alone: picking "อื่นๆ"
+    // clears value to "", which would otherwise look identical to the untouched/blank starting
+    // state and hide the custom field again right after choosing it. Explicit state instead —
+    // starts true only when editing an entry whose saved value isn't one of the presets.
+    var isCustom by remember { mutableStateOf(value.isNotBlank() && value !in paymentMethodOptions) }
+    val selected = if (isCustom) "อื่นๆ" else value
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = selected,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_payment_method)) },
+                leadingIcon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Box(Modifier.matchParentSize().clickable { menuExpanded = true })
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                paymentMethodOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            menuExpanded = false
+                            if (option == "อื่นๆ") {
+                                isCustom = true
+                                onValueChange("")
+                            } else {
+                                isCustom = false
+                                onValueChange(option)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        if (isCustom) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_payment_method)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VehicleEditScreen(
@@ -3943,6 +4048,7 @@ internal fun AddFuelScreen(
     var priceHadFocus by remember { mutableStateOf(false) }
     var totalHadFocus by remember { mutableStateOf(false) }
     var station by remember { mutableStateOf(editing?.station ?: "") }
+    var paymentMethod by remember { mutableStateOf(editing?.paymentMethod ?: "") }
     var fullTank by remember(editing, defaultFullTank) {
         mutableStateOf(editing?.fullTank ?: defaultFullTank)
     }
@@ -4063,6 +4169,7 @@ internal fun AddFuelScreen(
             grossAmount = grossAmountValue,
             fullTank = fullTank,
             station = station,
+            paymentMethod = paymentMethod,
             photoUri = photoUri,
             odometerIsTripMeter = odometerIsTripMeter,
             tankLevelEnabled = tankLevelEnabled,
@@ -4226,6 +4333,7 @@ internal fun AddFuelScreen(
                         )
                     }
                 }
+                item { PaymentMethodField(paymentMethod, { paymentMethod = it }) }
                 item {
                     FormRow(Icons.Filled.CalendarToday) {
                         DateField(date, { date = it }, modifier = Modifier.weight(1f))
@@ -4741,8 +4849,8 @@ internal fun AddExpenseScreen(
     // here (no odometer field on an expense).
     onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
+    onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
+    onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
@@ -4760,6 +4868,7 @@ internal fun AddExpenseScreen(
     var reminderDate by remember { mutableStateOf(editing?.reminderDate ?: "") }
     var reminderEnabled by remember { mutableStateOf(!editing?.reminderDate.isNullOrBlank()) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
+    var paymentMethod by remember { mutableStateOf(editing?.paymentMethod ?: "") }
 
     fun save() {
         val amountValue = amount.toDoubleOrNull() ?: 0.0
@@ -4767,9 +4876,9 @@ internal fun AddExpenseScreen(
         val reminderValue = reminderDate.takeIf { reminderEnabled && it.isNotBlank() }
         val photoUri = PhotoUris.join(photoUris)
         if (editing != null && onUpdate != null) {
-            onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+            onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, paymentMethod, onDismiss)
         } else {
-            onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+            onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, paymentMethod, onDismiss)
         }
     }
 
@@ -4876,6 +4985,7 @@ internal fun AddExpenseScreen(
                     Switch(checked = income, onCheckedChange = { income = it })
                 }
             }
+            item { PaymentMethodField(paymentMethod, { paymentMethod = it }) }
             item { Text(stringResource(com.songsit.fuellogpro.R.string.section_optional_fields), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 OutlinedTextField(

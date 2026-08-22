@@ -14,4 +14,5 @@ data class Expense(
     val photoUri: String? = null,
     val photoUrls: List<String> = emptyList(),
     val time: String = "00:00",
+    val paymentMethod: String = "",
 )

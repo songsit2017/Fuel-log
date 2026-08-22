@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -113,8 +114,8 @@ fun ProAppShell(
     onAddFuel: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdateFuel: (String, FuelEntryFormValues, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
+    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdateMaintenance: (String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
@@ -230,6 +231,12 @@ fun ProAppShell(
             topBar = {
                 TopAppBar(
                     title = { Text(proTabTitle(tab, moreDestination), fontWeight = FontWeight.SemiBold) },
+                    // The Activity's decor already stops at the real status bar (confirmed: this
+                    // app's ComposeView root starts below it, not edge-to-edge), so TopAppBar's
+                    // own default WindowInsets.statusBars reservation was reserving that same
+                    // status-bar height a second time as blank space inside the bar. Zero insets
+                    // here removes that duplicate gap above every screen's header.
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                     navigationIcon = {
                         if (moreDestination != null) {
                             IconButton(onClick = { moreDestination = null }) {
@@ -338,11 +345,11 @@ fun ProAppShell(
                 }
             },
             floatingActionButton = {
-                // Mockup FAB is solid t.amber with t.onAmber icon — M3's FloatingActionButton
-                // defaults to the washed-out primaryContainer/onPrimaryContainer pair, so both
-                // are overridden to the fully-saturated primary/onPrimary colors here.
+                // Primary (electric blue) marks the FAB — M3's FloatingActionButton default
+                // washed-out primaryContainer/onPrimaryContainer pair is overridden to the fully
+                // saturated primary + white icon.
                 val fabColors = @Composable {
-                    Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+                    Pair(MaterialTheme.colorScheme.primary, Color.White)
                 }
                 when {
                     moreDestination == ProMoreDestination.EXPENSES -> {

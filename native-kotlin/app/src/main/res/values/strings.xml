@@ -219,6 +219,8 @@
     <string name="label_name">Name</string>
     <string name="label_category">Category</string>
     <string name="label_specify_category">Specify category</string>
+    <string name="label_payment_method">Payment method</string>
+    <string name="label_specify_payment_method">Specify payment method</string>
     <string name="label_due_date_optional">Due date (optional)</string>
     <string name="label_due_odometer_optional">Due odometer (optional)</string>
     <string name="label_warning_days">Warn ahead (days)</string>

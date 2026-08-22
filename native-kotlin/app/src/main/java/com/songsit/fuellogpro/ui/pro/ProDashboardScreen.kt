@@ -1,6 +1,7 @@
 package com.songsit.fuellogpro.ui.pro
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,9 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +41,8 @@ import com.songsit.fuellogpro.ui.LocalDisplaySettings
 import com.songsit.fuellogpro.ui.MetricCard
 import com.songsit.fuellogpro.ui.NativeAppState
 import com.songsit.fuellogpro.ui.OilPriceCard
+import com.songsit.fuellogpro.ui.ProGood
+import com.songsit.fuellogpro.ui.ProGoodDark
 import com.songsit.fuellogpro.ui.formatCurrencyAmount
 import com.songsit.fuellogpro.ui.formatDistanceKm
 import com.songsit.fuellogpro.ui.formatEconomyKmPerLiter
@@ -105,7 +106,8 @@ fun ProDashboardScreen(
             val noDataLabel = stringResource(R.string.dashboard_no_data)
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 shadowElevation = 3.dp,
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -195,74 +197,69 @@ private fun efficiencyTrendPercent(
     return (current - previous) / previous * 100
 }
 
-// Hero card — the one visual centerpiece from the mockup with no existing equivalent. Layout
-// mirrors the mockup's compact horizontal card (small ring + stats beside it, not a big empty
-// circle) rather than the earlier draft, and Surface (not Card) gives a real soft drop shadow
-// without M3's default tonal-tint color contamination (see FuelLogTheme.kt's ProLight/ProDark
-// comment on onXContainer). The ring's filled sweep (250° of 360°) is decorative, matching the
-// mockup exactly, not a literal percentage — there's no natural 0-100% scale for km/L.
+// Hero card — the one visual centerpiece from the mockup with no existing equivalent. The big
+// tabular-figure number is the focal point (not a decorative ring — there's no natural 0-100%
+// scale for km/L to draw a gauge against anyway), with a short accent bar under it as the only
+// color flourish. Modern Minimal Bento: neutral surface + subtle outline hairline + soft
+// elevation, not a tinted background — color is reserved for the number itself (primary) and the
+// accent bar (secondary), per the unified dual-accent system in FuelLogTheme.kt.
 @Composable
 private fun EfficiencyGaugeCard(valueLabel: String?, distanceThisMonthLabel: String?, trendPercent: Double?) {
+    val goodColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) ProGoodDark else ProGood
     Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         shadowElevation = 3.dp,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                val trackColor = MaterialTheme.colorScheme.outlineVariant
-                val sweepColor = MaterialTheme.colorScheme.primary
-                Canvas(Modifier.size(88.dp)) {
-                    val stroke = Stroke(width = 9.dp.toPx())
-                    val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
-                    val topLeft = Offset(stroke.width / 2, stroke.width / 2)
-                    drawArc(trackColor, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = stroke, topLeft = topLeft, size = arcSize)
-                    drawArc(sweepColor, startAngle = -90f, sweepAngle = 250f, useCenter = false, style = stroke, topLeft = topLeft, size = arcSize)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(valueLabel ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        stringResource(R.string.unit_km_per_liter_short),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    stringResource(R.string.dashboard_avg_efficiency),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                trendPercent?.let { percent ->
-                    val improving = percent >= 0
-                    val trendColor = if (improving) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
-                    Surface(shape = RoundedCornerShape(20.dp), color = trendColor.copy(alpha = 0.14f)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                stringResource(R.string.dashboard_avg_efficiency),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // valueLabel already carries its own unit suffix (see formatEconomyKmPerLiter) —
+            // no separate unit Text here, or it doubles up ("11.59 km/L km/L").
+            Text(
+                valueLabel ?: "—",
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = "tnum",
+                ),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Box(
+                Modifier
+                    .width(36.dp)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.secondary),
+            )
+            if (trendPercent != null || distanceThisMonthLabel != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    trendPercent?.let { percent ->
+                        val improving = percent >= 0
+                        val trendColor = if (improving) goodColor else MaterialTheme.colorScheme.error
+                        Surface(shape = RoundedCornerShape(20.dp), color = trendColor.copy(alpha = 0.14f)) {
+                            Text(
+                                stringResource(
+                                    if (improving) R.string.dashboard_trend_up else R.string.dashboard_trend_down,
+                                    kotlin.math.abs(percent).let { "%.0f".format(it) },
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = trendColor,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
+                    distanceThisMonthLabel?.let {
                         Text(
-                            stringResource(
-                                if (improving) R.string.dashboard_trend_up else R.string.dashboard_trend_down,
-                                kotlin.math.abs(percent).let { "%.0f".format(it) },
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = trendColor,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            stringResource(R.string.dashboard_distance_this_month, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(Modifier.height(9.dp))
-                }
-                distanceThisMonthLabel?.let {
-                    Text(
-                        stringResource(R.string.dashboard_distance_this_month, it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }

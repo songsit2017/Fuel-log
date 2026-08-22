@@ -8,7 +8,7 @@
     <string name="title_stats">สถิติ</string>
     <string name="title_trips">ทริป</string>
     <string name="nav_timeline">ไทม์ไลน์</string>
-    <string name="nav_calculator">เครื่องคิดเลข</string>
+    <string name="nav_calculator">คำนวณ</string>
     <string name="nav_map">แผนที่</string>
     <string name="nav_dashboard">หน้าแรก</string>
     <string name="nav_more">เพิ่มเติม</string>
@@ -203,6 +203,8 @@
     <string name="label_name">รายการ</string>
     <string name="label_category">ประเภท</string>
     <string name="label_specify_category">ระบุประเภท</string>
+    <string name="label_payment_method">วิธีชำระเงิน</string>
+    <string name="label_specify_payment_method">ระบุวิธีชำระเงิน</string>
     <string name="label_due_date_optional">กำหนดวันที่ (ไม่บังคับ)</string>
     <string name="label_due_odometer_optional">กำหนดเลขไมล์ (ไม่บังคับ)</string>
     <string name="label_warning_days">เตือนล่วงหน้า (วัน)</string>

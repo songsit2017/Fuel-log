@@ -44,8 +44,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
+import java.text.Normalizer
 
 data class CarMake(val name: String, val domain: String)
+
+private fun carLogoUrl(name: String): String {
+    val withoutDiacritics = Normalizer.normalize(name, Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+    val slug = withoutDiacritics.replace(" ", "-").lowercase()
+    return "https://www.carlogos.org/car-logos/$slug-logo.png"
+}
 
 val carMakes = listOf(
     CarMake("Abarth", "abarth.com"),
@@ -164,7 +172,7 @@ fun VehicleMakeSelectionScreen(
                     headlineContent = { Text(make.name, fontWeight = FontWeight.SemiBold) },
                     leadingContent = {
                         SubcomposeAsyncImage(
-                            model = "https://www.carlogos.org/logo/${make.name.replace(" ", "-")}-logo.png",
+                            model = carLogoUrl(make.name),
                             contentDescription = make.name,
                             modifier = Modifier
                                 .size(40.dp)

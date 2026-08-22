@@ -528,6 +528,13 @@ class MainActivity : AppCompatActivity() {
         // switches back to Theme.FuelLogPro (postSplashScreenTheme) automatically.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // installSplashScreen()'s compat path leaves the window laid out edge-to-edge (decor not
+        // fitting system windows) after the splash exits, even though nothing else here expects
+        // that. Every TopAppBar in the app already reserves its own WindowInsets.statusBars space
+        // by default, so with the decor also extending under the status bar, that inset ends up
+        // reserved twice — a real gap of empty space above every screen's header. Restoring the
+        // normal (non-edge-to-edge) decor here removes the duplicate reservation.
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
         MaintenanceReminderWorker.schedule(applicationContext)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -828,11 +835,29 @@ class MainActivity : AppCompatActivity() {
                                 webClientId,
                             )
                         }.onSuccess { uid ->
-                            cloudState = CloudUiState(
-                                uid = uid,
-                                email = authRepository.currentEmail,
-                                message = getString(R.string.signed_in_tap_sync),
-                            )
+                            // Sync immediately after sign-in instead of leaving the user on a
+                            // "tap sync now" message — signing in already signals intent to pull
+                            // their cloud data, a second manual tap was just friction.
+                            cloudState = CloudUiState(uid = uid, email = authRepository.currentEmail, syncing = true)
+                            runCatching {
+                                cloudRepository.sync(
+                                    uid,
+                                    authRepository.currentEmail,
+                                    authRepository.currentDisplayName,
+                                    authRepository.currentPhotoUrl,
+                                )
+                            }.onSuccess { result ->
+                                MaintenanceReminderWorker.refresh(applicationContext)
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = getString(R.string.sync_result, result.uploaded, result.downloaded, result.vehicles),
+                                )
+                            }.onFailure {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = it.message ?: getString(R.string.sync_failed),
+                                )
+                            }
                         }.onFailure {
                             cloudState = cloudState.copy(
                                 syncing = false,

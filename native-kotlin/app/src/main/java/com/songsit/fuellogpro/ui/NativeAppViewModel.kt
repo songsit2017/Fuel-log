@@ -201,7 +201,7 @@ class NativeAppViewModel(
         }
     }
 
-    fun addFuel(values: FuelEntryFormValues, onSaved: () -> Unit) {
+    fun addFuel(values: FuelEntryFormValues, recordedByUid: String?, recordedByName: String?, onSaved: () -> Unit) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
             error.value = getString(R.string.error_add_vehicle_before_fuel)
@@ -216,7 +216,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             saving.value = true
             error.value = null
-            runCatching { fuelRepository.add(vehicleId, values) }
+            runCatching { fuelRepository.add(vehicleId, values, recordedByUid, recordedByName) }
                 .onSuccess { entryId ->
                     onFuelEntrySaved(entryId)
                     checkFuelEfficiencyAlert(vehicleId, priorEntries, values, maintenanceTasks)

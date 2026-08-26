@@ -1,5 +1,6 @@
 package com.songsit.fuellogpro.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.History
@@ -129,10 +131,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
@@ -2154,6 +2158,12 @@ internal fun FuelRow(
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(com.songsit.fuellogpro.R.string.fuel_liters_price_line, number.format(entry.liters), number.format(entry.pricePerLiter)))
                     kmPerLiter?.let { Text(stringResource(com.songsit.fuellogpro.R.string.fuel_efficiency_line, number.format(it)), style = MaterialTheme.typography.labelSmall) }
+                    entry.driver.takeIf { it.isNotBlank() }?.let {
+                        Text(stringResource(com.songsit.fuellogpro.R.string.fuel_driver_line, it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    entry.recordedByName?.takeIf { it.isNotBlank() }?.let {
+                        Text(stringResource(com.songsit.fuellogpro.R.string.fuel_recorded_by_line, it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 if (entry.fullTank) {
                     FullTankBadge()
@@ -3482,6 +3492,9 @@ private fun FamilySharingScreen(
     var joinResult by remember { mutableStateOf<String?>(null) }
     var joinError by remember { mutableStateOf<String?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
+    val familyScreenContext = LocalContext.current
+    val copiedMessage = stringResource(com.songsit.fuellogpro.R.string.copied_to_clipboard)
 
     Scaffold(
         topBar = {
@@ -3600,7 +3613,17 @@ private fun FamilySharingScreen(
                                     },
                                 )
                             }
-                            if (inviteResult != null) Text(joinedLabel, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            inviteResult?.let { code ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(joinedLabel, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = {
+                                        clipboardManager.setText(AnnotatedString(code))
+                                        Toast.makeText(familyScreenContext, copiedMessage, Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_copy))
+                                    }
+                                }
+                            }
                             inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
@@ -3792,6 +3815,71 @@ private fun PaymentMethodField(value: String, onValueChange: (String) -> Unit, m
                 value = value,
                 onValueChange = onValueChange,
                 label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_payment_method)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+// Same dropdown-plus-custom-field pattern as PaymentMethodField above, but the option list is
+// dynamic instead of a fixed preset: family/vehicle member names plus whatever driver names have
+// been typed on past entries (see ProAppShell's driverSuggestions computation), so a shared
+// vehicle's regular drivers become one-tap picks after the first time each is typed. Falls back
+// to a plain text field with no dropdown when there are no suggestions yet (nothing to pick from).
+@Composable
+private fun DriverField(value: String, onValueChange: (String) -> Unit, suggestions: List<String>, modifier: Modifier = Modifier) {
+    if (suggestions.isEmpty()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_driver)) },
+            leadingIcon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+            singleLine = true,
+            modifier = modifier.fillMaxWidth(),
+        )
+        return
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val otherLabel = stringResource(com.songsit.fuellogpro.R.string.driver_other_option)
+    var isCustom by remember { mutableStateOf(value.isNotBlank() && value !in suggestions) }
+    val selected = if (isCustom) otherLabel else value
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = selected,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_driver)) },
+                leadingIcon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Box(Modifier.matchParentSize().clickable { menuExpanded = true })
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                (suggestions + otherLabel).forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            menuExpanded = false
+                            if (option == otherLabel) {
+                                isCustom = true
+                                onValueChange("")
+                            } else {
+                                isCustom = false
+                                onValueChange(option)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        if (isCustom) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_driver)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -4051,6 +4139,7 @@ internal fun AddFuelScreen(
     vehicleFuelType: String = "",
     vehicleTankCapacity: Double? = null,
     stationVisitCounts: Map<String, Int> = emptyMap(),
+    driverSuggestions: List<String> = emptyList(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
@@ -4134,6 +4223,7 @@ internal fun AddFuelScreen(
     var priceHadFocus by remember { mutableStateOf(false) }
     var totalHadFocus by remember { mutableStateOf(false) }
     var station by remember { mutableStateOf(editing?.station ?: "") }
+    var driver by remember { mutableStateOf(editing?.driver ?: "") }
     var paymentMethod by remember { mutableStateOf(editing?.paymentMethod ?: "") }
     var fullTank by remember(editing, defaultFullTank) {
         mutableStateOf(editing?.fullTank ?: defaultFullTank)
@@ -4255,6 +4345,7 @@ internal fun AddFuelScreen(
             grossAmount = grossAmountValue,
             fullTank = fullTank,
             station = station,
+            driver = driver,
             paymentMethod = paymentMethod,
             photoUri = photoUri,
             odometerIsTripMeter = odometerIsTripMeter,
@@ -4420,6 +4511,7 @@ internal fun AddFuelScreen(
                     }
                 }
                 item { PaymentMethodField(paymentMethod, { paymentMethod = it }) }
+                item { DriverField(driver, { driver = it }, driverSuggestions) }
                 item {
                     FormRow(Icons.Filled.CalendarToday) {
                         DateField(date, { date = it }, modifier = Modifier.weight(1f))

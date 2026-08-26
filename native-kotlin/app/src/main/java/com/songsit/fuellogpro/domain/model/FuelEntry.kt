@@ -28,6 +28,11 @@ data class FuelEntry(
     val weatherTemperatureC: Double? = null,
     val weatherLatitude: Double? = null,
     val weatherLongitude: Double? = null,
+    // Who was signed in when this entry was first created — captured automatically at creation
+    // time (see LocalFuelRepository.add), never re-derived on edit, so it stays "who actually
+    // logged this" even if someone else on a shared vehicle later edits the entry.
+    val recordedByUid: String? = null,
+    val recordedByName: String? = null,
 )
 
 // Bundles the "add/edit fill-up" form's editable fields into one value so add/update calls
@@ -45,6 +50,7 @@ data class FuelEntryFormValues(
     val grossAmount: Double,
     val fullTank: Boolean,
     val station: String,
+    val driver: String = "",
     val paymentMethod: String = "",
     val photoUri: String?,
     val odometerIsTripMeter: Boolean = false,

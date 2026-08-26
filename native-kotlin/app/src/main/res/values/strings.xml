@@ -125,6 +125,8 @@
     <string name="family_creating_invite">Creating…</string>
     <string name="family_create_invite_code">Create invite code</string>
     <string name="family_invite_code_result">Invite code: %1$s (valid 7 days)</string>
+    <string name="action_copy">Copy</string>
+    <string name="copied_to_clipboard">Copied</string>
     <string name="family_join_by_code">Join with an invite code</string>
     <string name="family_invite_code_label">8-character invite code</string>
     <string name="family_joining">Checking…</string>
@@ -208,6 +210,8 @@
     <string name="content_desc_has_photo">Has photo</string>
     <string name="fuel_liters_price_line">%1$s L • %2$s/L</string>
     <string name="fuel_efficiency_line">%1$s km/L</string>
+    <string name="fuel_driver_line">Driver: %1$s</string>
+    <string name="fuel_recorded_by_line">Logged by: %1$s</string>
     <string name="fuel_full_tank">Full tank</string>
 
     <!-- AddMaintenanceDialog. NOTE: maintenanceCategoryOptions (the fixed category list, "อื่นๆ"
@@ -223,6 +227,9 @@
     <string name="label_specify_category">Specify category</string>
     <string name="label_payment_method">Payment method</string>
     <string name="label_specify_payment_method">Specify payment method</string>
+    <string name="label_driver">Driver</string>
+    <string name="label_specify_driver">Specify driver</string>
+    <string name="driver_other_option">Other</string>
     <string name="label_due_date_optional">Due date (optional)</string>
     <string name="label_due_odometer_optional">Due odometer (optional)</string>
     <string name="label_warning_days">Warn ahead (days)</string>

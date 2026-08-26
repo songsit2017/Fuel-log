@@ -116,6 +116,8 @@
     <string name="family_creating_invite">กำลังสร้าง…</string>
     <string name="family_create_invite_code">สร้างรหัสเชิญ</string>
     <string name="family_invite_code_result">รหัสเชิญ: %1$s (7 วัน)</string>
+    <string name="action_copy">คัดลอก</string>
+    <string name="copied_to_clipboard">คัดลอกแล้ว</string>
     <string name="family_join_by_code">เข้าร่วมด้วยรหัสเชิญ</string>
     <string name="family_invite_code_label">รหัสเชิญ 8 ตัว</string>
     <string name="family_joining">กำลังตรวจสอบ…</string>
@@ -197,6 +199,8 @@
     <string name="content_desc_has_photo">มีรูปแนบ</string>
     <string name="fuel_liters_price_line">%1$s ลิตร • %2$s/ลิตร</string>
     <string name="fuel_efficiency_line">%1$s กม./ลิตร</string>
+    <string name="fuel_driver_line">ผู้ขับขี่: %1$s</string>
+    <string name="fuel_recorded_by_line">บันทึกโดย: %1$s</string>
     <string name="fuel_full_tank">เต็มถัง</string>
 
     <string name="maintenance_default_name">เปลี่ยนน้ำมันเครื่อง</string>
@@ -207,6 +211,9 @@
     <string name="label_specify_category">ระบุประเภท</string>
     <string name="label_payment_method">วิธีชำระเงิน</string>
     <string name="label_specify_payment_method">ระบุวิธีชำระเงิน</string>
+    <string name="label_driver">ผู้ขับขี่</string>
+    <string name="label_specify_driver">ระบุผู้ขับขี่</string>
+    <string name="driver_other_option">อื่นๆ</string>
     <string name="label_due_date_optional">กำหนดวันที่ (ไม่บังคับ)</string>
     <string name="label_due_odometer_optional">กำหนดเลขไมล์ (ไม่บังคับ)</string>
     <string name="label_warning_days">เตือนล่วงหน้า (วัน)</string>

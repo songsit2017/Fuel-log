@@ -701,7 +701,9 @@ class MainActivity : AppCompatActivity() {
                 },
                 sharedPhotoPaths = sharedPhotoPaths,
                 onSharedPhotoConsumed = { sharedPhotoPaths = emptyList() },
-                onAddFuel = viewModel::addFuel,
+                onAddFuel = { values, onSaved ->
+                    viewModel.addFuel(values, authRepository.currentUid, authRepository.currentDisplayName, onSaved)
+                },
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,
                 onAddExpense = viewModel::addExpense,

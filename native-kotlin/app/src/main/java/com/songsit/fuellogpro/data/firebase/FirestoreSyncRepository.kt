@@ -652,6 +652,9 @@ private fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "full" to item.fullTank,
     "station" to item.station,
     "photoUri" to item.photoUri,
+    "driver" to item.driver,
+    "recordedByUid" to item.recordedByUid,
+    "recordedByName" to item.recordedByName,
 )
 
 private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
@@ -728,6 +731,9 @@ private fun parseFuel(vehicleId: String, document: DocumentSnapshot) = FuelEntry
     station = document.getString("station").orEmpty(),
     photoUri = document.getString("photoUri"),
     createdAt = document.timestampMillis("createdAt"),
+    driver = document.getString("driver").orEmpty(),
+    recordedByUid = document.getString("recordedByUid"),
+    recordedByName = document.getString("recordedByName"),
 )
 
 private fun parseExpense(vehicleId: String, document: DocumentSnapshot) = ExpenseEntity(

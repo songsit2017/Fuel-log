@@ -3,6 +3,7 @@ package com.songsit.fuellogpro.ui.pro
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,10 +44,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +97,7 @@ import com.songsit.fuellogpro.ui.VehiclesListScreen
 import com.songsit.fuellogpro.ui.stats.StatsScreen
 import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
 import com.songsit.fuellogpro.ui.timeline.TimelineScreen
+import kotlinx.coroutines.launch
 
 private enum class ProTab { DASHBOARD, TIMELINE, STATS, TRIPS, MORE }
 
@@ -212,6 +217,21 @@ fun ProAppShell(
         return
     }
 
+    // Was previously only wired into the unreachable default (non-Pro) shell further up
+    // FuelLogApp.kt — since ProAppShell is the app's only shell now (see the comment at the top
+    // of FuelLogApp()), that check never actually ran and the "update available" popup never
+    // appeared on launch, only reachable manually via Settings > "ตรวจสอบอัปเดต". Runs once per
+    // cold entry into the real app (after onboarding, so first-run users aren't greeted with an
+    // update prompt before they've even seen the app).
+    var availableUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
+    LaunchedEffect(Unit) {
+        val prefs = com.songsit.fuellogpro.settings.UpdateCheckPreferences(context)
+        val update = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(com.songsit.fuellogpro.BuildConfig.VERSION_CODE)
+        if (update != null && update.versionCode != prefs.skippedVersionCode()) {
+            availableUpdate = update
+        }
+    }
+
     val anyDialogOpen = showAddFuel || showAddExpense || showAddMaintenance || showAddTrip || showAddVehicle ||
         editingFuel != null || editingExpense != null || editingMaintenance != null || editingTrip != null || editingVehicle != null
     val atRoot = tab == 0 && moreDestination == null && !anyDialogOpen
@@ -224,6 +244,45 @@ fun ProAppShell(
             moreDestination != null -> moreDestination = null
             else -> tab = 0
         }
+    }
+
+    availableUpdate?.let { update ->
+        val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        var downloadingUpdate by remember { mutableStateOf(false) }
+        val updateScope = rememberCoroutineScope()
+        AlertDialog(
+            onDismissRequest = { if (!downloadingUpdate) availableUpdate = null },
+            title = { Text(stringResource(R.string.update_available_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.update_available_message, update.versionName))
+                    if (downloadingUpdate) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.update_downloading), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !downloadingUpdate, onClick = {
+                    downloadingUpdate = true
+                    updateScope.launch {
+                        val installed = com.songsit.fuellogpro.data.ApkUpdateDownloader(context).downloadAndInstall(update.downloadUrl)
+                        if (!installed) updateUriHandler.openUri(update.downloadUrl)
+                        downloadingUpdate = false
+                        availableUpdate = null
+                    }
+                }) { Text(stringResource(R.string.action_download)) }
+            },
+            dismissButton = {
+                TextButton(enabled = !downloadingUpdate, onClick = {
+                    com.songsit.fuellogpro.settings.UpdateCheckPreferences(context).skipVersion(update.versionCode)
+                    availableUpdate = null
+                }) { Text(stringResource(R.string.action_skip_version)) }
+            },
+        )
     }
 
     CompositionLocalProvider(LocalDisplaySettings provides displaySettings) {
@@ -499,12 +558,21 @@ fun ProAppShell(
         }
 
         if (showAddFuel || editingFuel != null) {
+            // Regular drivers on a shared vehicle become one-tap picks: family members (from
+            // Family Sharing) plus anyone typed into a past entry's driver field.
+            val driverSuggestions = remember(vehicleMembers, state.entries) {
+                (vehicleMembers.map { it.displayName.ifBlank { it.email } } + state.entries.map { it.driver })
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+            }
             AddFuelScreen(
                 saving = state.saving,
                 latestOdometer = state.summary.latestOdometerKm,
                 editing = editingFuel,
                 vehicleFuelType = state.selectedVehicle?.fuelType ?: "",
                 vehicleTankCapacity = state.selectedVehicle?.tankCapacity,
+                driverSuggestions = driverSuggestions,
                 onFindNearbyStations = onFindNearbyStations,
                 onFetchWeather = onFetchWeather,
                 onPickPhoto = onPickPhoto,

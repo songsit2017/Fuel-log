@@ -275,6 +275,7 @@
     <string name="odometer_mode_total">มาตรวัดระยะทางรวม</string>
     <string name="odometer_mode_trip">มาตรวัดการเดินทาง</string>
     <string name="odometer_last_value">ค่าสุดท้าย: %1$s km</string>
+    <string name="odometer_lower_than_last_warning">เลขไมล์น้อยกว่าค่าสุดท้าย (%1$s km) ตรวจสอบอีกครั้ง โดยเฉพาะถ้าเพิ่งสแกนด้วย AI</string>
     <string name="tank_dialog_title">ระดับน้ำมันเชื้อเพลิง</string>
     <string name="tank_dialog_subtitle">ระดับถังก่อนเติม หรือ หลังเติม</string>
     <string name="tank_before_short">ก่อนหน้า</string>

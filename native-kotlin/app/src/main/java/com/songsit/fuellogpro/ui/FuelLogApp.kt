@@ -4702,6 +4702,20 @@ private fun OdometerField(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, top = 2.dp),
             )
+            // Catches both fat-finger typos and AI/OCR misreads (e.g. a dropped digit) before
+            // save — a lower total odometer than the last entry silently voids this fill-up's
+            // km/L in calculatePerEntryKmPerLiter() (negative interval distance), so surfacing it
+            // here is cheaper than debugging a "why is my rate missing" report later. Trip-meter
+            // mode is exempt since that value is expected to be small relative to the total.
+            val enteredOdometer = value.toDoubleOrNull()
+            if (!isTripMeter && enteredOdometer != null && enteredOdometer < latestOdometer) {
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.odometer_lower_than_last_warning, "%.0f".format(Locale.US, latestOdometer)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                )
+            }
         }
     }
 }

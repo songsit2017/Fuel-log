@@ -231,12 +231,17 @@ fun ProAppShell(
             topBar = {
                 TopAppBar(
                     title = { Text(proTabTitle(tab, moreDestination), fontWeight = FontWeight.SemiBold) },
-                    // The Activity's decor already stops at the real status bar (confirmed: this
-                    // app's ComposeView root starts below it, not edge-to-edge), so TopAppBar's
-                    // own default WindowInsets.statusBars reservation was reserving that same
-                    // status-bar height a second time as blank space inside the bar. Zero insets
-                    // here removes that duplicate gap above every screen's header.
-                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    // Was previously hardcoded to WindowInsets(0, 0, 0, 0) on the assumption that
+                    // MainActivity's setDecorFitsSystemWindows(window, true) always keeps the
+                    // decor non-edge-to-edge, making TopAppBar's own status-bar inset reservation
+                    // redundant. That assumption breaks on Android 15+ (targetSdk 37): apps
+                    // targeting SDK 35+ are edge-to-edge by default and setDecorFitsSystemWindows
+                    // no longer opts out, so the decor DOES extend under the status bar there —
+                    // with insets zeroed, the header rendered with no top padding and overlapped
+                    // the phone's own status bar/clock. Leaving windowInsets at its default lets
+                    // TopAppBar ask WindowInsets.statusBars for the real value each time, which is
+                    // 0 on pre-15 devices (matching the old behavior) and the actual bar height on
+                    // 15+ (fixing the overlap) — self-adjusting instead of hardcoded either way.
                     navigationIcon = {
                         if (moreDestination != null) {
                             IconButton(onClick = { moreDestination = null }) {

@@ -297,6 +297,7 @@
     <string name="odometer_mode_total">Total odometer</string>
     <string name="odometer_mode_trip">Trip meter</string>
     <string name="odometer_last_value">Last: %1$s km</string>
+    <string name="odometer_lower_than_last_warning">Lower than last reading (%1$s km) — double-check, especially after an AI scan</string>
     <string name="tank_dialog_title">Fuel tank level</string>
     <string name="tank_dialog_subtitle">Tank level before or after this fill-up</string>
     <string name="tank_before_short">Before</string>

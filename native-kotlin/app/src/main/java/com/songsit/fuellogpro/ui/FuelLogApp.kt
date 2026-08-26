@@ -2492,7 +2492,13 @@ internal fun SettingsScreen(
     var showOtherSettings by remember { mutableStateOf(false) }
     var showPupuPocketLink by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
-    val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
+    // Deliberately does NOT require hasSelectedVehicle: someone freshly signed in with no
+    // vehicle of their own yet still needs to reach this screen to join a family's existing
+    // vehicle by invite code. Requiring a vehicle first made this menu invisible to exactly the
+    // people who most needed it — a new member joining, not the owner inviting. The
+    // create-invite section (which does need an existing vehicle to invite people to) is gated
+    // separately inside FamilySharingScreen via hasSelectedVehicle.
+    val canShareVehicle = cloudState.uid != null && (onCreateInvite != null || onJoinByCode != null)
 
     if (showImportExport) {
         ImportExportScreen(
@@ -2520,6 +2526,7 @@ internal fun SettingsScreen(
             members = vehicleMembers,
             onCreateInvite = onCreateInvite,
             onJoinByCode = onJoinByCode,
+            hasSelectedVehicle = hasSelectedVehicle,
         )
         return
     }
@@ -3464,6 +3471,7 @@ private fun FamilySharingScreen(
     members: List<VehicleMember>,
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    hasSelectedVehicle: Boolean = true,
 ) {
     var inviteEmail by remember { mutableStateOf("") }
     var inviteRole by remember { mutableStateOf("editor") }
@@ -3544,7 +3552,7 @@ private fun FamilySharingScreen(
                 }
             }
 
-            if (onCreateInvite != null) {
+            if (onCreateInvite != null && hasSelectedVehicle) {
                 item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.family_create_invite)) }
                 item {
                     val joinedLabel = stringResource(com.songsit.fuellogpro.R.string.family_invite_code_result, inviteResult ?: "")

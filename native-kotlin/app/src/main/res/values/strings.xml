@@ -58,6 +58,8 @@
     <string name="update_available_title">Update available</string>
     <string name="update_available_message">A new version (%s) is ready to download. Update now?</string>
     <string name="action_download">Download</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_download_failed">Couldn\'t download the update in-app — opening it in your browser instead</string>
     <string name="action_skip_version">Skip this version</string>
 
     <!-- Settings dialogs: units / currency / decimals / theme -->

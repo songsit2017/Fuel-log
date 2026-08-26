@@ -500,18 +500,40 @@ fun FuelLogApp(
     }
     availableUpdate?.let { update ->
         val updateUriHandler = LocalUriHandler.current
+        // Downloads straight into the app and hands the APK to the system installer
+        // (ApkUpdateDownloader) instead of opening the browser — falls back to the old
+        // browser-download behavior only if the in-app download/install intent itself fails
+        // (e.g. no network), so this never leaves the user with no way to update at all.
+        var downloadingUpdate by remember { mutableStateOf(false) }
+        val updateScope = androidx.compose.runtime.rememberCoroutineScope()
         AlertDialog(
-            onDismissRequest = { availableUpdate = null },
+            onDismissRequest = { if (!downloadingUpdate) availableUpdate = null },
             title = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_title)) },
-            text = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_message, update.versionName)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(com.songsit.fuellogpro.R.string.update_available_message, update.versionName))
+                    if (downloadingUpdate) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(com.songsit.fuellogpro.R.string.update_downloading), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    updateUriHandler.openUri(update.downloadUrl)
-                    availableUpdate = null
+                TextButton(enabled = !downloadingUpdate, onClick = {
+                    downloadingUpdate = true
+                    updateScope.launch {
+                        val installed = com.songsit.fuellogpro.data.ApkUpdateDownloader(updateContext).downloadAndInstall(update.downloadUrl)
+                        if (!installed) updateUriHandler.openUri(update.downloadUrl)
+                        downloadingUpdate = false
+                        availableUpdate = null
+                    }
                 }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_download)) }
             },
             dismissButton = {
-                TextButton(onClick = {
+                TextButton(enabled = !downloadingUpdate, onClick = {
                     com.songsit.fuellogpro.settings.UpdateCheckPreferences(updateContext).skipVersion(update.versionCode)
                     availableUpdate = null
                 }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_skip_version)) }
@@ -2672,27 +2694,39 @@ internal fun SettingsScreen(
                     )
 
                     val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
+                    val settingsContext = LocalContext.current
                     var checkingUpdate by remember { mutableStateOf(false) }
+                    var downloadingUpdate by remember { mutableStateOf(false) }
                     var checkedUpToDate by remember { mutableStateOf(false) }
                     var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
                     val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
                     val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
                     val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
+                    val downloadingMessage = stringResource(com.songsit.fuellogpro.R.string.update_downloading)
                     PreferenceListItem(
                         title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
                         subtitle = when {
+                            downloadingUpdate -> downloadingMessage
                             checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
                             foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
                             checkedUpToDate -> upToDateMessage
                             else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
                         },
                         onClick = {
-                            if (checkingUpdate) return@PreferenceListItem
+                            if (checkingUpdate || downloadingUpdate) return@PreferenceListItem
                             // Once a check has found an update, tapping again downloads it instead of
                             // re-checking — the row's subtitle already makes this action explicit.
+                            // Downloads in-app and hands the APK to the system installer
+                            // (ApkUpdateDownloader) rather than opening the browser; only falls back
+                            // to the browser if that in-app download/install itself fails.
                             val update = foundUpdate
                             if (update != null) {
-                                uriHandler.openUri(update.downloadUrl)
+                                downloadingUpdate = true
+                                checkUpdateScope.launch {
+                                    val installed = com.songsit.fuellogpro.data.ApkUpdateDownloader(settingsContext).downloadAndInstall(update.downloadUrl)
+                                    if (!installed) uriHandler.openUri(update.downloadUrl)
+                                    downloadingUpdate = false
+                                }
                                 return@PreferenceListItem
                             }
                             checkingUpdate = true

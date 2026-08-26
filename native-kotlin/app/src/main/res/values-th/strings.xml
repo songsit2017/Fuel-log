@@ -53,6 +53,8 @@
     <string name="update_available_title">มีอัปเดตใหม่</string>
     <string name="update_available_message">มีเวอร์ชันใหม่ (%s) พร้อมให้ดาวน์โหลด อัปเดตตอนนี้เลยไหม?</string>
     <string name="action_download">ดาวน์โหลด</string>
+    <string name="update_downloading">กำลังดาวน์โหลดอัปเดต…</string>
+    <string name="update_download_failed">ดาวน์โหลดในแอปไม่สำเร็จ กำลังเปิดในเบราว์เซอร์แทน</string>
     <string name="action_skip_version">ข้ามเวอร์ชันนี้</string>
 
     <string name="action_ok">ตกลง</string>

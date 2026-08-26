@@ -16,18 +16,27 @@ class LocalFuelRepository(
     fun observe(vehicleId: String): Flow<List<FuelEntry>> =
         dao.observeForVehicle(vehicleId).map { entries -> entries.map(FuelEntryEntity::toDomain) }
 
-    suspend fun add(vehicleId: String, values: FuelEntryFormValues): String {
+    suspend fun add(
+        vehicleId: String,
+        values: FuelEntryFormValues,
+        recordedByUid: String? = null,
+        recordedByName: String? = null,
+    ): String {
         val id = UUID.randomUUID().toString()
         dao.upsert(
             values.toEntity(
                 id = id,
                 vehicleId = vehicleId,
                 createdAt = System.currentTimeMillis(),
+                recordedByUid = recordedByUid,
+                recordedByName = recordedByName,
             ),
         )
         return id
     }
 
+    // recordedBy is never overwritten on edit — it stays whoever originally created the entry,
+    // carried forward from the existing row same as fallbackPhotoUri below.
     suspend fun update(id: String, vehicleId: String, values: FuelEntryFormValues) {
         val existing = dao.getById(id)
         dao.upsert(
@@ -36,6 +45,8 @@ class LocalFuelRepository(
                 vehicleId = vehicleId,
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                 fallbackPhotoUri = existing?.photoUri,
+                recordedByUid = existing?.recordedByUid,
+                recordedByName = existing?.recordedByName,
             ),
         )
     }
@@ -57,6 +68,8 @@ private fun FuelEntryFormValues.toEntity(
     vehicleId: String,
     createdAt: Long,
     fallbackPhotoUri: String? = null,
+    recordedByUid: String? = null,
+    recordedByName: String? = null,
 ): FuelEntryEntity {
     val discountTotal = if (discountEnabled) {
         if (discountPerLiter) discountAmount * liters else discountAmount
@@ -74,6 +87,7 @@ private fun FuelEntryFormValues.toEntity(
         amount = (grossAmount - discountTotal).coerceAtLeast(0.0),
         fullTank = fullTank,
         station = station.trim(),
+        paymentMethod = paymentMethod.trim(),
         createdAt = createdAt,
         photoUri = photoUri ?: fallbackPhotoUri,
         odometerIsTripMeter = odometerIsTripMeter,
@@ -89,6 +103,9 @@ private fun FuelEntryFormValues.toEntity(
         weatherTemperatureC = weatherTemperatureC,
         weatherLatitude = weatherLatitude,
         weatherLongitude = weatherLongitude,
+        driver = driver.trim(),
+        recordedByUid = recordedByUid,
+        recordedByName = recordedByName,
     )
 }
 
@@ -103,6 +120,7 @@ private fun FuelEntryEntity.toDomain() = FuelEntry(
     amount = amount,
     fullTank = fullTank,
     station = station,
+    paymentMethod = paymentMethod,
     photoUri = photoUri,
     photoUrls = PhotoUris.split(photoUri),
     odometerIsTripMeter = odometerIsTripMeter,
@@ -118,4 +136,7 @@ private fun FuelEntryEntity.toDomain() = FuelEntry(
     weatherTemperatureC = weatherTemperatureC,
     weatherLatitude = weatherLatitude,
     weatherLongitude = weatherLongitude,
+    driver = driver,
+    recordedByUid = recordedByUid,
+    recordedByName = recordedByName,
 )

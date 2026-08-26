@@ -13,6 +13,8 @@
     <string name="nav_timeline">Timeline</string>
     <string name="nav_calculator">Calculator</string>
     <string name="nav_map">Map</string>
+    <string name="nav_dashboard">Home</string>
+    <string name="nav_more">More</string>
 
     <!-- Settings screen: main list (dynamic/interpolated subtitles like unit + sync-status text
          are not converted yet — those need format-string placeholders, done in a later pass). -->
@@ -56,6 +58,8 @@
     <string name="update_available_title">Update available</string>
     <string name="update_available_message">A new version (%s) is ready to download. Update now?</string>
     <string name="action_download">Download</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_download_failed">Couldn\'t download the update in-app — opening it in your browser instead</string>
     <string name="action_skip_version">Skip this version</string>
 
     <!-- Settings dialogs: units / currency / decimals / theme -->
@@ -121,6 +125,8 @@
     <string name="family_creating_invite">Creating…</string>
     <string name="family_create_invite_code">Create invite code</string>
     <string name="family_invite_code_result">Invite code: %1$s (valid 7 days)</string>
+    <string name="action_copy">Copy</string>
+    <string name="copied_to_clipboard">Copied</string>
     <string name="family_join_by_code">Join with an invite code</string>
     <string name="family_invite_code_label">8-character invite code</string>
     <string name="family_joining">Checking…</string>
@@ -142,6 +148,29 @@
     <string name="dashboard_no_data">No data yet</string>
     <string name="dashboard_record_count">Records</string>
     <string name="dashboard_recent_entries">Recent entries</string>
+
+    <!-- Pro theme: onboarding + More hub (ui/pro/*) -->
+    <string name="pro_badge">PRO</string>
+    <string name="onboarding_headline">Every drop tracked.\nEvery baht counted.</string>
+    <string name="onboarding_subtitle">Log fill-ups and vehicle expenses in one place — simple, fast, accurate.</string>
+    <string name="onboarding_feature_log_fuel">Log fuel</string>
+    <string name="onboarding_feature_track_expenses">Track expenses</string>
+    <string name="onboarding_feature_maintenance_alerts">Maintenance alerts</string>
+    <string name="onboarding_sign_in_google">Sign in with Google</string>
+    <string name="onboarding_skip">Skip for now</string>
+    <string name="more_hub_expenses">Expenses</string>
+    <string name="more_hub_maintenance">Maintenance</string>
+    <string name="more_hub_vehicles">My Vehicles</string>
+    <string name="more_hub_map">Nearby stations</string>
+    <string name="more_hub_settings">Settings</string>
+    <string name="dashboard_trend_up">+%1$s%% better</string>
+    <string name="dashboard_trend_down">-%1$s%% lower</string>
+    <string name="dashboard_distance_this_month">%1$s this month</string>
+    <string name="shared_photo_chooser_title">Save receipt as</string>
+    <string name="shared_photo_chooser_message">Where should this shared photo go?</string>
+    <string name="shared_photo_choose_vehicle">Vehicle</string>
+    <string name="action_scan_receipt">Scan as receipt</string>
+    <string name="action_scan_odometer">Scan as odometer</string>
 
     <!-- FuelList / ExpenseList / ExpenseRow / TripList / MaintenanceList / FuelRow -->
     <string name="unknown_date">Unknown date</string>
@@ -181,6 +210,8 @@
     <string name="content_desc_has_photo">Has photo</string>
     <string name="fuel_liters_price_line">%1$s L • %2$s/L</string>
     <string name="fuel_efficiency_line">%1$s km/L</string>
+    <string name="fuel_driver_line">Driver: %1$s</string>
+    <string name="fuel_recorded_by_line">Logged by: %1$s</string>
     <string name="fuel_full_tank">Full tank</string>
 
     <!-- AddMaintenanceDialog. NOTE: maintenanceCategoryOptions (the fixed category list, "อื่นๆ"
@@ -194,6 +225,11 @@
     <string name="label_name">Name</string>
     <string name="label_category">Category</string>
     <string name="label_specify_category">Specify category</string>
+    <string name="label_payment_method">Payment method</string>
+    <string name="label_specify_payment_method">Specify payment method</string>
+    <string name="label_driver">Driver</string>
+    <string name="label_specify_driver">Specify driver</string>
+    <string name="driver_other_option">Other</string>
     <string name="label_due_date_optional">Due date (optional)</string>
     <string name="label_due_odometer_optional">Due odometer (optional)</string>
     <string name="label_warning_days">Warn ahead (days)</string>
@@ -270,6 +306,7 @@
     <string name="odometer_mode_total">Total odometer</string>
     <string name="odometer_mode_trip">Trip meter</string>
     <string name="odometer_last_value">Last: %1$s km</string>
+    <string name="odometer_lower_than_last_warning">Lower than last reading (%1$s km) — double-check, especially after an AI scan</string>
     <string name="tank_dialog_title">Fuel tank level</string>
     <string name="tank_dialog_subtitle">Tank level before or after this fill-up</string>
     <string name="tank_before_short">Before</string>

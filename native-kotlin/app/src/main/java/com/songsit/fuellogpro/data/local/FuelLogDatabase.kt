@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncConflictEntity::class,
         DeletionTombstoneEntity::class,
     ],
-    version = 13,
+    version = 15,
     exportSchema = false,
 )
 abstract class FuelLogDatabase : RoomDatabase() {
@@ -214,6 +214,25 @@ abstract class FuelLogDatabase : RoomDatabase() {
             }
         }
 
+        // Payment method (cash/bank/credit card/loan, free text if not a preset) on both fuel
+        // entries and expenses.
+        private val migration13To14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        // Driver (who was behind the wheel, editable) and recordedBy (who was signed in when the
+        // entry was created, captured automatically) — see FuelEntry.kt for the distinction.
+        private val migration14To15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN driver TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN recordedByUid TEXT")
+                db.execSQL("ALTER TABLE fuel_entries ADD COLUMN recordedByName TEXT")
+            }
+        }
+
         fun get(context: Context): FuelLogDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -233,6 +252,8 @@ abstract class FuelLogDatabase : RoomDatabase() {
                     migration10To11,
                     migration11To12,
                     migration12To13,
+                    migration13To14,
+                    migration14To15,
                 )
                     .build()
                     .also { instance = it }

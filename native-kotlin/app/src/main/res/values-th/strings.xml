@@ -8,8 +8,10 @@
     <string name="title_stats">สถิติ</string>
     <string name="title_trips">ทริป</string>
     <string name="nav_timeline">ไทม์ไลน์</string>
-    <string name="nav_calculator">เครื่องคิดเลข</string>
+    <string name="nav_calculator">คำนวณ</string>
     <string name="nav_map">แผนที่</string>
+    <string name="nav_dashboard">หน้าแรก</string>
+    <string name="nav_more">เพิ่มเติม</string>
 
     <string name="action_back">ย้อนกลับ</string>
     <string name="settings_title">ตั้งค่า</string>
@@ -51,6 +53,8 @@
     <string name="update_available_title">มีอัปเดตใหม่</string>
     <string name="update_available_message">มีเวอร์ชันใหม่ (%s) พร้อมให้ดาวน์โหลด อัปเดตตอนนี้เลยไหม?</string>
     <string name="action_download">ดาวน์โหลด</string>
+    <string name="update_downloading">กำลังดาวน์โหลดอัปเดต…</string>
+    <string name="update_download_failed">ดาวน์โหลดในแอปไม่สำเร็จ กำลังเปิดในเบราว์เซอร์แทน</string>
     <string name="action_skip_version">ข้ามเวอร์ชันนี้</string>
 
     <string name="action_ok">ตกลง</string>
@@ -112,6 +116,8 @@
     <string name="family_creating_invite">กำลังสร้าง…</string>
     <string name="family_create_invite_code">สร้างรหัสเชิญ</string>
     <string name="family_invite_code_result">รหัสเชิญ: %1$s (7 วัน)</string>
+    <string name="action_copy">คัดลอก</string>
+    <string name="copied_to_clipboard">คัดลอกแล้ว</string>
     <string name="family_join_by_code">เข้าร่วมด้วยรหัสเชิญ</string>
     <string name="family_invite_code_label">รหัสเชิญ 8 ตัว</string>
     <string name="family_joining">กำลังตรวจสอบ…</string>
@@ -132,6 +138,29 @@
     <string name="dashboard_no_data">ยังไม่มีข้อมูล</string>
     <string name="dashboard_record_count">จำนวนรายการ</string>
     <string name="dashboard_recent_entries">รายการล่าสุด</string>
+
+    <!-- Pro theme: onboarding + More hub (ui/pro/*) -->
+    <string name="pro_badge">PRO</string>
+    <string name="onboarding_headline">คุมทุกน้ำมัน\nคุมทุกบาท</string>
+    <string name="onboarding_subtitle">บันทึกการเติมน้ำมันและค่าใช้จ่ายรถในที่เดียว ง่าย รวดเร็ว แม่นยำ</string>
+    <string name="onboarding_feature_log_fuel">บันทึกเติมน้ำมัน</string>
+    <string name="onboarding_feature_track_expenses">ติดตามค่าใช้จ่าย</string>
+    <string name="onboarding_feature_maintenance_alerts">แจ้งเตือนซ่อมบำรุง</string>
+    <string name="onboarding_sign_in_google">เข้าสู่ระบบด้วย Google</string>
+    <string name="onboarding_skip">ข้ามไปก่อน</string>
+    <string name="more_hub_expenses">ค่าใช้จ่าย</string>
+    <string name="more_hub_maintenance">ซ่อมบำรุง</string>
+    <string name="more_hub_vehicles">รถของฉัน</string>
+    <string name="more_hub_map">ปั๊มใกล้ฉัน</string>
+    <string name="more_hub_settings">ตั้งค่า</string>
+    <string name="dashboard_trend_up">+%1$s%% ดีขึ้น</string>
+    <string name="dashboard_trend_down">-%1$s%% ลดลง</string>
+    <string name="dashboard_distance_this_month">ระยะทางเดือนนี้ %1$s</string>
+    <string name="shared_photo_chooser_title">บันทึกรูปนี้เป็น</string>
+    <string name="shared_photo_chooser_message">รูปที่แชร์มา ต้องการบันทึกไว้ที่ไหน?</string>
+    <string name="shared_photo_choose_vehicle">รถ</string>
+    <string name="action_scan_receipt">สแกนเป็นใบเสร็จ</string>
+    <string name="action_scan_odometer">สแกนเป็นเลขไมล์</string>
 
     <string name="unknown_date">ไม่ทราบวันที่</string>
     <string name="expense_net_after_income">สุทธิหลังรายรับ</string>
@@ -170,6 +199,8 @@
     <string name="content_desc_has_photo">มีรูปแนบ</string>
     <string name="fuel_liters_price_line">%1$s ลิตร • %2$s/ลิตร</string>
     <string name="fuel_efficiency_line">%1$s กม./ลิตร</string>
+    <string name="fuel_driver_line">ผู้ขับขี่: %1$s</string>
+    <string name="fuel_recorded_by_line">บันทึกโดย: %1$s</string>
     <string name="fuel_full_tank">เต็มถัง</string>
 
     <string name="maintenance_default_name">เปลี่ยนน้ำมันเครื่อง</string>
@@ -178,6 +209,11 @@
     <string name="label_name">รายการ</string>
     <string name="label_category">ประเภท</string>
     <string name="label_specify_category">ระบุประเภท</string>
+    <string name="label_payment_method">วิธีชำระเงิน</string>
+    <string name="label_specify_payment_method">ระบุวิธีชำระเงิน</string>
+    <string name="label_driver">ผู้ขับขี่</string>
+    <string name="label_specify_driver">ระบุผู้ขับขี่</string>
+    <string name="driver_other_option">อื่นๆ</string>
     <string name="label_due_date_optional">กำหนดวันที่ (ไม่บังคับ)</string>
     <string name="label_due_odometer_optional">กำหนดเลขไมล์ (ไม่บังคับ)</string>
     <string name="label_warning_days">เตือนล่วงหน้า (วัน)</string>
@@ -248,6 +284,7 @@
     <string name="odometer_mode_total">มาตรวัดระยะทางรวม</string>
     <string name="odometer_mode_trip">มาตรวัดการเดินทาง</string>
     <string name="odometer_last_value">ค่าสุดท้าย: %1$s km</string>
+    <string name="odometer_lower_than_last_warning">เลขไมล์น้อยกว่าค่าสุดท้าย (%1$s km) ตรวจสอบอีกครั้ง โดยเฉพาะถ้าเพิ่งสแกนด้วย AI</string>
     <string name="tank_dialog_title">ระดับน้ำมันเชื้อเพลิง</string>
     <string name="tank_dialog_subtitle">ระดับถังก่อนเติม หรือ หลังเติม</string>
     <string name="tank_before_short">ก่อนหน้า</string>

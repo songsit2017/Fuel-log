@@ -18,4 +18,5 @@ data class ExpenseEntity(
     val createdAt: Long,
     val photoUri: String? = null,
     val time: String = "00:00",
+    val paymentMethod: String = "",
 )

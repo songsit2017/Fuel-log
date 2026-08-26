@@ -36,4 +36,8 @@ data class FuelEntryEntity(
     val weatherTemperatureC: Double? = null,
     val weatherLatitude: Double? = null,
     val weatherLongitude: Double? = null,
+    val paymentMethod: String = "",
+    val driver: String = "",
+    val recordedByUid: String? = null,
+    val recordedByName: String? = null,
 )

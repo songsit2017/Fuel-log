@@ -49,7 +49,9 @@ import com.songsit.fuellogpro.settings.DisplaySettings
 import android.widget.Toast
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
@@ -526,6 +528,13 @@ class MainActivity : AppCompatActivity() {
         // switches back to Theme.FuelLogPro (postSplashScreenTheme) automatically.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // installSplashScreen()'s compat path leaves the window laid out edge-to-edge (decor not
+        // fitting system windows) after the splash exits, even though nothing else here expects
+        // that. Every TopAppBar in the app already reserves its own WindowInsets.statusBars space
+        // by default, so with the decor also extending under the status bar, that inset ends up
+        // reserved twice — a real gap of empty space above every screen's header. Restoring the
+        // normal (non-edge-to-edge) decor here removes the duplicate reservation.
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
         MaintenanceReminderWorker.schedule(applicationContext)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -564,6 +573,51 @@ class MainActivity : AppCompatActivity() {
             var oilPriceInfo by remember { mutableStateOf<OilPriceInfo?>(null) }
             LaunchedEffect(Unit) {
                 oilPriceInfo = oilPriceRepository.fetchTodayPrices()
+            }
+            // Dev-build-only share target (src/debug/AndroidManifest.xml registers ACTION_SEND
+            // and ACTION_SEND_MULTIPLE for image/* on this Activity — some gallery apps fire
+            // SEND_MULTIPLE even for a single selected photo) — photos shared in from
+            // Gallery/Camera/LINE/etc. get copied into app storage the same way pickPhoto above
+            // does, then handed to ProAppShell's "save as" chooser via the sharedPhotoPaths param.
+            var sharedPhotoPaths by remember { mutableStateOf<List<String>>(emptyList()) }
+            LaunchedEffect(Unit) {
+                val sharedIntent = intent
+                val isImageShare = sharedIntent?.type?.startsWith("image/") == true &&
+                    (sharedIntent.action == Intent.ACTION_SEND || sharedIntent.action == Intent.ACTION_SEND_MULTIPLE)
+                val sharedUris = if (isImageShare && sharedIntent?.action == Intent.ACTION_SEND) {
+                    val single = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        sharedIntent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        sharedIntent.getParcelableExtra(Intent.EXTRA_STREAM)
+                    }
+                    listOfNotNull(single)
+                } else if (isImageShare) {
+                    val multiple = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        sharedIntent?.getParcelableArrayListExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        sharedIntent?.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+                    }
+                    multiple.orEmpty()
+                } else {
+                    emptyList()
+                }
+                if (sharedUris.isNotEmpty()) {
+                    val copiedPaths = withContext(Dispatchers.IO) {
+                        sharedUris.take(MAX_PICK_PHOTOS).mapNotNull { uri ->
+                            runCatching {
+                                val photosDir = java.io.File(filesDir, "photos").apply { mkdirs() }
+                                val destFile = java.io.File(photosDir, "${java.util.UUID.randomUUID()}.jpg")
+                                contentResolver.openInputStream(uri)?.use { input ->
+                                    destFile.outputStream().use { output -> input.copyTo(output) }
+                                } ?: error("cannot open shared image stream")
+                                destFile.absolutePath
+                            }.getOrNull()
+                        }
+                    }
+                    sharedPhotoPaths = copiedPaths
+                }
             }
             // Pull the latest family-shared data as soon as the app opens (if already signed
             // in), so a vehicle another member edited elsewhere shows up without the user
@@ -645,7 +699,11 @@ class MainActivity : AppCompatActivity() {
                     backupSettings = backupSettings.copy(driveAutoSyncEnabled = enabled)
                     backupPreferences.save(backupSettings)
                 },
-                onAddFuel = viewModel::addFuel,
+                sharedPhotoPaths = sharedPhotoPaths,
+                onSharedPhotoConsumed = { sharedPhotoPaths = emptyList() },
+                onAddFuel = { values, onSaved ->
+                    viewModel.addFuel(values, authRepository.currentUid, authRepository.currentDisplayName, onSaved)
+                },
                 onUpdateFuel = viewModel::updateFuel,
                 onDeleteFuel = viewModel::deleteFuel,
                 onAddExpense = viewModel::addExpense,
@@ -728,6 +786,12 @@ class MainActivity : AppCompatActivity() {
                     if (type == "fuel" || type == "expense") launchDocumentScan(type, onPicked) else launchCameraCapture(type, onPicked)
                 },
                 onPickPdf = { onPicked -> launchPdfPicker(onPicked) },
+                onScanExistingPhoto = { path, type, onResult ->
+                    composeScope.launch {
+                        val result = runCatching { scanFirstPhoto(path, type) }.getOrNull()
+                        onResult(result)
+                    }
+                },
                 oilPriceInfo = oilPriceInfo,
                 vehicleMembers = vehicleMembers,
                 onCreateInvite = { email, role, onResult, onError ->
@@ -773,11 +837,29 @@ class MainActivity : AppCompatActivity() {
                                 webClientId,
                             )
                         }.onSuccess { uid ->
-                            cloudState = CloudUiState(
-                                uid = uid,
-                                email = authRepository.currentEmail,
-                                message = getString(R.string.signed_in_tap_sync),
-                            )
+                            // Sync immediately after sign-in instead of leaving the user on a
+                            // "tap sync now" message — signing in already signals intent to pull
+                            // their cloud data, a second manual tap was just friction.
+                            cloudState = CloudUiState(uid = uid, email = authRepository.currentEmail, syncing = true)
+                            runCatching {
+                                cloudRepository.sync(
+                                    uid,
+                                    authRepository.currentEmail,
+                                    authRepository.currentDisplayName,
+                                    authRepository.currentPhotoUrl,
+                                )
+                            }.onSuccess { result ->
+                                MaintenanceReminderWorker.refresh(applicationContext)
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = getString(R.string.sync_result, result.uploaded, result.downloaded, result.vehicles),
+                                )
+                            }.onFailure {
+                                cloudState = cloudState.copy(
+                                    syncing = false,
+                                    message = it.message ?: getString(R.string.sync_failed),
+                                )
+                            }
                         }.onFailure {
                             cloudState = cloudState.copy(
                                 syncing = false,

@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: SOURCE MODEL FOR THE PU POCKET PROJECTION
+// Contract fields are encoded to Firestore and then mapped into PU Pocket.
+// Read /ARCHITECTURE.md before renaming fields, changing units, ID stability,
+// money precision, date/time meaning, deletion behavior, or photo representation.
+// ============================================================================
 package com.songsit.fuellogpro.data.local
 
 import androidx.room.Entity

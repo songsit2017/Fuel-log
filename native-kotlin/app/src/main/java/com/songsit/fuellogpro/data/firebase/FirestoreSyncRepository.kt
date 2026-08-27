@@ -1,3 +1,9 @@
+// ============================================================================
+// AI AGENT WARNING: CROSS-APP SYNC CRITICAL PATH
+// This file owns Fuel Log's Room <-> Firestore mapping. Firestore entry writes
+// also trigger the PU Pocket bridge. Read /ARCHITECTURE.md before changing fields,
+// IDs, conflicts, tombstones, photo URLs, or pushFuelEntry save semantics.
+// ============================================================================
 package com.songsit.fuellogpro.data.firebase
 
 import android.content.Context
@@ -469,6 +475,28 @@ class FirestoreSyncRepository(
         for ((id, localItem) in localById) {
             val cloudDocument = cloudById[id]
             val cloudItem = cloudDocument?.let { runCatching { decode(it) }.getOrNull() }
+            // Older releases saved paymentMethod in Room but never uploaded it. Enrich
+            // only that absent field, only when the rest still agrees, and recheck in
+            // a Firestore transaction so another device's payment edit cannot be lost.
+            if (collection == "entries" && cloudDocument != null && cloudItem != null &&
+                canEnrichPayment(encode(localItem), encode(cloudItem), cloudDocument.contains("paymentMethod"))) {
+                val enriched = firestore.runTransaction { transaction ->
+                    val fresh = transaction.get(cloudDocument.reference)
+                    if (fresh.exists() && canEnrichPayment(
+                            encode(localItem), encode(decode(fresh)), fresh.contains("paymentMethod"))) {
+                        transaction.update(cloudDocument.reference, mapOf(
+                            "paymentMethod" to encode(localItem)["paymentMethod"],
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ))
+                        true
+                    } else false
+                }.await()
+                if (enriched) {
+                    uploaded++
+                    clearConflict(collection, vehicleId, id)
+                    continue
+                }
+            }
             val equal = cloudItem?.let(encode) == encode(localItem)
             when (decideSync(localExists = true, cloudExists = cloudDocument != null, contentEqual = equal)) {
                 SyncDecision.UPLOAD -> {
@@ -640,7 +668,7 @@ private fun vehicleEditableCloudMap(item: VehicleEntity): Map<String, Any?> = ma
 private fun conflictKey(collection: String, vehicleId: String, recordId: String) =
     "$collection|$vehicleId|$recordId"
 
-private fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
+internal fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "id" to item.id,
     "vehicleId" to item.vehicleId,
     "date" to item.date,
@@ -655,6 +683,7 @@ private fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "driver" to item.driver,
     "recordedByUid" to item.recordedByUid,
     "recordedByName" to item.recordedByName,
+    "paymentMethod" to item.paymentMethod,
 )
 
 private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
@@ -734,6 +763,7 @@ private fun parseFuel(vehicleId: String, document: DocumentSnapshot) = FuelEntry
     driver = document.getString("driver").orEmpty(),
     recordedByUid = document.getString("recordedByUid"),
     recordedByName = document.getString("recordedByName"),
+    paymentMethod = readFuelPaymentMethod(document.get("paymentMethod")),
 )
 
 private fun parseExpense(vehicleId: String, document: DocumentSnapshot) = ExpenseEntity(

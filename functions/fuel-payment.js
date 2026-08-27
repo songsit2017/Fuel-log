@@ -35,7 +35,11 @@ function validateReceiptEvidence(value) {
   if (!value.hasReceipt) return { hasReceipt: false, confidence: 'high' };
   if (!METHODS.has(value.method)) return null;
   if (value.provider != null && !Object.hasOwn(PROVIDERS, value.provider)) return null;
-  return { hasReceipt: true, confidence: 'high', method: value.method, provider: value.provider || null };
+  // A network logo/PAN (e.g. VISA) can be credit OR debit. Require a literal
+  // credit marker as separate evidence instead of trusting a confident guess.
+  if (value.method === 'CREDIT_CARD' && !['CREDIT', 'เครดิต'].includes(value.creditMarker)) return null;
+  return { hasReceipt: true, confidence: 'high', method: value.method, provider: value.provider || null,
+    ...(value.method === 'CREDIT_CARD' ? { creditMarker: value.creditMarker } : {}) };
 }
 
 async function resolvePayment(entry, attachments, inspect) {

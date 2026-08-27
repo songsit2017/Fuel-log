@@ -159,7 +159,7 @@ async function prepareEntry(vehicleId, entryId, entry, sourceUpdatedAt, ocrBudge
     }
   }
   const payment = await resolvePayment(entry, attachments, async attachment => {
-    const fingerprint = sha256(`${vehicleId}/${entryId}/v1/${sha256(attachment.bytes)}`);
+    const fingerprint = sha256(`${vehicleId}/${entryId}/v2/${sha256(attachment.bytes)}`);
     const ref = getFirestore().collection('pupu_payment_receipt_cache').doc(fingerprint);
     const cached = await ref.get();
     if (cached.exists) return cached.data().evidence;

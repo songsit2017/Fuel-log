@@ -49,7 +49,7 @@ function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badP
     './fuel-payment': payment,
     './payment-ocr': { inspectPaymentReceipt: async () => {
       ocrCalls++;
-      return { hasReceipt: true, method: 'CREDIT_CARD', provider: 'firstchoice', confidence: 'high' };
+      return { hasReceipt: true, method: 'CREDIT_CARD', provider: 'firstchoice', creditMarker: 'CREDIT', confidence: 'high' };
     } },
     crypto: require('node:crypto'),
   };

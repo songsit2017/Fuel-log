@@ -8,6 +8,7 @@ package com.songsit.fuellogpro.data.firebase
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.tasks.await
 
 /** Redeems a short-lived code created by PU Pocket without exposing either backend secret. */
@@ -18,6 +19,7 @@ class PupuPocketLinkRepository(
     suspend fun redeem(code: String, vehicleIds: List<String>) {
         check(auth.currentUser != null) { "กรุณาเข้าสู่ระบบ Google ก่อนเชื่อมต่อ" }
         functions.getHttpsCallable("redeemPupuLink")
+            .withTimeout(540, TimeUnit.SECONDS)
             .call(mapOf("code" to code, "vehicleIds" to vehicleIds))
             .await()
     }

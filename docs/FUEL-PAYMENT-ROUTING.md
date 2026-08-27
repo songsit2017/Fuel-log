@@ -1,6 +1,7 @@
 # Fuel payment routing (2026-08-27)
 
-Status: implementation on `agent/fuel-payment-routing`; not deployed.
+Release pair: PU Pocket 0.2.34 / Fuel Log 1.3.5. Deployment and signed-artifact
+evidence is recorded in the coordinated GitHub releases, not inferred from source.
 
 ## Before and after
 
@@ -23,6 +24,12 @@ Resolution order:
 3. No attachments, or all images confidently identified as non-receipts, means
    cash. Failed downloads, unreadable receipts, unsupported documents, and
    contradictory evidence mean unresolved, never cash.
+
+A VISA/Mastercard label alone cannot distinguish credit from debit. Receipt OCR
+must provide a literal CREDIT/เครดิต marker before classifying CREDIT_CARD.
+Network-only evidence remains unresolved. Cache schema v2 invalidates older
+classifications. Automatic fallback sends images to the existing server-side
+Anthropic provider; it stores only bounded payment evidence, not raw OCR text.
 
 Match only active THB accounts owned by the linked PU Pocket user. A unique
 matching name/type or recognized institution is eligible. A generic method can
@@ -52,6 +59,7 @@ only retries account/category routing of the stored evidence; it does not run
 OCR again. Set the payment method in Fuel Log to resolve such cases, or approve
 a bounded server replay after reviewing the historical selection. The pairing
 backfill still iterates history and is not a resumable bulk-import job.
+The native pairing timeout is 540 seconds, matching the callable's upper bound.
 
 ## Options and trade-offs
 
@@ -99,7 +107,7 @@ Companion PRs: linked in the draft PR descriptions.
   (20 existing unit tests; Gradle reused unchanged test outputs).
 - Fuel Log: `testDebugUnitTest assembleDebug` passed (25 tests, including three
   new payment encoder/legacy-enrichment tests).
-- Fuel Log `functions/npm test`: 29 tests passed, including actual trigger/
+- Fuel Log Node 20 `functions` tests: 30 tests passed, including actual trigger/
   callable wiring with in-memory service doubles, receipt decision reuse,
   authentication/member denial, and bounded historical OCR.
 - PU Pocket `supabase/tests/npm test`: 21 tests passed against all repository
@@ -113,10 +121,17 @@ Companion PRs: linked in the draft PR descriptions.
   with cash/bank/card choices; exited without saving or pairing. Local screenshots
   are ignored, not committed.
 
-Not yet verified: real OCR accuracy on the user's slips, true concurrent database
-connections, authenticated pending-list success on a deployed backend, source
-save -> production import -> device refresh, or signed production upgrade. No
-backend deployment, production data repair, bulk replay, or release occurred.
+Initial debug validation did not deploy a backend or replay history. The release
+gate additionally checks signed updates, deployed pending access and source/finance
+round-trip behavior; consult release records for those results. A real network-only
+VISA receipt was verified to remain unresolved rather than guessed credit. Bulk
+historical replay is separate from deploying this release and needs a reviewed
+selection; never re-pair simply to force an unbounded replay.
+
+Dependency audit: existing Google SDK transitives report a moderate uuid buffer
+bounds advisory for v3/v5/v6. Inspected Google callers use v4, and the bridge uses
+crypto SHA-256/source IDs, not those APIs. The suggested forced SDK downgrade was
+not applied as part of this release. No new runtime package was introduced.
 
 Fuel Log prerequisite: `develop` lacked released native payment support. The
 isolated, user-approved worktree merges released `origin/main` at `362d2fc` into

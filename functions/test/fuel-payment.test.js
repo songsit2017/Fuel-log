@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { explicitPayment, resolvePayment, receiptObjectPath, validateReceiptEvidence } = require('../fuel-payment');
 const { inspectPaymentReceipt } = require('../payment-ocr');
 const photo = { bytes: Buffer.from('synthetic-image'), contentType: 'image/jpeg' };
-const receipt = (method = 'CREDIT_CARD', provider = 'firstchoice') => ({ hasReceipt: true, method, provider, confidence: 'high' });
+const receipt = (method = 'CREDIT_CARD', provider = 'firstchoice') => ({ hasReceipt: true, method, provider, confidence: 'high', ...(method === 'CREDIT_CARD' ? { creditMarker: 'CREDIT' } : {}) });
 
 for (const [label, method] of [['เงินสด','CASH'], ['cash','CASH'], ['บัตรเครดิต','CREDIT_CARD'],
   ['บัตรเครดิตกสิกรไทย','CREDIT_CARD'], ['FirstChoice','CREDIT_CARD'], ['ธนาคารกสิกรไทย','BANK'],
@@ -46,6 +46,12 @@ for (const [label, images, inspect] of [
 test('model output is restricted to known fields and providers', () => {
   assert.equal(validateReceiptEvidence({ ...receipt(), provider: 'account number 123456' }), null);
   assert.deepEqual(validateReceiptEvidence({ ...receipt(), rawText: 'private' }), receipt());
+});
+test('a confident VISA/network-only guess is insufficient credit evidence', async () => {
+  for (const creditMarker of [undefined, null, 'VISA', 'Mastercard']) {
+    assert.equal(validateReceiptEvidence({ ...receipt(), creditMarker }), null);
+    assert.equal((await resolvePayment({}, [photo], async () => ({ ...receipt(), creditMarker }))).source, 'unresolved');
+  }
 });
 test('receipt loader allows only the exact bucket and entry object namespace', () => {
   const path = 'vehicles/car/photos/entry/receipt.jpg';

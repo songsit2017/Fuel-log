@@ -9,6 +9,9 @@
 const { initializeApp } = require('firebase-admin/app');
 const { defineSecret } = require('firebase-functions/params');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
+const { resolvePayment, receiptObjectPath } = require('./fuel-payment');
+const { inspectPaymentReceipt } = require('./payment-ocr');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const crypto = require('crypto');
@@ -116,7 +119,7 @@ function receiptUrls(entry) {
   return String(entry.photoUri || '')
     .split(',')
     .map(value => value.trim())
-    .filter(value => /^https:\/\//i.test(value));
+    .filter(Boolean);
 }
 
 function transactionDate(entry) {
@@ -137,18 +140,47 @@ function entryNote(entry, vehicle) {
   return `เติมน้ำมัน • ${details.join(' • ')}`;
 }
 
-async function copyReceiptUrls(link, entryId, urls) {
-  const copied = [];
-  for (let index = 0; index < urls.length; index += 1) {
-    const source = urls[index];
+async function prepareEntry(vehicleId, entryId, entry, sourceUpdatedAt, ocrBudget = { remaining: 6 }) {
+  const bucket = getStorage().bucket();
+  const attachments = [];
+  for (const url of receiptUrls(entry)) {
     try {
-      const download = await fetch(source);
-      if (!download.ok) throw new Error(`source returned ${download.status}`);
-      const length = Number(download.headers.get('content-length') || 0);
-      if (length > MAX_RECEIPT_BYTES) throw new Error('source image is too large');
-      const bytes = Buffer.from(await download.arrayBuffer());
-      if (bytes.length > MAX_RECEIPT_BYTES) throw new Error('source image is too large');
-      const contentType = download.headers.get('content-type') || 'image/jpeg';
+      const path = receiptObjectPath(url, bucket.name, vehicleId, entryId);
+      const file = bucket.file(path);
+      const [metadata] = await file.getMetadata();
+      if (Number(metadata.size) > MAX_RECEIPT_BYTES) throw new Error('Image too large');
+      const [bytes] = await file.download({ validation: 'crc32c' });
+      if (bytes.length > MAX_RECEIPT_BYTES) throw new Error('Image too large');
+      attachments.push({ bytes, contentType: metadata.contentType || 'image/jpeg' });
+    } catch {
+      // A failed/local/unauthorized attachment is not evidence of cash payment.
+      attachments.push(null);
+      console.warn('Fuel Log receipt unavailable', { entryId });
+    }
+  }
+  const payment = await resolvePayment(entry, attachments, async attachment => {
+    const fingerprint = sha256(`${vehicleId}/${entryId}/v1/${sha256(attachment.bytes)}`);
+    const ref = getFirestore().collection('pupu_payment_receipt_cache').doc(fingerprint);
+    const cached = await ref.get();
+    if (cached.exists) return cached.data().evidence;
+    // A link can contain years of history. Bound new paid OCR requests per
+    // invocation; exhausted/unclear records remain pending, never guessed cash.
+    if (ocrBudget.remaining <= 0) return null;
+    ocrBudget.remaining--;
+    const evidence = await inspectPaymentReceipt(attachment, anthropicApiKey.value());
+    if (evidence) await ref.set({ evidence, createdAt: new Date() });
+    return evidence;
+  });
+  return { attachments, payment, sourceUpdatedAt };
+}
+
+async function copyReceiptUrls(link, entryId, attachments) {
+  const copied = [];
+  for (let index = 0; index < attachments.length; index += 1) {
+    const attachment = attachments[index];
+    if (!attachment) continue;
+    try {
+      const { bytes, contentType } = attachment;
       if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(contentType)) {
         throw new Error(`unsupported content type ${contentType}`);
       }
@@ -173,9 +205,8 @@ async function copyReceiptUrls(link, entryId, urls) {
   return copied;
 }
 
-async function upsertEntryForLink(link, vehicle, entryId, entry) {
-  const localReceiptUrls = receiptUrls(entry);
-  const receiptPaths = await copyReceiptUrls(link, entryId, localReceiptUrls);
+async function upsertEntryForLink(link, vehicle, entryId, entry, prepared) {
+  const receiptPaths = await copyReceiptUrls(link, entryId, prepared.attachments);
   const metadata = {
     vehicleId: link.vehicle_id,
     vehicleName: vehicle?.name || null,
@@ -186,6 +217,8 @@ async function upsertEntryForLink(link, vehicle, entryId, entry) {
     odometerKm: Number(entry.odometer || 0),
     fullTank: Boolean(entry.full),
     receiptPaths,
+    payment: prepared.payment,
+    sourceUpdatedAt: prepared.sourceUpdatedAt,
     importedAt: new Date().toISOString(),
   };
   await supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
@@ -216,12 +249,17 @@ async function assertVehicleMember(uid, vehicleId) {
   }
 }
 
-async function syncEntry(vehicleId, entryId, before, after) {
+async function syncEntry(vehicleId, entryId, eventTime) {
   const links = await activeLinksForVehicle(vehicleId);
   if (!links.length) return;
   const vehicle = (await getFirestore().collection('vehicles').doc(vehicleId).get()).data() || null;
+  // Re-read the authoritative record: late event delivery must not replay an old
+  // payment choice over a newer edit. The RPC also compares sourceUpdatedAt.
+  const live = await getFirestore().collection('vehicles').doc(vehicleId).collection('entries').doc(entryId).get();
+  const after = live.exists ? live.data() : null;
   if (after) {
-    await Promise.all(links.map(link => upsertEntryForLink(link, vehicle, entryId, after)));
+    const prepared = await prepareEntry(vehicleId, entryId, after, live.updateTime.toDate().toISOString());
+    await Promise.all(links.map(link => upsertEntryForLink(link, vehicle, entryId, after, prepared)));
   } else {
     await Promise.all(links.map(link => supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
       method: 'POST',
@@ -232,7 +270,7 @@ async function syncEntry(vehicleId, entryId, before, after) {
         p_transaction_date: new Date().toISOString(),
         p_note: null,
         p_receipt_url: null,
-        p_metadata: { vehicleId, deletedFromFuelLogAt: new Date().toISOString() },
+        p_metadata: { vehicleId, sourceUpdatedAt: eventTime, deletedFromFuelLogAt: new Date().toISOString() },
         p_deleted: true,
       }),
     })));
@@ -242,16 +280,17 @@ async function syncEntry(vehicleId, entryId, before, after) {
 exports.syncFuelEntryToPupu = onDocumentWritten({
   region: BRIDGE_REGION,
   document: 'vehicles/{vehicleId}/entries/{entryId}',
-  secrets: [supabaseUrl, supabaseServiceRoleKey],
+  secrets: [supabaseUrl, supabaseServiceRoleKey, anthropicApiKey],
+  timeoutSeconds: 300,
+  maxInstances: 5,
 }, async event => {
-  const before = event.data?.before.exists ? event.data.before.data() : null;
-  const after = event.data?.after.exists ? event.data.after.data() : null;
-  await syncEntry(event.params.vehicleId, event.params.entryId, before, after);
+  await syncEntry(event.params.vehicleId, event.params.entryId, event.time);
 });
 
 exports.redeemPupuLink = onCall({
   region: BRIDGE_REGION,
-  secrets: [supabaseUrl, supabaseServiceRoleKey],
+  secrets: [supabaseUrl, supabaseServiceRoleKey, anthropicApiKey],
+  timeoutSeconds: 540,
 }, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in to Fuel Log first');
   const code = String(request.data?.code || '').trim().toUpperCase();
@@ -266,10 +305,14 @@ exports.redeemPupuLink = onCall({
   });
   // Import existing fill-ups immediately. New/updated items continue through
   // the Firestore trigger above.
+  const ocrBudget = { remaining: 10 };
   for (const link of links) {
     const vehicle = (await getFirestore().collection('vehicles').doc(link.vehicle_id).get()).data() || null;
     const entries = await getFirestore().collection('vehicles').doc(link.vehicle_id).collection('entries').get();
-    for (const entry of entries.docs) await upsertEntryForLink(link, vehicle, entry.id, entry.data());
+    for (const entry of entries.docs) {
+      const prepared = await prepareEntry(link.vehicle_id, entry.id, entry.data(), entry.updateTime.toDate().toISOString(), ocrBudget);
+      await upsertEntryForLink(link, vehicle, entry.id, entry.data(), prepared);
+    }
   }
   return { importedVehicles: links.map(link => link.vehicle_id) };
 });

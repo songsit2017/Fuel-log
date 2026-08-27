@@ -2,6 +2,10 @@
 
 Status: production architecture, last reviewed 2026-08-11.
 
+Payment-method routing changes under development are specified in
+[`docs/FUEL-PAYMENT-ROUTING.md`](docs/FUEL-PAYMENT-ROUTING.md). The current
+production behavior below remains in force until the coordinated rollout.
+
 This document explains how Fuel Log and PU Pocket exchange data. Read it before changing sync code, database models, Firebase paths/rules, Supabase migrations/RPCs, receipt storage, or account/vehicle sharing.
 
 ## Non-negotiable invariants

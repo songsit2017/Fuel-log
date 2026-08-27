@@ -1,6 +1,8 @@
 package com.songsit.fuellogpro.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -32,9 +35,11 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.History
@@ -70,6 +75,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,6 +99,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -120,10 +131,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.songsit.fuellogpro.domain.model.FuelEntry
@@ -147,8 +160,10 @@ import com.songsit.fuellogpro.ui.timeline.FullScreenImageViewer
 import com.songsit.fuellogpro.ui.timeline.TimelineThumbnails
 import com.songsit.fuellogpro.ui.timeline.openPdfExternally
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import java.util.Locale
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -157,6 +172,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -215,8 +231,8 @@ fun FuelLogApp(
     onAddFuel: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdateFuel: (String, FuelEntryFormValues, () -> Unit) -> Unit,
     onDeleteFuel: (String) -> Unit,
-    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
+    onAddExpense: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
+    onUpdateExpense: (String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
     onDeleteExpense: (String) -> Unit,
     onAddMaintenance: (String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
     onUpdateMaintenance: (String, String, String, String?, Double?, Int, Double, Int?, Double?, () -> Unit) -> Unit,
@@ -248,6 +264,9 @@ fun FuelLogApp(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
+    // Dev-build-only "scan an already-attached photo" entry point — see ProAppShell's param of
+    // the same name for the full explanation. Unused (always null) in the default shell.
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
@@ -261,7 +280,87 @@ fun FuelLogApp(
     onDriveRestore: (() -> Unit)? = null,
     driveAutoSyncEnabled: Boolean = false,
     onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
+    // Dev-build-only "share receipt photo(s) into the app" entry point — see ProAppShell's param
+    // of the same name for the full explanation. Unused (always empty) in the default shell.
+    sharedPhotoPaths: List<String> = emptyList(),
+    onSharedPhotoConsumed: () -> Unit = {},
 ) {
+    // Pro (FuelLog Pro Redesign concept, see FuelLogTheme.kt's ProLight/ProDark) is the app's
+    // only shell now — everyone always renders ProAppShell below, regardless of any legacy
+    // themePalette value persisted from before the other palettes were removed. The old
+    // drawer-based shell further down in this function is unreachable dead code, kept only
+    // because ProAppShell still reuses many of its supporting composables (ExpenseList,
+    // StatsScreen, SettingsScreen, etc. defined in this file).
+    run {
+        // FuelLogApp's own MaterialTheme wrapper lives further down (around the FuelLogTheme(...)
+        // call below, for the unreachable default shell) — this early-return branch would
+        // otherwise render with no ColorScheme ancestor at all (Compose's stock M3 baseline
+        // purple) since it exits before reaching that wrapper. Wrap explicitly here so
+        // ProAppShell actually gets ProLight/ProDark instead of the default baseline scheme.
+        // Font stays a real user choice (Settings > แบบอักษร, now including the explicit
+        // "System default" option — see AppFonts.kt) rather than force-locked to Kanit: Pro only
+        // fixes the color palette, font selection is independent.
+        FuelLogTheme(
+            themeMode = displaySettings.themeMode,
+            fontFamily = displaySettings.fontFamily,
+        ) {
+        com.songsit.fuellogpro.ui.pro.ProAppShell(
+            state = state,
+            onAddFuel = onAddFuel,
+            onUpdateFuel = onUpdateFuel,
+            onDeleteFuel = onDeleteFuel,
+            onAddExpense = onAddExpense,
+            onUpdateExpense = onUpdateExpense,
+            onDeleteExpense = onDeleteExpense,
+            onAddMaintenance = onAddMaintenance,
+            onUpdateMaintenance = onUpdateMaintenance,
+            onCompleteMaintenance = onCompleteMaintenance,
+            onDeleteMaintenance = onDeleteMaintenance,
+            onAddTrip = onAddTrip,
+            onUpdateTrip = onUpdateTrip,
+            onDeleteTrip = onDeleteTrip,
+            onStartTripRecording = onStartTripRecording,
+            onExportCsv = onExportCsv,
+            reminderSettings = reminderSettings,
+            onReminderSettingsChange = onReminderSettingsChange,
+            onExportBackup = onExportBackup,
+            onImportBackup = onImportBackup,
+            cloudState = cloudState,
+            onGoogleSignIn = onGoogleSignIn,
+            onCloudSync = onCloudSync,
+            onSignOut = onSignOut,
+            syncConflicts = syncConflicts,
+            onResolveConflict = onResolveConflict,
+            onResolveAllConflicts = onResolveAllConflicts,
+            onSelectVehicle = onSelectVehicle,
+            onAddVehicle = onAddVehicle,
+            onUpdateVehicle = onUpdateVehicle,
+            onDeleteVehicle = onDeleteVehicle,
+            onFindNearbyStations = onFindNearbyStations,
+            onFetchWeather = onFetchWeather,
+            onPickPhoto = onPickPhoto,
+            onPickCameraPhoto = onPickCameraPhoto,
+            onPickPdf = onPickPdf,
+            onScanExistingPhoto = onScanExistingPhoto,
+            oilPriceInfo = oilPriceInfo,
+            vehicleMembers = vehicleMembers,
+            onCreateInvite = onCreateInvite,
+            onJoinByCode = onJoinByCode,
+            displaySettings = displaySettings,
+            onDisplaySettingsChange = onDisplaySettingsChange,
+            importSummaryResult = importSummaryResult,
+            onDismissImportSummary = onDismissImportSummary,
+            onDriveBackup = onDriveBackup,
+            onDriveRestore = onDriveRestore,
+            driveAutoSyncEnabled = driveAutoSyncEnabled,
+            onDriveAutoSyncChange = onDriveAutoSyncChange,
+            sharedPhotoPaths = sharedPhotoPaths,
+            onSharedPhotoConsumed = onSharedPhotoConsumed,
+        )
+        }
+        return
+    }
+
     var tab by remember { mutableIntStateOf(0) }
     var showAddFuel by remember { mutableStateOf(false) }
     var addFuelAutoScan by remember { mutableStateOf(false) }
@@ -405,18 +504,40 @@ fun FuelLogApp(
     }
     availableUpdate?.let { update ->
         val updateUriHandler = LocalUriHandler.current
+        // Downloads straight into the app and hands the APK to the system installer
+        // (ApkUpdateDownloader) instead of opening the browser — falls back to the old
+        // browser-download behavior only if the in-app download/install intent itself fails
+        // (e.g. no network), so this never leaves the user with no way to update at all.
+        var downloadingUpdate by remember { mutableStateOf(false) }
+        val updateScope = androidx.compose.runtime.rememberCoroutineScope()
         AlertDialog(
-            onDismissRequest = { availableUpdate = null },
+            onDismissRequest = { if (!downloadingUpdate) availableUpdate = null },
             title = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_title)) },
-            text = { Text(stringResource(com.songsit.fuellogpro.R.string.update_available_message, update.versionName)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(com.songsit.fuellogpro.R.string.update_available_message, update.versionName))
+                    if (downloadingUpdate) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(com.songsit.fuellogpro.R.string.update_downloading), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    updateUriHandler.openUri(update.downloadUrl)
-                    availableUpdate = null
+                TextButton(enabled = !downloadingUpdate, onClick = {
+                    downloadingUpdate = true
+                    updateScope.launch {
+                        val installed = com.songsit.fuellogpro.data.ApkUpdateDownloader(updateContext).downloadAndInstall(update.downloadUrl)
+                        if (!installed) updateUriHandler.openUri(update.downloadUrl)
+                        downloadingUpdate = false
+                        availableUpdate = null
+                    }
                 }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_download)) }
             },
             dismissButton = {
-                TextButton(onClick = {
+                TextButton(enabled = !downloadingUpdate, onClick = {
                     com.songsit.fuellogpro.settings.UpdateCheckPreferences(updateContext).skipVersion(update.versionCode)
                     availableUpdate = null
                 }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_skip_version)) }
@@ -903,7 +1024,7 @@ private fun QuickPickField(
 }
 
 @Composable
-private fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Modifier) {
+internal fun TripCalculatorScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     var modeExpanded by remember { mutableStateOf(false) }
     var mode by remember { mutableIntStateOf(0) }
     var distanceKm by remember { mutableStateOf("") }
@@ -1033,7 +1154,7 @@ private fun matchOilPrice(brand: StationBrand, oilPriceInfo: OilPriceInfo?): Dou
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NearbyStationsMapScreen(
+internal fun NearbyStationsMapScreen(
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)?,
     oilPriceInfo: OilPriceInfo?,
     modifier: Modifier = Modifier,
@@ -1336,13 +1457,18 @@ private fun oilBrandLogoRes(brand: String): Int? = when {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OilPriceCard(info: OilPriceInfo) {
+internal fun OilPriceCard(info: OilPriceInfo) {
     // Brand selection state lives only inside this card — never propagates upward.
     var selectedIndex by remember { mutableIntStateOf(0) }
     val safeIndex = selectedIndex.coerceIn(0, info.brands.lastIndex)
     val selected = info.brands[safeIndex]
 
-    Card(shape = RoundedCornerShape(20.dp)) {
+    // Modern Minimal Bento: neutral surface + subtle outline hairline, not a tinted background.
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -1454,7 +1580,23 @@ private fun OilPriceRow(label: String, price: Double?) {
             thaiCurrency.format(price),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+// "Full tank" status pill — secondary (orange) text on the spec's exact translucent orange fill,
+// full CircleShape corners.
+@Composable
+internal fun FullTankBadge() {
+    val badgeBg = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) FullTankBadgeDark else FullTankBadgeLight
+    Surface(shape = CircleShape, color = badgeBg) {
+        Text(
+            stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank),
+            color = MaterialTheme.colorScheme.secondary,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
 }
@@ -1523,7 +1665,7 @@ internal fun StationBadge(stationName: String, modifier: Modifier = Modifier, si
 }
 
 @Composable
-private fun SectionHeader(icon: ImageVector, title: String) {
+internal fun SectionHeader(icon: ImageVector, title: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         IconBadge(icon, size = 26.dp)
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1531,11 +1673,12 @@ private fun SectionHeader(icon: ImageVector, title: String) {
 }
 
 @Composable
-private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+internal fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.padding(16.dp)) {
             if (icon != null) {
@@ -1544,13 +1687,21 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
             }
             Text(label, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(6.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            // Matches IconBadge's own icon tint (primary) so the number carries the same accent
+            // as its icon instead of sitting there in plain onSurface — colored icon, gray value
+            // reads inconsistent.
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (icon != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            )
         }
     }
 }
 
 @Composable
-private fun FuelList(
+internal fun FuelList(
     entries: List<FuelEntry>,
     onDelete: (String) -> Unit,
     onEdit: ((FuelEntry) -> Unit)? = null,
@@ -1580,7 +1731,7 @@ private fun FuelList(
                     label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )
             }
@@ -1590,7 +1741,7 @@ private fun FuelList(
 }
 
 @Composable
-private fun ExpenseList(
+internal fun ExpenseList(
     expenses: List<Expense>,
     totalExpense: Double,
     totalIncome: Double,
@@ -1675,7 +1826,7 @@ private fun ExpenseList(
                     label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )
             }
@@ -1693,9 +1844,12 @@ private fun ExpenseRow(
     onEdit: ((Expense) -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val goodColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) ProGoodDark else ProGood
+    val amountColor = if (expense.income) goodColor else MaterialTheme.colorScheme.onSurface
     Card(
         shape = RoundedCornerShape(18.dp),
         modifier = if (onEdit != null) Modifier.clickable { onEdit(expense) } else Modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
             IconBadge(if (expense.income) Icons.Filled.Savings else Icons.Filled.Receipt)
@@ -1736,7 +1890,7 @@ private fun ExpenseRow(
                 Text(
                     "${if (expense.income) "+" else ""}${thaiCurrency.format(kotlin.math.abs(expense.amount))}",
                     fontWeight = FontWeight.Bold,
-                    color = if (expense.income) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                    color = amountColor,
                 )
                 Box {
                     IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(28.dp)) {
@@ -1755,7 +1909,7 @@ private fun ExpenseRow(
 }
 
 @Composable
-private fun TripList(
+internal fun TripList(
     trips: List<Trip>,
     summary: com.songsit.fuellogpro.domain.TripSummary,
     onDelete: (String) -> Unit,
@@ -1894,7 +2048,7 @@ private fun TripList(
 }
 
 @Composable
-private fun MaintenanceList(
+internal fun MaintenanceList(
     tasks: List<MaintenanceTask>,
     currentOdometerKm: Double?,
     onComplete: (String) -> Unit,
@@ -1967,7 +2121,7 @@ private fun MaintenanceList(
 }
 
 @Composable
-private fun FuelRow(
+internal fun FuelRow(
     entry: FuelEntry,
     onDelete: ((String) -> Unit)? = null,
     onEdit: ((FuelEntry) -> Unit)? = null,
@@ -1980,6 +2134,7 @@ private fun FuelRow(
     Card(
         shape = RoundedCornerShape(18.dp),
         modifier = if (onEdit != null) Modifier.clickable { onEdit(entry) } else Modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1989,7 +2144,7 @@ private fun FuelRow(
                     Text(entry.station.ifBlank { stringResource(com.songsit.fuellogpro.R.string.fuel_default_label) }, fontWeight = FontWeight.SemiBold)
                     Text("${entry.date} • ${number.format(entry.odometerKm)} ${stringResource(com.songsit.fuellogpro.R.string.unit_km_short)}", style = MaterialTheme.typography.bodySmall)
                 }
-                Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold)
+                Text(thaiCurrency.format(entry.amount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             if (entry.photoUrls.isNotEmpty()) {
                 TimelineThumbnails(entry.photoUrls, onImageClick ?: { _, _ -> })
@@ -2003,8 +2158,16 @@ private fun FuelRow(
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(com.songsit.fuellogpro.R.string.fuel_liters_price_line, number.format(entry.liters), number.format(entry.pricePerLiter)))
                     kmPerLiter?.let { Text(stringResource(com.songsit.fuellogpro.R.string.fuel_efficiency_line, number.format(it)), style = MaterialTheme.typography.labelSmall) }
+                    entry.driver.takeIf { it.isNotBlank() }?.let {
+                        Text(stringResource(com.songsit.fuellogpro.R.string.fuel_driver_line, it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    entry.recordedByName?.takeIf { it.isNotBlank() }?.let {
+                        Text(stringResource(com.songsit.fuellogpro.R.string.fuel_recorded_by_line, it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                if (entry.fullTank) Text(stringResource(com.songsit.fuellogpro.R.string.fuel_full_tank), color = MaterialTheme.colorScheme.tertiary)
+                if (entry.fullTank) {
+                    FullTankBadge()
+                }
                 onDelete?.let { TextButton(onClick = { it(entry.id) }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_delete)) } }
             }
         }
@@ -2109,7 +2272,7 @@ private fun DisplaySettingsCard(
 }
 
 @Composable
-private fun VehiclesListScreen(
+internal fun VehiclesListScreen(
     vehicles: List<Vehicle>,
     selectedVehicleId: String?,
     onSelect: (String) -> Unit,
@@ -2223,11 +2386,41 @@ private fun PreferenceCategoryHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
     )
 }
+
+// Groups related PreferenceListItem rows into a single Bento card: surface background, 20dp
+// rounded corners, 1dp outline border. Pass rows as `content`, separated by HorizontalDivider
+// where a visual break inside the group is wanted.
+@Composable
+private fun BentoGroupCard(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column {
+        if (title != null) {
+            PreferenceCategoryHeader(title)
+        }
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        ) {
+            Column(content = content)
+        }
+    }
+}
+
+// Shared checked-state colors for every settings Switch: primary thumb + track, as opposed to
+// Compose's default (onPrimary thumb / primary track) so the toggle reads as one solid brand-color
+// pill when on.
+@Composable
+private fun bentoSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.primary,
+    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+    checkedBorderColor = MaterialTheme.colorScheme.primary,
+)
 
 @Composable
 private fun PreferenceListItem(
@@ -2257,15 +2450,20 @@ private fun PreferenceListItem(
                 )
             }
         }
-        if (trailing != null) {
-            trailing()
+        when {
+            trailing != null -> trailing()
+            onClick != null -> Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(
+internal fun SettingsScreen(
     onDismiss: () -> Unit,
     onExportBackup: () -> Unit,
     onExportCsv: () -> Unit,
@@ -2296,7 +2494,6 @@ private fun SettingsScreen(
     var showDecimalsDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
-    var showThemePaletteDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showImportExport by remember { mutableStateOf(false) }
     var showFamilySharing by remember { mutableStateOf(false) }
@@ -2305,7 +2502,13 @@ private fun SettingsScreen(
     var showOtherSettings by remember { mutableStateOf(false) }
     var showPupuPocketLink by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
-    val canShareVehicle = cloudState.uid != null && hasSelectedVehicle && (onCreateInvite != null || onJoinByCode != null)
+    // Deliberately does NOT require hasSelectedVehicle: someone freshly signed in with no
+    // vehicle of their own yet still needs to reach this screen to join a family's existing
+    // vehicle by invite code. Requiring a vehicle first made this menu invisible to exactly the
+    // people who most needed it — a new member joining, not the owner inviting. The
+    // create-invite section (which does need an existing vehicle to invite people to) is gated
+    // separately inside FamilySharingScreen via hasSelectedVehicle.
+    val canShareVehicle = cloudState.uid != null && (onCreateInvite != null || onJoinByCode != null)
 
     if (showImportExport) {
         ImportExportScreen(
@@ -2333,6 +2536,7 @@ private fun SettingsScreen(
             members = vehicleMembers,
             onCreateInvite = onCreateInvite,
             onJoinByCode = onJoinByCode,
+            hasSelectedVehicle = hasSelectedVehicle,
         )
         return
     }
@@ -2371,240 +2575,225 @@ private fun SettingsScreen(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             // ── Category 1: general ──────────────────────────────────────────────
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) }
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_general)) {
+                    val volumeLabel = stringResource(if (displaySettings.volumeUnit == "gal") com.songsit.fuellogpro.R.string.unit_word_gallons else com.songsit.fuellogpro.R.string.unit_word_liters)
+                    val distLabel = stringResource(if (displaySettings.distanceUnit == "mi") com.songsit.fuellogpro.R.string.unit_word_mi else com.songsit.fuellogpro.R.string.unit_word_km)
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_units_subtitle, volumeLabel, distLabel),
+                        onClick = { showUnitDialog = true },
+                    )
 
-            item {
-                val volumeLabel = stringResource(if (displaySettings.volumeUnit == "gal") com.songsit.fuellogpro.R.string.unit_word_gallons else com.songsit.fuellogpro.R.string.unit_word_liters)
-                val distLabel = stringResource(if (displaySettings.distanceUnit == "mi") com.songsit.fuellogpro.R.string.unit_word_mi else com.songsit.fuellogpro.R.string.unit_word_km)
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_units_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_units_subtitle, volumeLabel, distLabel),
-                    onClick = { showUnitDialog = true },
-                )
-            }
+                    val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
+                        subtitle = currencyDisplayLabel(currencyOption.code),
+                        onClick = { showCurrencyDialog = true },
+                    )
 
-            item {
-                val currencyOption = CURRENCY_OPTIONS.firstOrNull { it.code == displaySettings.currency } ?: CURRENCY_OPTIONS[0]
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_currency_title),
-                    subtitle = currencyDisplayLabel(currencyOption.code),
-                    onClick = { showCurrencyDialog = true },
-                )
-            }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_theme_title),
+                        subtitle = when (displaySettings.themeMode) {
+                            "light" -> stringResource(com.songsit.fuellogpro.R.string.theme_light)
+                            "dark" -> stringResource(com.songsit.fuellogpro.R.string.theme_dark)
+                            else -> stringResource(com.songsit.fuellogpro.R.string.theme_system)
+                        },
+                        onClick = { showThemeDialog = true },
+                    )
+                    // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_theme_title),
-                    subtitle = when (displaySettings.themeMode) {
-                        "light" -> stringResource(com.songsit.fuellogpro.R.string.theme_light)
-                        "dark" -> stringResource(com.songsit.fuellogpro.R.string.theme_dark)
-                        else -> stringResource(com.songsit.fuellogpro.R.string.theme_system)
-                    },
-                    onClick = { showThemeDialog = true },
-                )
-                // NotificationSettingRow: ตามเลขไมล์ (Satisfy unit test)
-            }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_font_title),
+                        subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
+                        onClick = { showFontDialog = true },
+                    )
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_font_title),
-                    subtitle = fontOptions.firstOrNull { it.key == displaySettings.fontFamily }?.label ?: "Ubuntu",
-                    onClick = { showFontDialog = true },
-                )
-            }
+                    val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label),
+                        subtitle = when (currentLanguageTag) {
+                            "th" -> stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
+                            "en" -> stringResource(com.songsit.fuellogpro.R.string.language_name_english)
+                            else -> stringResource(com.songsit.fuellogpro.R.string.language_system_default)
+                        },
+                        onClick = { showLanguageDialog = true },
+                    )
 
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title),
-                    subtitle = themePaletteLabel(displaySettings.themePalette),
-                    onClick = { showThemePaletteDialog = true },
-                )
-            }
-            item {
-                val currentLanguageTag = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_language_row_label),
-                    subtitle = when (currentLanguageTag) {
-                        "th" -> stringResource(com.songsit.fuellogpro.R.string.language_name_thai)
-                        "en" -> stringResource(com.songsit.fuellogpro.R.string.language_name_english)
-                        else -> stringResource(com.songsit.fuellogpro.R.string.language_system_default)
-                    },
-                    onClick = { showLanguageDialog = true },
-                )
-            }
-
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_other_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_other_subtitle),
-                    onClick = { showOtherSettings = true },
-                )
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_other_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_other_subtitle),
+                        onClick = { showOtherSettings = true },
+                    )
+                }
             }
 
             // ── Category 2: backup (import/export) ───────────────────────
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) }
             item {
-                val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
-                val syncSubtitle = when {
-                    syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_summary, syncConflicts.size)
-                    cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
-                    else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_backup)) {
+                    val googleConnectedLabel = stringResource(com.songsit.fuellogpro.R.string.google_connected)
+                    val syncSubtitle = when {
+                        syncConflicts.isNotEmpty() -> stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_summary, syncConflicts.size)
+                        cloudState.uid != null -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local_with_detail, cloudState.email ?: googleConnectedLabel)
+                        else -> stringResource(com.songsit.fuellogpro.R.string.sync_cloud_and_local)
+                    }
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
+                        subtitle = syncSubtitle,
+                        leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        onClick = { showImportExport = true },
+                    )
+
+                    if (canShareVehicle) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
+                            subtitle = if (vehicleMembers.isEmpty()) {
+                                stringResource(com.songsit.fuellogpro.R.string.family_share_no_members)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
+                            },
+                            leading = {
+                                Icon(
+                                    Icons.Filled.People,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = { showFamilySharing = true },
+                        )
+                    }
                 }
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title),
-                    subtitle = syncSubtitle,
-                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = { showImportExport = true },
-                )
             }
 
-            if (canShareVehicle) {
-                item {
+            // ── Category 3: PU Pocket account & cloud ────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_pupu_pocket)) {
+                    if (cloudState.uid == null) {
+                        PreferenceListItem(
+                            title = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                            },
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_sign_in_subtitle),
+                            leading = {
+                                Icon(
+                                    Icons.Filled.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        )
+                    } else {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_subtitle),
+                            leading = {
+                                Icon(
+                                    Icons.Filled.Sync,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            },
+                            onClick = { showPupuPocketLink = true },
+                        )
+                    }
+                }
+            }
+
+            // ── Category 4: about ───────────────────────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) {
                     PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.settings_family_share_title),
-                        subtitle = if (vehicleMembers.isEmpty()) {
-                            stringResource(com.songsit.fuellogpro.R.string.family_share_no_members)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.family_share_member_count, vehicleMembers.size)
+                        title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_about_subtitle),
+                    )
+
+                    val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
+                    val settingsContext = LocalContext.current
+                    var checkingUpdate by remember { mutableStateOf(false) }
+                    var downloadingUpdate by remember { mutableStateOf(false) }
+                    var checkedUpToDate by remember { mutableStateOf(false) }
+                    var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
+                    val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
+                    val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
+                    val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
+                    val downloadingMessage = stringResource(com.songsit.fuellogpro.R.string.update_downloading)
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
+                        subtitle = when {
+                            downloadingUpdate -> downloadingMessage
+                            checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
+                            foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
+                            checkedUpToDate -> upToDateMessage
+                            else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
                         },
-                        leading = {
-                            Icon(
-                                Icons.Filled.People,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                        onClick = {
+                            if (checkingUpdate || downloadingUpdate) return@PreferenceListItem
+                            // Once a check has found an update, tapping again downloads it instead of
+                            // re-checking — the row's subtitle already makes this action explicit.
+                            // Downloads in-app and hands the APK to the system installer
+                            // (ApkUpdateDownloader) rather than opening the browser; only falls back
+                            // to the browser if that in-app download/install itself fails.
+                            val update = foundUpdate
+                            if (update != null) {
+                                downloadingUpdate = true
+                                checkUpdateScope.launch {
+                                    val installed = com.songsit.fuellogpro.data.ApkUpdateDownloader(settingsContext).downloadAndInstall(update.downloadUrl)
+                                    if (!installed) uriHandler.openUri(update.downloadUrl)
+                                    downloadingUpdate = false
+                                }
+                                return@PreferenceListItem
+                            }
+                            checkingUpdate = true
+                            checkedUpToDate = false
+                            checkUpdateScope.launch {
+                                val result = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
+                                checkingUpdate = false
+                                checkedUpToDate = result == null
+                                foundUpdate = result
+                            }
                         },
-                        onClick = { showFamilySharing = true },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
+                        subtitle = "songsit2017 • songsit2017@gmail.com",
+                        onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_subtitle),
+                        onClick = { showOpenSourceLicenses = true }
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_subtitle),
+                        onClick = { showChangelog = true },
                     )
                 }
             }
 
-            // ── Category 3: about ───────────────────────────────────────────────
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            // ── Category 5: data sources ─────────────────────────────────────────
             item {
-                PreferenceCategoryHeader(
-                    stringResource(com.songsit.fuellogpro.R.string.settings_category_pupu_pocket),
-                )
-            }
-            if (cloudState.uid == null) {
-                item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) {
                     PreferenceListItem(
-                        title = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
-                        },
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_sign_in_subtitle),
-                        leading = {
-                            Icon(
-                                Icons.Filled.AccountCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_subtitle),
+                    )
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI")
+                    PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_update_check_source_title), subtitle = "GitHub Releases API")
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),
+                        subtitle = "github.com/songsit2017/Fuel-log",
+                        onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
                     )
                 }
-            } else {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_pupu_connect_subtitle),
-                        leading = {
-                            Icon(
-                                Icons.Filled.Sync,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        onClick = { showPupuPocketLink = true },
-                    )
-                }
-            }
-
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_about)) }
-            item {
-                PreferenceListItem(
-                    title = "FuelLog Pro v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_about_subtitle),
-                )
-            }
-            item {
-                val checkUpdateScope = androidx.compose.runtime.rememberCoroutineScope()
-                var checkingUpdate by remember { mutableStateOf(false) }
-                var checkedUpToDate by remember { mutableStateOf(false) }
-                var foundUpdate by remember { mutableStateOf<com.songsit.fuellogpro.data.UpdateInfo?>(null) }
-                val updateFoundFormat = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_found)
-                val downloadLabel = stringResource(com.songsit.fuellogpro.R.string.action_download)
-                val upToDateMessage = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_up_to_date)
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_check_update_title),
-                    subtitle = when {
-                        checkingUpdate -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_checking)
-                        foundUpdate != null -> "${updateFoundFormat.format(foundUpdate!!.versionName)} — $downloadLabel"
-                        checkedUpToDate -> upToDateMessage
-                        else -> stringResource(com.songsit.fuellogpro.R.string.settings_check_update_subtitle)
-                    },
-                    onClick = {
-                        if (checkingUpdate) return@PreferenceListItem
-                        // Once a check has found an update, tapping again downloads it instead of
-                        // re-checking — the row's subtitle already makes this action explicit.
-                        val update = foundUpdate
-                        if (update != null) {
-                            uriHandler.openUri(update.downloadUrl)
-                            return@PreferenceListItem
-                        }
-                        checkingUpdate = true
-                        checkedUpToDate = false
-                        checkUpdateScope.launch {
-                            val result = com.songsit.fuellogpro.data.UpdateChecker().checkForUpdate(BuildConfig.VERSION_CODE)
-                            checkingUpdate = false
-                            checkedUpToDate = result == null
-                            foundUpdate = result
-                        }
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_developer_title),
-                    subtitle = "songsit2017 • songsit2017@gmail.com",
-                    onClick = { uriHandler.openUri("mailto:songsit2017@gmail.com") },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_licenses_subtitle),
-                    onClick = { showOpenSourceLicenses = true }
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_changelog_subtitle),
-                    onClick = { showChangelog = true },
-                )
-            }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_category_data_sources)) }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.settings_oil_price_subtitle),
-                )
-            }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_nearby_stations_title), subtitle = "Google Places API") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_weather_title), subtitle = "Open-Meteo") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_ocr_title), subtitle = "Claude (Anthropic) AI") }
-            item { PreferenceListItem(title = stringResource(com.songsit.fuellogpro.R.string.settings_update_check_source_title), subtitle = "GitHub Releases API") }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.settings_source_code_title),
-                    subtitle = "github.com/songsit2017/Fuel-log",
-                    onClick = { uriHandler.openUri("https://github.com/songsit2017/Fuel-log") },
-                )
             }
         }
     }
@@ -2805,38 +2994,6 @@ private fun SettingsScreen(
         )
     }
 
-    if (showThemePaletteDialog) {
-        AlertDialog(
-            onDismissRequest = { showThemePaletteDialog = false },
-            title = { Text(stringResource(com.songsit.fuellogpro.R.string.settings_color_scheme_title)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    themePaletteKeys.forEach { key ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clickable {
-                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
-                                    showThemePaletteDialog = false
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = displaySettings.themePalette == key,
-                                onClick = {
-                                    onDisplaySettingsChange(displaySettings.copy(themePalette = key))
-                                    showThemePaletteDialog = false
-                                },
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(themePaletteLabel(key))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showThemePaletteDialog = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2865,58 +3022,62 @@ private fun OtherSettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_logging)) }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = settings.defaultFullTank,
-                            onCheckedChange = {
-                                onSettingsChange(settings.copy(defaultFullTank = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onSettingsChange(settings.copy(defaultFullTank = !settings.defaultFullTank))
-                    },
-                )
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_logging)) {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_full_tank_default_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = settings.defaultFullTank,
+                                onCheckedChange = {
+                                    onSettingsChange(settings.copy(defaultFullTank = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onSettingsChange(settings.copy(defaultFullTank = !settings.defaultFullTank))
+                        },
+                    )
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = settings.confirmBeforeDelete,
+                                onCheckedChange = {
+                                    onSettingsChange(settings.copy(confirmBeforeDelete = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
+                        },
+                    )
+                }
             }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_confirm_delete_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = settings.confirmBeforeDelete,
-                            onCheckedChange = {
-                                onSettingsChange(settings.copy(confirmBeforeDelete = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onSettingsChange(settings.copy(confirmBeforeDelete = !settings.confirmBeforeDelete))
-                    },
-                )
-            }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_notifications)) }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = reminderSettings.fuelEfficiencyAlerts,
-                            onCheckedChange = {
-                                onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = it))
-                            },
-                        )
-                    },
-                    onClick = {
-                        onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = !reminderSettings.fuelEfficiencyAlerts))
-                    },
-                )
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.other_settings_category_notifications)) {
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.other_settings_fuel_efficiency_alerts_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = reminderSettings.fuelEfficiencyAlerts,
+                                onCheckedChange = {
+                                    onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = it))
+                                },
+                                colors = bentoSwitchColors(),
+                            )
+                        },
+                        onClick = {
+                            onReminderSettingsChange(reminderSettings.copy(fuelEfficiencyAlerts = !reminderSettings.fuelEfficiencyAlerts))
+                        },
+                    )
+                }
             }
         }
     }
@@ -2958,172 +3119,194 @@ private fun ImportExportScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title)) }
             item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.backup_json_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.backup_json_subtitle),
-                    leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onExportBackup,
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.export_csv_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.export_csv_subtitle),
-                    leading = { Icon(Icons.Filled.ListAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onExportCsv,
-                )
-            }
-            item {
-                PreferenceListItem(
-                    title = stringResource(com.songsit.fuellogpro.R.string.import_data_title),
-                    subtitle = stringResource(com.songsit.fuellogpro.R.string.import_data_subtitle),
-                    leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onImportBackup,
-                )
-            }
-            if (onDriveBackup != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_backup_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_backup_subtitle),
-                        leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onDriveBackup,
-                    )
-                }
-            }
-            if (onDriveRestore != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_restore_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_restore_subtitle),
-                        leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onDriveRestore,
-                    )
-                }
-            }
-            if (onDriveAutoSyncChange != null) {
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_title),
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_subtitle),
-                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        trailing = {
-                            Switch(
-                                checked = driveAutoSyncEnabled,
-                                onCheckedChange = onDriveAutoSyncChange,
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.settings_backup_restore_title)) {
+                    // Export buttons: JSON backup and CSV report side-by-side as outlined actions
+                    // rather than full list rows, since these are the two "produce a file" exports.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onExportBackup,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Filled.CloudUpload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp),
                             )
-                        },
-                        onClick = { onDriveAutoSyncChange(!driveAutoSyncEnabled) },
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.songsit.fuellogpro.R.string.backup_json_title),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onExportCsv,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Filled.ListAlt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.songsit.fuellogpro.R.string.export_csv_title),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+
+                    PreferenceListItem(
+                        title = stringResource(com.songsit.fuellogpro.R.string.import_data_title),
+                        subtitle = stringResource(com.songsit.fuellogpro.R.string.import_data_subtitle),
+                        leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        onClick = onImportBackup,
                     )
+
+                    if (onDriveBackup != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_backup_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_backup_subtitle),
+                            leading = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = onDriveBackup,
+                        )
+                    }
+                    if (onDriveRestore != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_restore_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_restore_subtitle),
+                            leading = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = onDriveRestore,
+                        )
+                    }
+                    if (onDriveAutoSyncChange != null) {
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_title),
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.drive_autosync_subtitle),
+                            leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            trailing = {
+                                Switch(
+                                    checked = driveAutoSyncEnabled,
+                                    onCheckedChange = onDriveAutoSyncChange,
+                                    colors = bentoSwitchColors(),
+                                )
+                            },
+                            onClick = { onDriveAutoSyncChange(!driveAutoSyncEnabled) },
+                        )
+                    }
                 }
             }
 
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.google_sync_category)) }
-            if (cloudState.uid == null) {
-                item {
-                    PreferenceListItem(
-                        title = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
-                        },
-                        subtitle = stringResource(com.songsit.fuellogpro.R.string.google_sync_subtitle),
-                        leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = if (!cloudState.syncing) onGoogleSignIn else null,
-                    )
-                }
-            } else {
-                item {
-                    PreferenceListItem(
-                        title = cloudState.email ?: stringResource(com.songsit.fuellogpro.R.string.google_connected_default),
-                        subtitle = if (cloudState.syncing) {
-                            stringResource(com.songsit.fuellogpro.R.string.google_syncing)
-                        } else {
-                            stringResource(com.songsit.fuellogpro.R.string.google_tap_to_sync)
-                        },
-                        leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = if (!cloudState.syncing) onCloudSync else null,
-                    )
-                }
-                item {
-                    PreferenceListItem(
-                        title = stringResource(com.songsit.fuellogpro.R.string.google_sign_out),
-                        leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = onSignOut,
-                    )
-                }
-            }
-            cloudState.message?.let { message ->
-                item {
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
+            // ── Account & cloud ───────────────────────────────────────────────────
+            item {
+                BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.google_sync_category)) {
+                    if (cloudState.uid == null) {
+                        PreferenceListItem(
+                            title = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_signing_in)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_sign_in_title)
+                            },
+                            subtitle = stringResource(com.songsit.fuellogpro.R.string.google_sync_subtitle),
+                            leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = if (!cloudState.syncing) onGoogleSignIn else null,
+                        )
+                    } else {
+                        PreferenceListItem(
+                            title = cloudState.email ?: stringResource(com.songsit.fuellogpro.R.string.google_connected_default),
+                            subtitle = if (cloudState.syncing) {
+                                stringResource(com.songsit.fuellogpro.R.string.google_syncing)
+                            } else {
+                                stringResource(com.songsit.fuellogpro.R.string.google_tap_to_sync)
+                            },
+                            leading = { Icon(Icons.Filled.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                            onClick = if (!cloudState.syncing) onCloudSync else null,
+                        )
+                        PreferenceListItem(
+                            title = stringResource(com.songsit.fuellogpro.R.string.google_sign_out),
+                            leading = { Icon(Icons.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = onSignOut,
+                        )
+                    }
+                    cloudState.message?.let { message ->
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                 }
             }
 
             if (syncConflicts.isNotEmpty()) {
-                item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-                item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_category)) }
                 item {
-                    Text(
-                        stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-                }
-                item {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = { onResolveAllConflicts(true) },
-                            enabled = !cloudState.syncing,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_local)) }
-                        OutlinedButton(
-                            onClick = { onResolveAllConflicts(false) },
-                            enabled = !cloudState.syncing,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_cloud)) }
-                    }
-                }
-                if (syncConflicts.size > 5) {
-                    item {
+                    BentoGroupCard(stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_category)) {
                         Text(
-                            stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_showing_n_of, syncConflicts.size),
+                            stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_found, syncConflicts.size),
+                            color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
-                    }
-                }
-                items(syncConflicts.take(5)) { conflict ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { onResolveAllConflicts(true) },
+                                enabled = !cloudState.syncing,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_local), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) }
+                            OutlinedButton(
+                                onClick = { onResolveAllConflicts(false) },
+                                enabled = !cloudState.syncing,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_all_cloud), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) }
+                        }
+                        if (syncConflicts.size > 5) {
                             Text(
-                                "${conflict.collectionName} • ${conflict.recordId.take(8)}",
-                                fontWeight = FontWeight.SemiBold,
+                                stringResource(com.songsit.fuellogpro.R.string.sync_conflicts_showing_n_of, syncConflicts.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = { onResolveConflict(conflict.key, true) },
-                                    enabled = !cloudState.syncing,
-                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_local)) }
-                                TextButton(
-                                    onClick = { onResolveConflict(conflict.key, false) },
-                                    enabled = !cloudState.syncing,
-                                ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_cloud)) }
+                        }
+                        syncConflicts.take(5).forEach { conflict ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text(
+                                        "${conflict.collectionName} • ${conflict.recordId.take(8)}",
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, true) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_local)) }
+                                        TextButton(
+                                            onClick = { onResolveConflict(conflict.key, false) },
+                                            enabled = !cloudState.syncing,
+                                        ) { Text(stringResource(com.songsit.fuellogpro.R.string.use_cloud)) }
+                                    }
+                                }
                             }
                         }
                     }
@@ -3298,6 +3481,7 @@ private fun FamilySharingScreen(
     members: List<VehicleMember>,
     onCreateInvite: ((email: String, role: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
     onJoinByCode: ((code: String, onResult: (String) -> Unit, onError: (String) -> Unit) -> Unit)?,
+    hasSelectedVehicle: Boolean = true,
 ) {
     var inviteEmail by remember { mutableStateOf("") }
     var inviteRole by remember { mutableStateOf("editor") }
@@ -3308,6 +3492,9 @@ private fun FamilySharingScreen(
     var joinResult by remember { mutableStateOf<String?>(null) }
     var joinError by remember { mutableStateOf<String?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
+    val familyScreenContext = LocalContext.current
+    val copiedMessage = stringResource(com.songsit.fuellogpro.R.string.copied_to_clipboard)
 
     Scaffold(
         topBar = {
@@ -3378,7 +3565,7 @@ private fun FamilySharingScreen(
                 }
             }
 
-            if (onCreateInvite != null) {
+            if (onCreateInvite != null && hasSelectedVehicle) {
                 item { PreferenceCategoryHeader(stringResource(com.songsit.fuellogpro.R.string.family_create_invite)) }
                 item {
                     val joinedLabel = stringResource(com.songsit.fuellogpro.R.string.family_invite_code_result, inviteResult ?: "")
@@ -3426,7 +3613,17 @@ private fun FamilySharingScreen(
                                     },
                                 )
                             }
-                            if (inviteResult != null) Text(joinedLabel, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            inviteResult?.let { code ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(joinedLabel, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = {
+                                        clipboardManager.setText(AnnotatedString(code))
+                                        Toast.makeText(familyScreenContext, copiedMessage, Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(com.songsit.fuellogpro.R.string.action_copy))
+                                    }
+                                }
+                            }
                             inviteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
@@ -3498,7 +3695,7 @@ private fun NotificationSettingRow(
 }
 
 @Composable
-private fun EmptyFuelState() {
+internal fun EmptyFuelState() {
     Card(shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(com.songsit.fuellogpro.R.string.fuel_list_empty_title), fontWeight = FontWeight.SemiBold)
@@ -3547,9 +3744,152 @@ private fun UnitDropdownField(
     }
 }
 
+// Cash, a spread of Thai banks/credit cards/loan products, or "อื่นๆ" to type any product name
+// not listed — mirrors the maintenance-category dialog's dropdown-plus-custom-field pattern.
+// Bank/card product names are kept as-is in every language (proper nouns), same as station brand
+// names elsewhere in the app — only the field's own label is localized.
+private val paymentMethodOptions = listOf(
+    "เงินสด",
+    "ธนาคารกรุงเทพ",
+    "ธนาคารกสิกรไทย",
+    "ธนาคารไทยพาณิชย์",
+    "ธนาคารกรุงไทย",
+    "ธนาคารกรุงศรีอยุธยา",
+    "ธนาคารทหารไทยธนชาต (ttb)",
+    "ธนาคารออมสิน",
+    "ธนาคารเพื่อการเกษตรและสหกรณ์ (ธ.ก.ส.)",
+    "บัตรเครดิตกสิกรไทย",
+    "บัตรเครดิตกรุงศรี",
+    "บัตรเครดิตไทยพาณิชย์",
+    "บัตรเครดิตกรุงไทย",
+    "บัตรเครดิต KTC",
+    "บัตรเครดิต American Express",
+    "สินเชื่อส่วนบุคคล",
+    "สินเชื่อรถยนต์",
+    "บัตรกดเงินสด",
+    "อื่นๆ",
+)
+
+@Composable
+private fun PaymentMethodField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    // Whether the user is in "custom" mode can't be derived from `value` alone: picking "อื่นๆ"
+    // clears value to "", which would otherwise look identical to the untouched/blank starting
+    // state and hide the custom field again right after choosing it. Explicit state instead —
+    // starts true only when editing an entry whose saved value isn't one of the presets.
+    var isCustom by remember { mutableStateOf(value.isNotBlank() && value !in paymentMethodOptions) }
+    val selected = if (isCustom) "อื่นๆ" else value
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = selected,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_payment_method)) },
+                leadingIcon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Box(Modifier.matchParentSize().clickable { menuExpanded = true })
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                paymentMethodOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            menuExpanded = false
+                            if (option == "อื่นๆ") {
+                                isCustom = true
+                                onValueChange("")
+                            } else {
+                                isCustom = false
+                                onValueChange(option)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        if (isCustom) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_payment_method)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+// Same dropdown-plus-custom-field pattern as PaymentMethodField above, but the option list is
+// dynamic instead of a fixed preset: family/vehicle member names plus whatever driver names have
+// been typed on past entries (see ProAppShell's driverSuggestions computation), so a shared
+// vehicle's regular drivers become one-tap picks after the first time each is typed. Falls back
+// to a plain text field with no dropdown when there are no suggestions yet (nothing to pick from).
+@Composable
+private fun DriverField(value: String, onValueChange: (String) -> Unit, suggestions: List<String>, modifier: Modifier = Modifier) {
+    if (suggestions.isEmpty()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_driver)) },
+            leadingIcon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+            singleLine = true,
+            modifier = modifier.fillMaxWidth(),
+        )
+        return
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val otherLabel = stringResource(com.songsit.fuellogpro.R.string.driver_other_option)
+    var isCustom by remember { mutableStateOf(value.isNotBlank() && value !in suggestions) }
+    val selected = if (isCustom) otherLabel else value
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = selected,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_driver)) },
+                leadingIcon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Box(Modifier.matchParentSize().clickable { menuExpanded = true })
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                (suggestions + otherLabel).forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            menuExpanded = false
+                            if (option == otherLabel) {
+                                isCustom = true
+                                onValueChange("")
+                            } else {
+                                isCustom = false
+                                onValueChange(option)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        if (isCustom) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_specify_driver)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleEditScreen(
+internal fun VehicleEditScreen(
     saving: Boolean,
     editing: Vehicle?,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)?,
@@ -3792,19 +4132,29 @@ private fun VehicleEditScreen(
 // AddFuelDialog / AddFuelScreen (full-screen add/edit fuel entry)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddFuelScreen(
+internal fun AddFuelScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: FuelEntry? = null,
     vehicleFuelType: String = "",
     vehicleTankCapacity: Double? = null,
     stationVisitCounts: Map<String, Int> = emptyMap(),
+    driverSuggestions: List<String> = emptyList(),
     onFindNearbyStations: ((onResult: (List<NearbyStation>) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onFetchWeather: ((onResult: (WeatherInfo) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     autoOpenScan: Boolean = false,
     defaultFullTank: Boolean = true,
+    // Pre-attaches photo(s) already copied into app storage (e.g. shared in from another app via
+    // Android's share sheet — see MainActivity's ACTION_SEND/SEND_MULTIPLE handling) without
+    // needing a full `editing` entity. Ignored when `editing` is set, since that already
+    // supplies photoUrls.
+    initialPhotoPaths: List<String> = emptyList(),
+    // Runs OCR on a photo that's already attached (skipped the pick-flow's automatic scan) —
+    // same underlying scan MainActivity's pick callbacks use, just addressable by path instead
+    // of only firing right after a fresh pick/capture. type is "fuel" or "odometer".
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (FuelEntryFormValues, () -> Unit) -> Unit,
     onUpdate: ((String, FuelEntryFormValues, () -> Unit) -> Unit)? = null,
@@ -3873,6 +4223,8 @@ private fun AddFuelScreen(
     var priceHadFocus by remember { mutableStateOf(false) }
     var totalHadFocus by remember { mutableStateOf(false) }
     var station by remember { mutableStateOf(editing?.station ?: "") }
+    var driver by remember { mutableStateOf(editing?.driver ?: "") }
+    var paymentMethod by remember { mutableStateOf(editing?.paymentMethod ?: "") }
     var fullTank by remember(editing, defaultFullTank) {
         mutableStateOf(editing?.fullTank ?: defaultFullTank)
     }
@@ -3880,7 +4232,7 @@ private fun AddFuelScreen(
     var nearbyStations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var nearbySearching by remember { mutableStateOf(false) }
     var nearbyError by remember { mutableStateOf<String?>(null) }
-    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: initialPhotoPaths) }
     // Photo pick + OCR scan is one round trip (see MainActivity.scanFirstPhoto) that can take a
     // few seconds over the network — without this the "สแกนบิล/ใบเสร็จด้วย AI" button and camera
     // icons looked like they'd done nothing until the fields suddenly populated. Kept as two
@@ -3993,6 +4345,8 @@ private fun AddFuelScreen(
             grossAmount = grossAmountValue,
             fullTank = fullTank,
             station = station,
+            driver = driver,
+            paymentMethod = paymentMethod,
             photoUri = photoUri,
             odometerIsTripMeter = odometerIsTripMeter,
             tankLevelEnabled = tankLevelEnabled,
@@ -4156,22 +4510,12 @@ private fun AddFuelScreen(
                         )
                     }
                 }
+                item { PaymentMethodField(paymentMethod, { paymentMethod = it }) }
+                item { DriverField(driver, { driver = it }, driverSuggestions) }
                 item {
                     FormRow(Icons.Filled.CalendarToday) {
-                        OutlinedTextField(
-                            date,
-                            { date = it },
-                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlinedTextField(
-                            time,
-                            { time = it },
-                            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
+                        DateField(date, { date = it }, modifier = Modifier.weight(1f))
+                        TimeField(time, { time = it }, modifier = Modifier.weight(1f))
                     }
                 }
                 if (onPickPhoto != null) {
@@ -4183,6 +4527,12 @@ private fun AddFuelScreen(
                             onPickGallery = { isScanningReceipt = true; onPickPhoto(null, handlePicked) },
                             onPickCamera = onPickCameraPhoto?.let { pick -> { isScanningReceipt = true; pick(null, handlePicked) } },
                             onRemove = { uri -> photoUris = photoUris - uri },
+                            onScanReceipt = onScanExistingPhoto?.let { scan ->
+                                { path -> isScanningReceipt = true; scan(path, "fuel") { result -> handlePicked(emptyList(), result) } }
+                            },
+                            onScanOdometer = onScanExistingPhoto?.let { scan ->
+                                { path -> isScanningOdometer = true; scan(path, "odometer") { result -> handlePicked(emptyList(), result) } }
+                            },
                         )
                     }
                     item {
@@ -4353,6 +4703,84 @@ private fun AddFuelScreen(
     }
 }
 
+// Both fields were plain typed-text OutlinedTextFields (no calendar/clock UI at all) — readOnly
+// + a tap-to-open Material3 DatePicker/TimePicker dialog instead. Stored format stays exactly
+// what the rest of the app already persists/parses: date as ISO "yyyy-MM-dd"
+// (LocalDate.toString()), time as ISO "HH:mm" (LocalTime.toString() with zero seconds).
+// DatePickerDialog's selectedDateMillis is UTC-midnight-of-day, so it's converted via
+// ZoneOffset.UTC specifically (not the device zone) per Compose's own recommendation — using the
+// local zone here would shift the parsed date by a day near midnight in zones ahead of UTC.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showPicker by remember { mutableStateOf(false) }
+    // A plain Modifier.clickable on a readOnly OutlinedTextField doesn't fire — the field's own
+    // pointer input (cursor placement / text selection) consumes the tap first even when
+    // readOnly. Same fix already used elsewhere in this file (see UnitDropdownField above): an
+    // invisible Box the same size laid on top to actually catch the tap.
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { showPicker = true })
+    }
+    if (showPicker) {
+        val initialMillis = remember(value) {
+            runCatching { LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull()
+        }
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        onValueChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    showPicker = false
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
+        ) { DatePicker(state = pickerState) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showPicker by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { showPicker = true })
+    }
+    if (showPicker) {
+        val parsed = remember(value) { runCatching { LocalTime.parse(value) }.getOrNull() ?: LocalTime.now() }
+        val pickerState = rememberTimePickerState(initialHour = parsed.hour, initialMinute = parsed.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            text = { TimePicker(state = pickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onValueChange(LocalTime.of(pickerState.hour, pickerState.minute).toString())
+                    showPicker = false
+                }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(com.songsit.fuellogpro.R.string.action_cancel)) } },
+        )
+    }
+}
+
 @Composable
 private fun OdometerField(
     value: String,
@@ -4408,6 +4836,20 @@ private fun OdometerField(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, top = 2.dp),
             )
+            // Catches both fat-finger typos and AI/OCR misreads (e.g. a dropped digit) before
+            // save — a lower total odometer than the last entry silently voids this fill-up's
+            // km/L in calculatePerEntryKmPerLiter() (negative interval distance), so surfacing it
+            // here is cheaper than debugging a "why is my rate missing" report later. Trip-meter
+            // mode is exempt since that value is expected to be small relative to the total.
+            val enteredOdometer = value.toDoubleOrNull()
+            if (!isTripMeter && enteredOdometer != null && enteredOdometer < latestOdometer) {
+                Text(
+                    stringResource(com.songsit.fuellogpro.R.string.odometer_lower_than_last_warning, "%.0f".format(Locale.US, latestOdometer)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                )
+            }
         }
     }
 }
@@ -4486,6 +4928,11 @@ private fun PhotoAttachmentRow(
     onRemove: (String) -> Unit,
     onPickCamera: (() -> Unit)? = null,
     onPickPdf: (() -> Unit)? = null,
+    // Offers a "scan this photo" action in the full-screen preview for an already-attached image
+    // that never went through the pick-flow's automatic OCR (e.g. one shared in from another
+    // app). See FullScreenImageViewer's doc comment for the split between the two.
+    onScanReceipt: ((String) -> Unit)? = null,
+    onScanOdometer: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var fullScreenIndex by remember { mutableStateOf<Int?>(null) }
@@ -4566,6 +5013,8 @@ private fun PhotoAttachmentRow(
             initialIndex = index,
             onDismiss = { fullScreenIndex = null },
             onDelete = { uri -> onRemove(uri) },
+            onScanReceipt = onScanReceipt,
+            onScanOdometer = onScanOdometer,
         )
     }
 }
@@ -4577,7 +5026,7 @@ private val expenseCategories = listOf(
 // AddExpenseDialog / AddExpenseScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddExpenseScreen(
+internal fun AddExpenseScreen(
     saving: Boolean,
     latestOdometer: Double?,
     editing: Expense? = null,
@@ -4586,13 +5035,18 @@ private fun AddExpenseScreen(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
+    // Same purpose as AddFuelScreen's param of the same name — see its doc comment.
+    initialPhotoPaths: List<String> = emptyList(),
+    // Same purpose as AddFuelScreen's param of the same name; only "receipt" scanning applies
+    // here (no odometer field on an expense).
+    onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit,
-    onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, () -> Unit) -> Unit)? = null,
+    onSave: (String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit,
+    onUpdate: ((String, String, String, String, String, Double, Double?, Boolean, Boolean, String?, String?, String, () -> Unit) -> Unit)? = null,
 ) {
     var date by remember { mutableStateOf(editing?.date ?: LocalDate.now().toString()) }
     var time by remember { mutableStateOf(editing?.time ?: LocalTime.now().withSecond(0).withNano(0).toString()) }
-    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: emptyList()) }
+    var photoUris by remember { mutableStateOf(editing?.photoUrls ?: initialPhotoPaths) }
     var isScanning by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(editing?.category ?: expenseCategories.first()) }
     var description by remember { mutableStateOf(editing?.description ?: "") }
@@ -4606,6 +5060,7 @@ private fun AddExpenseScreen(
     var reminderDate by remember { mutableStateOf(editing?.reminderDate ?: "") }
     var reminderEnabled by remember { mutableStateOf(!editing?.reminderDate.isNullOrBlank()) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
+    var paymentMethod by remember { mutableStateOf(editing?.paymentMethod ?: "") }
 
     fun save() {
         val amountValue = amount.toDoubleOrNull() ?: 0.0
@@ -4613,9 +5068,9 @@ private fun AddExpenseScreen(
         val reminderValue = reminderDate.takeIf { reminderEnabled && it.isNotBlank() }
         val photoUri = PhotoUris.join(photoUris)
         if (editing != null && onUpdate != null) {
-            onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+            onUpdate(editing.id, date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, paymentMethod, onDismiss)
         } else {
-            onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, onDismiss)
+            onSave(date, time, category, description, amountValue, odometerValue, income, recurring, reminderValue, photoUri, paymentMethod, onDismiss)
         }
     }
 
@@ -4708,14 +5163,8 @@ private fun AddExpenseScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        date, { date = it },
-                        label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_date)) },
-                        leadingIcon = { Icon(Icons.Filled.CalendarToday, contentDescription = null) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(time, { time = it }, label = { Text(stringResource(com.songsit.fuellogpro.R.string.label_time)) }, singleLine = true, modifier = Modifier.weight(1f))
+                    DateField(date, { date = it }, modifier = Modifier.weight(1f))
+                    TimeField(time, { time = it }, modifier = Modifier.weight(1f))
                 }
             }
             item {
@@ -4728,6 +5177,7 @@ private fun AddExpenseScreen(
                     Switch(checked = income, onCheckedChange = { income = it })
                 }
             }
+            item { PaymentMethodField(paymentMethod, { paymentMethod = it }) }
             item { Text(stringResource(com.songsit.fuellogpro.R.string.section_optional_fields), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             item {
                 OutlinedTextField(
@@ -4795,6 +5245,9 @@ private fun AddExpenseScreen(
                             }
                         },
                         onRemove = { uri -> photoUris = photoUris - uri },
+                        onScanReceipt = onScanExistingPhoto?.let { scan ->
+                            { path -> isScanning = true; scan(path, "expense") { result -> expenseHandlePicked(emptyList(), result) } }
+                        },
                     )
                 }
                 item {
@@ -4871,7 +5324,7 @@ private fun AddExpenseScreen(
 }
 
 @Composable
-private fun AddMaintenanceDialog(
+internal fun AddMaintenanceDialog(
     saving: Boolean,
     latestOdometer: Double?,
     editing: MaintenanceTask? = null,
@@ -4984,7 +5437,7 @@ private fun AddMaintenanceDialog(
 }
 
 @Composable
-private fun AddTripDialog(
+internal fun AddTripDialog(
     saving: Boolean,
     editing: Trip? = null,
     prefillDistanceKm: Double? = null,

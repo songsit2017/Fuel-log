@@ -201,7 +201,7 @@ class NativeAppViewModel(
         }
     }
 
-    fun addFuel(values: FuelEntryFormValues, onSaved: () -> Unit) {
+    fun addFuel(values: FuelEntryFormValues, recordedByUid: String?, recordedByName: String?, onSaved: () -> Unit) {
         val vehicleId = state.value.selectedVehicle?.id
         if (vehicleId == null) {
             error.value = getString(R.string.error_add_vehicle_before_fuel)
@@ -216,7 +216,7 @@ class NativeAppViewModel(
         viewModelScope.launch {
             saving.value = true
             error.value = null
-            runCatching { fuelRepository.add(vehicleId, values) }
+            runCatching { fuelRepository.add(vehicleId, values, recordedByUid, recordedByName) }
                 .onSuccess { entryId ->
                     onFuelEntrySaved(entryId)
                     checkFuelEfficiencyAlert(vehicleId, priorEntries, values, maintenanceTasks)
@@ -299,6 +299,7 @@ class NativeAppViewModel(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.selectedVehicle?.id
@@ -326,6 +327,7 @@ class NativeAppViewModel(
                     recurring,
                     reminderDate,
                     photoUri,
+                    paymentMethod,
                 )
             }.onSuccess {
                 onReminderDataChanged()
@@ -348,6 +350,7 @@ class NativeAppViewModel(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
         onSaved: () -> Unit,
     ) {
         val vehicleId = state.value.expenses.firstOrNull { it.id == id }?.vehicleId
@@ -364,7 +367,7 @@ class NativeAppViewModel(
             saving.value = true
             error.value = null
             runCatching {
-                expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri)
+                expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri, paymentMethod)
             }.onSuccess {
                 onReminderDataChanged()
                 onSaved()

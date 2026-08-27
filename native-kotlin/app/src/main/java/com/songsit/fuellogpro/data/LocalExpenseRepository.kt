@@ -30,6 +30,7 @@ class LocalExpenseRepository(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
     ) {
         dao.upsert(
             ExpenseEntity(
@@ -46,6 +47,7 @@ class LocalExpenseRepository(
                 reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = System.currentTimeMillis(),
                 photoUri = photoUri,
+                paymentMethod = paymentMethod.trim(),
             ),
         )
     }
@@ -63,6 +65,7 @@ class LocalExpenseRepository(
         recurring: Boolean,
         reminderDate: String?,
         photoUri: String? = null,
+        paymentMethod: String = "",
     ) {
         val existing = dao.getById(id)
         dao.upsert(
@@ -80,6 +83,7 @@ class LocalExpenseRepository(
                 reminderDate = reminderDate?.takeIf(String::isNotBlank),
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                 photoUri = photoUri ?: existing?.photoUri,
+                paymentMethod = paymentMethod.trim(),
             ),
         )
     }
@@ -107,4 +111,5 @@ private fun ExpenseEntity.toDomain() = Expense(
     reminderDate = reminderDate,
     photoUri = photoUri,
     photoUrls = PhotoUris.split(photoUri),
+    paymentMethod = paymentMethod,
 )

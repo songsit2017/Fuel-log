@@ -1,5 +1,7 @@
 package com.songsit.fuellogpro.ui.stats
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +13,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -574,14 +580,16 @@ private fun StationCostDonutChart(breakdown: List<Pair<String, Double>>, otherLa
         modelProducer.runTransaction { pieSeries { series(breakdown.map { it.second }) } }
     }
     val total = remember(breakdown) { breakdown.sumOf { it.second } }
-    // Fixed categorical order (primary/tertiary/secondary/primaryContainer), never cycled, so a
-    // station keeps its color across recompositions; the residual "Other" bucket always gets a
-    // neutral tone rather than competing for a "real" hue.
+    // Fixed categorical order (primary/secondary/primaryContainer/secondaryContainer), never
+    // cycled, so a station keeps its color across recompositions; the residual "Other" bucket
+    // always gets a neutral tone rather than competing for a "real" hue. tertiary now equals
+    // primary under the unified dual-accent system (see FuelLogTheme.kt), so the containers —
+    // not a third hue — supply the two paler, still-distinct slice colors.
     val sliceColors = listOf(
         MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.tertiary,
         MaterialTheme.colorScheme.secondary,
         MaterialTheme.colorScheme.primaryContainer,
+        MaterialTheme.colorScheme.secondaryContainer,
     )
     val otherColor = MaterialTheme.colorScheme.outlineVariant
     val colors = remember(breakdown, sliceColors, otherColor) {
@@ -761,12 +769,21 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     val prevMonthLabel = stringResource(com.songsit.fuellogpro.R.string.stats_prev_month)
 
     Column(modifier = modifier.fillMaxSize()) {
-        ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 12.dp) {
+        // Clean underline indicator in primary — explicit selected/unselected content colors so
+        // the tab row reads deliberately styled rather than relying on M3's default tinting.
+        ScrollableTabRow(
+            selectedTabIndex = selectedTab,
+            edgePadding = 12.dp,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
+                    text = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -787,7 +804,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
             when (selectedTab) {
                 0 -> {
                     // General Tab
-                    item { HeroCard("General") }
+                    item {
+                        HeroMetricCard(
+                            stringResource(com.songsit.fuellogpro.R.string.dashboard_net_cost),
+                            statsCurrency.format(generalStats.netCost),
+                            Icons.Filled.AccountBalanceWallet,
+                        )
+                    }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.dashboard_record_count),
@@ -800,7 +823,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             title = stringResource(com.songsit.fuellogpro.R.string.dashboard_total_cost),
                             value = statsCurrency.format(generalStats.totalCost),
                             icon = Icons.Filled.Payments,
-                            iconTint = Color(0xFFF44336),
+                            iconTint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     item {
@@ -808,7 +831,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             title = stringResource(com.songsit.fuellogpro.R.string.dashboard_net_cost),
                             value = statsCurrency.format(generalStats.netCost),
                             icon = Icons.Filled.AccountBalanceWallet,
-                            iconTint = Color(0xFF4CAF50),
+                            iconTint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     item {
@@ -842,7 +865,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 }
                 1 -> {
                     // Refills Tab
-                    item { HeroCard("Refills") }
+                    item { HeroEfficiencyGauge(stats.avgKml, stats.bestKml) }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.stats_refills),
@@ -875,16 +898,16 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             value = "${statsNumber.format(stats.avgKml)} km/l",
                             bottomLeftLabel = "${statsNumber.format(stats.bestKml)} km/l\n${stringResource(com.songsit.fuellogpro.R.string.stats_best_fuel_efficiency)}",
                             bottomLeftIcon = Icons.Filled.ThumbUp,
-                            bottomLeftIconTint = Color(0xFF4CAF50),
+                            bottomLeftIconTint = MaterialTheme.colorScheme.onSurface,
                             bottomRightLabel = "${statsNumber.format(stats.worstKml)} km/l\n${stringResource(com.songsit.fuellogpro.R.string.stats_worst_fuel_efficiency)}",
                             bottomRightIcon = Icons.Filled.ThumbDown,
-                            bottomRightIconTint = Color(0xFFF44336)
+                            bottomRightIconTint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
                 2 -> {
                     // Costs Tab
-                    item { HeroCard("Costs") }
+                    item { HeroCostPreview(monthlyCosts) }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.stats_costs),
@@ -894,7 +917,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             thisMonth = "${statsCurrency.format(stats.costThisMonth)}\n$thisMonthLabel",
                             prevMonth = "${statsCurrency.format(stats.costPrevMonth)}\n$prevMonthLabel",
                             icon = Icons.Filled.TrendingUp,
-                            iconTint = Color(0xFF4CAF50)
+                            iconTint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     item {
@@ -907,9 +930,9 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                                     maxVal = statsCurrency.format(stats.maxBill),
                                     maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_expense),
                                     iconMin = Icons.Filled.MonetizationOn,
-                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMinTint = MaterialTheme.colorScheme.onSurface,
                                     iconMax = Icons.Filled.MonetizationOn,
-                                    iconMaxTint = Color(0xFFF44336)
+                                    iconMaxTint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Box(modifier = Modifier.weight(1f)) {
@@ -920,9 +943,9 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                                     maxVal = statsCurrency.format(stats.worstPricePerLiter),
                                     maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_worst_price),
                                     iconMin = Icons.Filled.LocalGasStation,
-                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMinTint = MaterialTheme.colorScheme.onSurface,
                                     iconMax = Icons.Filled.LocalGasStation,
-                                    iconMaxTint = Color(0xFFF44336)
+                                    iconMaxTint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -933,10 +956,10 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             value = "${statsNumber.format(stats.avgCostPerKm)}/km",
                             bottomLeftLabel = "${statsCurrency.format(stats.bestCostPerKm)}/km\n${stringResource(com.songsit.fuellogpro.R.string.stats_best_cost_per_km)}",
                             bottomLeftIcon = Icons.Filled.MonetizationOn,
-                            bottomLeftIconTint = Color(0xFF4CAF50),
+                            bottomLeftIconTint = MaterialTheme.colorScheme.onSurface,
                             bottomRightLabel = "${statsCurrency.format(stats.worstCostPerKm)}/km\n${stringResource(com.songsit.fuellogpro.R.string.stats_worst_cost_per_km)}",
                             bottomRightIcon = Icons.Filled.MonetizationOn,
-                            bottomRightIconTint = Color(0xFFF44336)
+                            bottomRightIconTint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     item {
@@ -954,7 +977,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 }
                 3 -> {
                     // Income Tab
-                    item { HeroCard("Income") }
+                    item {
+                        HeroMetricCard(
+                            stringResource(com.songsit.fuellogpro.R.string.stats_income),
+                            statsCurrency.format(incomeStats.totalIncome),
+                            Icons.Filled.Savings,
+                        )
+                    }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.stats_income),
@@ -964,7 +993,7 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                             thisMonth = "${statsCurrency.format(incomeStats.incomeThisMonth)}\n$thisMonthLabel",
                             prevMonth = "${statsCurrency.format(incomeStats.incomePrevMonth)}\n$prevMonthLabel",
                             icon = Icons.Filled.Savings,
-                            iconTint = Color(0xFF4CAF50),
+                            iconTint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     item {
@@ -977,9 +1006,9 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                                     maxVal = statsCurrency.format(incomeStats.maxIncome),
                                     maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_income),
                                     iconMin = Icons.Filled.Savings,
-                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMinTint = MaterialTheme.colorScheme.onSurface,
                                     iconMax = Icons.Filled.Savings,
-                                    iconMaxTint = Color(0xFF4CAF50),
+                                    iconMaxTint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                             Box(modifier = Modifier.weight(1f)) {
@@ -1000,7 +1029,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 }
                 4 -> {
                     // Distance Tab
-                    item { HeroCard("Distance") }
+                    item {
+                        HeroMetricCard(
+                            stringResource(com.songsit.fuellogpro.R.string.stats_distance_tracked),
+                            "${statsNumber.format(stats.totalDistance)} km",
+                            Icons.Filled.DirectionsCar,
+                        )
+                    }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.stats_distance_tracked),
@@ -1034,7 +1069,13 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                 }
                 5 -> {
                     // Service Tab
-                    item { HeroCard("Service") }
+                    item {
+                        HeroMetricCard(
+                            stringResource(com.songsit.fuellogpro.R.string.stats_service),
+                            statsCurrency.format(serviceStats.totalCost),
+                            Icons.Filled.Build,
+                        )
+                    }
                     item {
                         MainValueCard(
                             title = stringResource(com.songsit.fuellogpro.R.string.stats_service),
@@ -1056,9 +1097,9 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
                                     maxVal = statsCurrency.format(serviceStats.maxBill),
                                     maxLabel = stringResource(com.songsit.fuellogpro.R.string.stats_max_service_bill),
                                     iconMin = Icons.Filled.Build,
-                                    iconMinTint = Color(0xFF4CAF50),
+                                    iconMinTint = MaterialTheme.colorScheme.onSurface,
                                     iconMax = Icons.Filled.Build,
-                                    iconMaxTint = Color(0xFFF44336),
+                                    iconMaxTint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                             Box(modifier = Modifier.weight(1f)) {
@@ -1086,46 +1127,143 @@ fun StatsScreen(state: NativeAppState, modifier: Modifier = Modifier) {
     }
 }
 
+// Hero summary card, headline number version — used for the tabs whose single most meaningful
+// number doesn't have a natural chart/gauge (General/Income/Distance/Service). A big highlight
+// number in primary, per the same rule the dashboard's KM/L hero follows.
 @Composable
-fun HeroCard(type: String) {
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-            when (type) {
-                "General" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.Dashboard, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.Insights, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
+fun HeroMetricCard(headline: String, value: String, icon: ImageVector) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(160.dp).padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Column {
+                Text(headline, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    value,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+// Hero for the Refills tab — average fuel efficiency plotted against the vehicle's own personal
+// best, as a filled arc gauge. Genuinely data-driven (not decorative): the fill fraction is
+// avgKml / bestKml, so a full ring means "running at your best efficiency."
+@Composable
+fun HeroEfficiencyGauge(avgKml: Double, bestKml: Double) {
+    val fraction = if (bestKml > 0) (avgKml / bestKml).coerceIn(0.0, 1.0) else 0.0
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
+    val fillColor = MaterialTheme.colorScheme.primary
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().height(160.dp).padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Canvas(Modifier.size(96.dp)) {
+                    val stroke = Stroke(width = 10.dp.toPx())
+                    val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
+                    val topLeft = Offset(stroke.width / 2, stroke.width / 2)
+                    drawArc(trackColor, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = stroke, topLeft = topLeft, size = arcSize)
+                    drawArc(fillColor, startAngle = -90f, sweepAngle = (360f * fraction).toFloat(), useCenter = false, style = stroke, topLeft = topLeft, size = arcSize)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        statsNumber.format(avgKml),
+                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text("km/L", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(com.songsit.fuellogpro.R.string.stats_avg_fuel_efficiency) + " • ${(fraction * 100).let { "%.0f".format(it) }}% " +
+                    stringResource(com.songsit.fuellogpro.R.string.stats_best_fuel_efficiency),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+// Hero for the Costs tab — a glanceable spark-bar strip of the last few months, distinct from the
+// fully-labeled MonthlyCostChart further down the same tab (glance vs analyze), built from plain
+// Boxes rather than pulling in the chart library for a decoration this small.
+@Composable
+fun HeroCostPreview(monthlyCosts: List<Pair<YearMonth, Double>>) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().height(160.dp).padding(20.dp)) {
+            Text(
+                stringResource(com.songsit.fuellogpro.R.string.stats_monthly_cost_chart_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            val recent = remember(monthlyCosts) { monthlyCosts.takeLast(6) }
+            if (recent.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        statsCurrency.format(0),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                val maxCost = remember(recent) { recent.maxOf { it.second }.coerceAtLeast(1.0) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    recent.forEach { (month, cost) ->
+                        val isLatest = month == recent.last().first
+                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight((cost / maxCost).toFloat().coerceIn(0.08f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(
+                                        if (isLatest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    ),
+                            )
+                        }
                     }
                 }
-                "Refills" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.LocalGasStation, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.WaterDrop, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color(0xFFEA4335))
-                    }
-                }
-                "Costs" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.LocalGasStation, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.Payments, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
-                    }
-                }
-                "Distance" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.ShowChart, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
-                    }
-                }
-                "Income" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.Savings, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.TrendingUp, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
-                    }
-                }
-                "Service" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF4285F4))
-                        Icon(Icons.Filled.CarRepair, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFFEA4335))
-                    }
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(recent.first().first.format(monthLabelFormatter), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(recent.last().first.format(monthLabelFormatter), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -1149,14 +1287,14 @@ fun MainValueCard(
     bottomRightIcon: ImageVector? = null,
     bottomRightIconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
-    Card(shape = RoundedCornerShape(20.dp)) {
+    Card(shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.fillMaxWidth().padding(18.dp)) {
             if (icon != null && thisYear == null && bottomLeftLabel == null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(icon, contentDescription = null, tint = iconTint)
                     Column {
                         Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = iconTint)
                     }
                 }
             } else {
@@ -1170,7 +1308,7 @@ fun MainValueCard(
                         Column(Modifier.weight(1f)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (icon != null) Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
-                                Text(thisYear, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(thisYear, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = iconTint)
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(prevYear, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = if (icon != null) 26.dp else 0.dp))
@@ -1178,7 +1316,7 @@ fun MainValueCard(
                         Column(Modifier.weight(1f)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (icon != null) Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
-                                Text(thisMonth ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(thisMonth ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = iconTint)
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(prevMonth ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = if (icon != null) 26.dp else 0.dp))
@@ -1193,14 +1331,14 @@ fun MainValueCard(
                         Column(Modifier.weight(1f)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (bottomLeftIcon != null) Icon(bottomLeftIcon, contentDescription = null, tint = bottomLeftIconTint, modifier = Modifier.size(20.dp))
-                                Text(bottomLeftLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(bottomLeftLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = bottomLeftIconTint)
                             }
                         }
                         if (bottomRightLabel != null) {
                             Column(Modifier.weight(1f)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (bottomRightIcon != null) Icon(bottomRightIcon, contentDescription = null, tint = bottomRightIconTint, modifier = Modifier.size(20.dp))
-                                    Text(bottomRightLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(bottomRightLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = bottomRightIconTint)
                                 }
                             }
                         }
@@ -1223,14 +1361,14 @@ fun MinMaxCard(
     iconMax: ImageVector,
     iconMaxTint: Color,
 ) {
-    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(iconMin, contentDescription = null, tint = iconMinTint, modifier = Modifier.size(24.dp))
                 Column {
-                    Text(minVal, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(minVal, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = iconMinTint)
                     Text(minLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -1238,7 +1376,7 @@ fun MinMaxCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(iconMax, contentDescription = null, tint = iconMaxTint, modifier = Modifier.size(24.dp))
                 Column {
-                    Text(maxVal, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(maxVal, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = iconMaxTint)
                     Text(maxLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -1248,7 +1386,7 @@ fun MinMaxCard(
 
 @Composable
 fun TitleValueCard(title: String, value: String, icon: ImageVector) {
-    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))

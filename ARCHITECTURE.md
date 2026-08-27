@@ -1,6 +1,10 @@
 # Cross-app sync architecture
 
-Status: production architecture, last reviewed 2026-08-11.
+Status: release architecture, reviewed 2026-08-27 (PU Pocket 0.2.34 / Fuel Log 1.3.5).
+
+Payment routing, compatibility, verification and rollout gates are specified in
+[`docs/FUEL-PAYMENT-ROUTING.md`](docs/FUEL-PAYMENT-ROUTING.md). Deployment evidence
+is recorded in the coordinated releases; do not infer deployment from source alone.
 
 This document explains how Fuel Log and PU Pocket exchange data. Read it before changing sync code, database models, Firebase paths/rules, Supabase migrations/RPCs, receipt storage, or account/vehicle sharing.
 
@@ -38,14 +42,18 @@ Do not bypass these boundaries by calling Supabase directly from Fuel Log or Fir
 
 ## Pairing and authorization
 
-1. A signed-in PU Pocket user selects the destination account/category.
+1. A signed-in PU Pocket user selects the category and legacy fallback account.
 2. `create-fuel-log-link` creates a 10-minute, 10-character code. Supabase stores only its SHA-256 hash.
 3. A signed-in Fuel Log user submits that code and selected vehicle IDs to the Firebase callable `redeemPupuLink`.
 4. The callable verifies Firebase vehicle membership before using the server-only Supabase credential.
 5. Supabase `redeem_fuel_log_link` locks and consumes the code once, then creates one active link per selected vehicle.
 6. The callable backfills existing entries. Later Firestore writes use the document trigger.
 
-The link owns the PU Pocket destination account/category. It does not transfer ownership of a Fuel Log vehicle or merge the two family-sharing systems.
+The link identifies the PU Pocket owner/category. New bridge calls select an active
+owned THB account from the source payment method or receipt evidence; missing or
+ambiguous destinations enter an owner-only pending queue. Only legacy calls without
+payment metadata may use the active linked fallback account. It does not transfer
+vehicle ownership or merge the two family-sharing systems.
 
 ## Entry contract
 
@@ -55,6 +63,8 @@ The link owns the PU Pocket destination account/category. It does not transfer o
 | constant source | `fuel_log` | `external_source` |
 | `total` in baht | round once at boundary: `total * 100` | `amount_minor` as integer |
 | `date` + `time` | interpret in Thailand (`+07:00`) | `transaction_date` |
+| optional `paymentMethod` | explicit choice, then receipt evidence, no receipt means cash | `external_metadata.payment` + safe account selection |
+| Firestore update/event time | compare source watermark under an identity lock | `fuel_log_import_versions` |
 | vehicle/station/liters/price/odometer/full | JSON projection | `external_metadata` |
 | HTTPS receipt URLs | validate, copy server-side | private `receiptPaths` |
 | document deletion | RPC with `p_deleted = true` | `deleted_at` soft delete |
@@ -65,6 +75,7 @@ Adding an optional metadata field should be additive and old readers must tolera
 
 - Fuel Log's normal full device sync treats different local/cloud copies as a conflict. The save path uses `pushFuelEntry(entryId)` because the just-saved local record is authoritative and must trigger the bridge immediately.
 - Firebase document triggers may retry. The Supabase uniqueness constraint and RPC make those retries idempotent.
+- Payment-aware imports retain source watermarks, including deletes. Older or unversioned events cannot overwrite a watermarked decision. User retries route only their stored pending payloads, without inventing new source data.
 - PU Pocket records a local mutation and its outbox row in one Room transaction. It pushes the outbox before pulling server rows.
 - PU Pocket pulls parents before transactions, uses an overlapping incremental cursor, and does not overwrite a row with a pending local mutation.
 - Supabase server timestamps and soft-delete tombstones are canonical. Device clocks are not conflict authority.

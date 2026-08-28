@@ -1,13 +1,17 @@
 package com.songsit.fuellogpro.ui
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
+import androidx.core.view.WindowCompat
 
 // "Modern Minimal Bento" identity: a unified dual-accent system (electric blue + vibrant orange)
 // on neutral slate surfaces, replacing the earlier per-category rainbow — blue (primary) marks
@@ -128,6 +132,21 @@ fun FuelLogTheme(
         "light" -> false
         "dark" -> true
         else -> isSystemInDarkTheme()
+    }
+    // Theme.FuelLogPro (styles.xml) hardcodes android:windowLightStatusBar="false" (white system
+    // status/nav bar icons) for the dark navy status bar it used to paint everywhere — but that
+    // color is only actually applied pre-edge-to-edge. On Android 15+ (edge-to-edge enforced,
+    // see ProAppShell's TopAppBar inset fix) the status bar is transparent and whatever this
+    // theme draws underneath shows through instead, so in "light" mode that's now a white
+    // TopAppBar with white icons on top of it — invisible. Sync the system bar icon color to the
+    // in-app light/dark choice here instead of leaving it pinned to the XML default, since
+    // themeMode is a runtime Compose setting the static theme resource can't see.
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = !useDark
+        controller.isAppearanceLightNavigationBars = !useDark
     }
     MaterialTheme(
         colorScheme = if (useDark) ProDark else ProLight,

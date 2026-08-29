@@ -138,6 +138,13 @@ place beside the production package on VOG-L29 (`10.10.99.155`). The device was
 locked after launch, so interactive save-to-PU-Pocket E2E remains a release gate
 rather than being claimed from this run.
 
+Production consumer-first rollout on the same date deployed
+`syncVehicleExpenseToPupu` and the updated `redeemPupuLink` as Gen 2 functions in
+`asia-southeast1`. A read-only post-deploy check still showed 220 Fuel Log rows,
+zero `expense:` rows, and zero pending rows, confirming that deployment did not
+replay or mutate historical vehicle expenses. Historical replay requires a
+separately reviewed selection and authorization.
+
 ## Verification performed (2026-08-27)
 
 - PU Pocket: `:domain:test :data:testDebugUnitTest :app:assembleDebug` passed

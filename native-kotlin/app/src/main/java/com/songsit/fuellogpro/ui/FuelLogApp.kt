@@ -264,8 +264,8 @@ fun FuelLogApp(
     onPickPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickCameraPhoto: ((type: String?, onPicked: (uris: List<String>, scanResult: ReceiptScanResult?) -> Unit) -> Unit)? = null,
     onPickPdf: ((onPicked: (uris: List<String>) -> Unit) -> Unit)? = null,
-    // Dev-build-only "scan an already-attached photo" entry point — see ProAppShell's param of
-    // the same name for the full explanation. Unused (always null) in the default shell.
+    // "Scan an already-attached photo" entry point — see ProAppShell's param of the same name
+    // for the full explanation. Unused (always null) in the default shell.
     onScanExistingPhoto: ((path: String, type: String, onResult: (ReceiptScanResult?) -> Unit) -> Unit)? = null,
     oilPriceInfo: OilPriceInfo? = null,
     vehicleMembers: List<VehicleMember> = emptyList(),
@@ -280,8 +280,8 @@ fun FuelLogApp(
     onDriveRestore: (() -> Unit)? = null,
     driveAutoSyncEnabled: Boolean = false,
     onDriveAutoSyncChange: ((Boolean) -> Unit)? = null,
-    // Dev-build-only "share receipt photo(s) into the app" entry point — see ProAppShell's param
-    // of the same name for the full explanation. Unused (always empty) in the default shell.
+    // "Share receipt photo(s) into the app" entry point — see ProAppShell's param of the same
+    // name for the full explanation. Unused (always empty) in the default shell.
     sharedPhotoPaths: List<String> = emptyList(),
     onSharedPhotoConsumed: () -> Unit = {},
 ) {

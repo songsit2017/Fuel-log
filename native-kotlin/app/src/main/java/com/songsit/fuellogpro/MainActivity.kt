@@ -574,11 +574,11 @@ class MainActivity : AppCompatActivity() {
             LaunchedEffect(Unit) {
                 oilPriceInfo = oilPriceRepository.fetchTodayPrices()
             }
-            // Dev-build-only share target (src/debug/AndroidManifest.xml registers ACTION_SEND
-            // and ACTION_SEND_MULTIPLE for image/* on this Activity — some gallery apps fire
-            // SEND_MULTIPLE even for a single selected photo) — photos shared in from
-            // Gallery/Camera/LINE/etc. get copied into app storage the same way pickPhoto above
-            // does, then handed to ProAppShell's "save as" chooser via the sharedPhotoPaths param.
+            // Share target (AndroidManifest.xml registers ACTION_SEND and ACTION_SEND_MULTIPLE
+            // for image/* on this Activity — some gallery apps fire SEND_MULTIPLE even for a
+            // single selected photo) — photos shared in from Gallery/Camera/LINE/etc. get copied
+            // into app storage the same way pickPhoto above does, then handed to ProAppShell's
+            // "save as" chooser via the sharedPhotoPaths param.
             var sharedPhotoPaths by remember { mutableStateOf<List<String>>(emptyList()) }
             LaunchedEffect(Unit) {
                 val sharedIntent = intent

@@ -31,10 +31,11 @@ class LocalExpenseRepository(
         reminderDate: String?,
         photoUri: String? = null,
         paymentMethod: String = "",
-    ) {
+    ): String {
+        val id = UUID.randomUUID().toString()
         dao.upsert(
             ExpenseEntity(
-                id = UUID.randomUUID().toString(),
+                id = id,
                 vehicleId = vehicleId,
                 date = date,
                 time = time,
@@ -50,6 +51,7 @@ class LocalExpenseRepository(
                 paymentMethod = paymentMethod.trim(),
             ),
         )
+        return id
     }
 
     suspend fun update(

@@ -134,9 +134,7 @@ rows; never rewrite the deployed migration or hard-delete finance history.
 Verification on 2026-08-29: all 34 Firebase Function tests passed, including
 expense create/income/delete/backfill and receipt/payment behavior. Native
 `testDebugUnitTest assembleDebug --no-daemon` passed, and the dev APK updated in
-place beside the production package on VOG-L29 (`10.10.99.155`). The device was
-locked after launch, so interactive save-to-PU-Pocket E2E remains a release gate
-rather than being claimed from this run.
+place beside the production package on VOG-L29 (`10.10.99.155`).
 
 Production consumer-first rollout on the same date deployed
 `syncVehicleExpenseToPupu` and the updated `redeemPupuLink` as Gen 2 functions in
@@ -144,6 +142,15 @@ Production consumer-first rollout on the same date deployed
 zero `expense:` rows, and zero pending rows, confirming that deployment did not
 replay or mutate historical vehicle expenses. Historical replay requires a
 separately reviewed selection and authorization.
+
+The physical-device E2E gate completed on 2026-08-31. A ฿1.23 `ทางด่วน`
+expense explicitly paid by `บัตรเครดิต KTC` produced exactly one namespaced
+transaction (123 minor units) in the active KTC `CREDIT_CARD` account and active
+`ทางด่วน` expense category. Editing it to ฿2.34 and `ล้างรถ` updated the same
+transaction/source identity and category instead of inserting a duplicate.
+Deleting it removed the source record and set the same PU Pocket row's
+`deleted_at`; the test is no longer visible in Fuel Log, active vehicle-expense
+count returned to zero, and pending count remained zero.
 
 ## Verification performed (2026-08-27)
 

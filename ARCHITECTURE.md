@@ -10,9 +10,9 @@ This document explains how Fuel Log and PU Pocket exchange data. Read it before 
 
 ## Non-negotiable invariants
 
-1. Fuel Log is the source of truth for vehicles and fuel entries. PU Pocket stores a finance-facing projection, not a second editable copy of a fuel entry.
+1. Fuel Log is the source of truth for vehicles, fill-ups, and vehicle expenses. PU Pocket stores a finance-facing projection, not a second editable copy of a Fuel Log record.
 2. The cross-app flow is one-way: **Fuel Log -> PU Pocket**. PU Pocket's own Room/Supabase sync remains bidirectional.
-3. A Fuel Log entry ID is stable. PU Pocket identifies it with `external_source = "fuel_log"` and `external_source_id = <entryId>`.
+3. A Fuel Log source ID is stable. Fill-ups keep `external_source_id = <entryId>` for compatibility; vehicle expenses use `external_source_id = expense:<expenseId>` so the two Firestore collections cannot collide.
 4. `(user_id, external_source, external_source_id)` stays unique. Retrying create/update events must update one transaction, never create duplicates.
 5. Backend secrets never enter either APK. Only Firebase Cloud Functions may use the Supabase service-role key.
 6. Imported receipts stay private. Persist Supabase object paths, not expiring signed URLs.
@@ -23,8 +23,8 @@ This document explains how Fuel Log and PU Pocket exchange data. Read it before 
 
 ```mermaid
 flowchart LR
-    A["Fuel Log Room"] -->|save/edit| B["Firestore vehicles/{vehicleId}/entries/{entryId}"]
-    B -->|onDocumentWritten| C["Firebase Function syncFuelEntryToPupu"]
+    A["Fuel Log Room"] -->|save/edit| B["Firestore entries + expenses"]
+    B -->|collection triggers| C["Firebase Functions PU Pocket bridge"]
     C -->|service role + RPC| D["Supabase upsert_fuel_log_transaction"]
     C -->|copy authorized receipt| E["Private pupu-receipts bucket"]
     D --> F["Supabase transactions projection"]
@@ -47,7 +47,7 @@ Do not bypass these boundaries by calling Supabase directly from Fuel Log or Fir
 3. A signed-in Fuel Log user submits that code and selected vehicle IDs to the Firebase callable `redeemPupuLink`.
 4. The callable verifies Firebase vehicle membership before using the server-only Supabase credential.
 5. Supabase `redeem_fuel_log_link` locks and consumes the code once, then creates one active link per selected vehicle.
-6. The callable backfills existing entries. Later Firestore writes use the document trigger.
+6. The callable backfills existing fill-ups and vehicle expenses with one shared bounded OCR budget. Later Firestore writes use their collection-specific document triggers.
 
 The link identifies the PU Pocket owner/category. New bridge calls select an active
 owned THB account from the source payment method or receipt evidence; missing or
@@ -55,11 +55,12 @@ ambiguous destinations enter an owner-only pending queue. Only legacy calls with
 payment metadata may use the active linked fallback account. It does not transfer
 vehicle ownership or merge the two family-sharing systems.
 
-## Entry contract
+## Record contract
 
 | Fuel Log / Firestore | Bridge transformation | PU Pocket / Supabase |
 | --- | --- | --- |
-| Firestore document ID | stable source identity | `external_source_id` |
+| fill-up document ID | unchanged stable source identity | `external_source_id = <entryId>` |
+| vehicle-expense document ID | prefix with `expense:` | `external_source_id = expense:<expenseId>` |
 | constant source | `fuel_log` | `external_source` |
 | `total` in baht | round once at boundary: `total * 100` | `amount_minor` as integer |
 | `date` + `time` | interpret in Thailand (`+07:00`) | `transaction_date` |
@@ -69,11 +70,18 @@ vehicle ownership or merge the two family-sharing systems.
 | HTTPS receipt URLs | validate, copy server-side | private `receiptPaths` |
 | document deletion | RPC with `p_deleted = true` | `deleted_at` soft delete |
 
+Fill-ups remain expenses in PU Pocket's canonical fuel category. Vehicle-expense
+documents add `recordType = vehicle_expense`, `sourceCategory`, and `income` to
+metadata. PU Pocket maps Fuel Log's built-in categories to owner-scoped finance
+categories and uses `income` to choose transaction type. Unknown optional source
+categories map to the bounded fallback category rather than creating arbitrary
+category names.
+
 Adding an optional metadata field should be additive and old readers must tolerate its absence. Renaming/removing a field, changing units, changing ID composition, changing time-zone handling, or changing money rounding is a breaking contract change.
 
 ## Conflict, ordering, and retry behavior
 
-- Fuel Log's normal full device sync treats different local/cloud copies as a conflict. The save path uses `pushFuelEntry(entryId)` because the just-saved local record is authoritative and must trigger the bridge immediately.
+- Fuel Log's normal full device sync treats different local/cloud copies as a conflict. Save paths use `pushFuelEntry(entryId)` and `pushExpense(expenseId)` because the just-saved local record is authoritative and must trigger the bridge immediately.
 - Firebase document triggers may retry. The Supabase uniqueness constraint and RPC make those retries idempotent.
 - Payment-aware imports retain source watermarks, including deletes. Older or unversioned events cannot overwrite a watermarked decision. User retries route only their stored pending payloads, without inventing new source data.
 - PU Pocket records a local mutation and its outbox row in one Room transaction. It pushes the outbox before pulling server rows.
@@ -85,7 +93,7 @@ Adding an optional metadata field should be additive and old readers must tolera
 
 Fuel Log repository:
 
-- `native-kotlin/.../data/firebase/FirestoreSyncRepository.kt`: Room/Firestore sync and immediate saved-entry push.
+- `native-kotlin/.../data/firebase/FirestoreSyncRepository.kt`: Room/Firestore sync and immediate fill-up/expense pushes.
 - `native-kotlin/.../data/firebase/PupuPocketLinkRepository.kt`: client side of pairing.
 - `functions/index.js`: membership checks, mapping, receipt copy, backfill, Firestore trigger, Supabase calls.
 - `firestore.rules`: vehicle membership and write authorization.

@@ -79,6 +79,23 @@ class FirestoreSyncRepository(
         clearConflict("entries", ready.vehicleId, ready.id)
     }
 
+    /**
+     * Pushes a newly saved vehicle expense immediately so downstream integrations receive the
+     * authoritative edit without waiting for a full two-way sync cycle.
+     */
+    suspend fun pushExpense(expenseId: String) = syncMutex.withLock {
+        val current = database.expenseDao().getById(expenseId) ?: return@withLock
+        val uploadedPhotoUri = uploadLocalPhotos(current.vehicleId, current.id, current.photoUri)
+        val ready = if (uploadedPhotoUri != null) current.copy(photoUri = uploadedPhotoUri) else current
+        if (uploadedPhotoUri != null) database.expenseDao().upsert(ready)
+        val upload = expenseCloudMap(ready).toMutableMap().apply {
+            put("updatedAt", FieldValue.serverTimestamp())
+        }
+        firestore.collection("vehicles").document(ready.vehicleId).collection("expenses")
+            .document(ready.id).set(upload, SetOptions.merge()).await()
+        clearConflict("expenses", ready.vehicleId, ready.id)
+    }
+
     suspend fun sync(uid: String, email: String?, displayName: String?, photoUrl: String? = null): CloudSyncResult = syncMutex.withLock {
         normalizeLegacyVehicleId()
         val deletedVehicleIds = applyVehicleDeletionTombstones(uid)
@@ -686,7 +703,7 @@ internal fun fuelCloudMap(item: FuelEntryEntity): Map<String, Any?> = mapOf(
     "paymentMethod" to item.paymentMethod,
 )
 
-private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
+internal fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
     "id" to item.id,
     "vehicleId" to item.vehicleId,
     "date" to item.date,
@@ -699,6 +716,7 @@ private fun expenseCloudMap(item: ExpenseEntity): Map<String, Any?> = mapOf(
     "recurrence" to if (item.recurring) "recurring" else "once",
     "reminderDate" to item.reminderDate,
     "photoUri" to item.photoUri,
+    "paymentMethod" to item.paymentMethod,
 )
 
 private fun maintenanceCloudMap(item: MaintenanceEntity): Map<String, Any?> = mapOf(
@@ -780,6 +798,7 @@ private fun parseExpense(vehicleId: String, document: DocumentSnapshot) = Expens
     reminderDate = document.getString("reminderDate")?.takeIf(String::isNotBlank),
     photoUri = document.getString("photoUri"),
     createdAt = document.timestampMillis("createdAt"),
+    paymentMethod = readFuelPaymentMethod(document.get("paymentMethod")),
 )
 
 private fun parseMaintenance(vehicleId: String, document: DocumentSnapshot, context: Context) = MaintenanceEntity(

@@ -671,6 +671,15 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     },
+                    onExpenseSaved = { expenseId ->
+                        MaintenanceReminderWorker.refresh(applicationContext)
+                        if (backupSettings.driveAutoSyncEnabled) performDriveBackup(silent = true)
+                        if (authRepository.currentUid != null) {
+                            composeScope.launch {
+                                runCatching { cloudRepository.pushExpense(expenseId) }
+                            }
+                        }
+                    },
                 ),
             )
             val state by viewModel.state.collectAsState()

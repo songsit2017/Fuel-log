@@ -7,7 +7,9 @@ const payment = require('../fuel-payment');
 
 // Execute the actual trigger/callable wiring against in-memory Firebase and
 // Supabase doubles. No credentials, network, production writes or paid OCR.
-function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badPhoto = false } = {}) {
+function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badPhoto = false,
+  expenseCount = 0, expenseDeleted = false, expenseCategory = 'บริการ', expenseIncome = false,
+  expenseMethod, expensePhoto = true } = {}) {
   const cache = new Map();
   const writes = [];
   const uploads = [];
@@ -21,6 +23,14 @@ function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badP
         photoUri: badPhoto ? 'https://untrusted.invalid/receipt' : url,
         ...(method === undefined ? {} : { paymentMethod: method }) }) };
   });
+  const expenses = Array.from({ length: expenseCount }, (_, i) => {
+    const id = `expense-${i}`;
+    const url = `https://firebasestorage.googleapis.com/v0/b/synthetic-bucket/o/${encodeURIComponent(`vehicles/car/photos/${id}/receipt.jpg`)}`;
+    return { id, exists: !expenseDeleted, updateTime: { toDate: () => new Date('2026-08-29T09:21:00Z') },
+      data: () => ({ id, date: '2026-08-29', time: '16:21', amount: 1340, category: expenseCategory,
+        title: 'Synthetic vehicle expense', income: expenseIncome, recurrence: 'once', odometer: 130350,
+        photoUri: expensePhoto ? url : '', ...(expenseMethod === undefined ? {} : { paymentMethod: expenseMethod }) }) };
+  });
   const firestore = { collection(name) {
     if (name === 'pupu_payment_receipt_cache') return { doc: key => ({
       get: async () => ({ exists: cache.has(key), data: () => cache.get(key) }),
@@ -31,8 +41,9 @@ function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badP
       assert.equal(id, 'car');
       return { get: async () => ({ data: () => ({ name: 'Synthetic car', ownerUid: 'firebase-user' }) }),
         collection: name => {
-          assert.equal(name, 'entries');
-          return { get: async () => ({ docs: entries }), doc: id => ({ get: async () => entries.find(entry => entry.id === id) }) };
+          assert.ok(['entries', 'expenses'].includes(name));
+          const documents = name === 'entries' ? entries : expenses;
+          return { get: async () => ({ docs: documents }), doc: id => ({ get: async () => documents.find(entry => entry.id === id) }) };
         } };
     } };
   } };
@@ -66,6 +77,7 @@ function bridge({ method, deleted = false, historyCount = 1, linkCount = 1, badP
   vm.runInNewContext(readFileSync(require.resolve('../index.js'), 'utf8'), context);
   return { writes, uploads, cache, ocrCalls: () => ocrCalls,
     sync: () => context.exports.syncFuelEntryToPupu({ params: { vehicleId: 'car', entryId: 'entry-0' }, time: '2026-08-27T10:00:00Z' }),
+    syncExpense: () => context.exports.syncVehicleExpenseToPupu({ params: { vehicleId: 'car', expenseId: 'expense-0' }, time: '2026-08-29T09:00:00Z' }),
     redeem: auth => context.exports.redeemPupuLink({ auth, data: { code: 'ABCDEFGHJK', vehicleIds: ['car'] } }) };
 }
 
@@ -111,12 +123,58 @@ test('authoritative missing document sends only a tombstone with event watermark
   assert.equal(b.writes[0].p_metadata.sourceUpdatedAt, '2026-08-27T10:00:00Z');
 });
 
+test('vehicle expense trigger preserves category, identity, money, time and receipt', async () => {
+  const b = bridge({ expenseCount: 1, expenseMethod: 'KTC' });
+  await b.syncExpense();
+  assert.equal(b.writes.length, 1);
+  const row = b.writes[0];
+  assert.equal(row.p_source_id, 'expense:expense-0');
+  assert.equal(row.p_amount_minor, 134000);
+  assert.equal(row.p_transaction_date, '2026-08-29T16:21:00+07:00');
+  assert.equal(row.p_metadata.recordType, 'vehicle_expense');
+  assert.equal(row.p_metadata.sourceCategory, 'บริการ');
+  assert.equal(row.p_metadata.income, false);
+  assert.equal(row.p_metadata.payment.label, 'KTC');
+  assert.match(row.p_note, /^ค่าใช้จ่ายรถ • Synthetic car • บริการ/);
+  assert.equal(row.p_receipt_url, 'fuel-log/user-0/car/expenses/expense-0/1.jpg');
+  assert.equal(b.ocrCalls(), 0);
+});
+
+test('vehicle income without a receipt is explicit income metadata with cash routing', async () => {
+  const b = bridge({ expenseCount: 1, expenseIncome: true, expenseCategory: 'บริการ', expensePhoto: false });
+  await b.syncExpense();
+  const row = b.writes[0];
+  assert.equal(row.p_metadata.income, true);
+  assert.equal(row.p_metadata.payment.method, 'CASH');
+  assert.equal(row.p_metadata.payment.source, 'no_receipt');
+  assert.match(row.p_note, /^รายรับรถ • Synthetic car • บริการ/);
+});
+
+test('deleted vehicle expense sends a namespaced tombstone and no OCR or upload', async () => {
+  const b = bridge({ expenseCount: 1, expenseDeleted: true });
+  await b.syncExpense();
+  assert.equal(b.writes[0].p_source_id, 'expense:expense-0');
+  assert.equal(b.writes[0].p_deleted, true);
+  assert.equal(b.writes[0].p_metadata.recordType, 'vehicle_expense');
+  assert.equal(b.writes[0].p_metadata.sourceUpdatedAt, '2026-08-29T09:00:00Z');
+  assert.equal(b.ocrCalls(), 0);
+  assert.equal(b.uploads.length, 0);
+});
+
 test('historical import bounds new OCR calls and keeps over-budget entries unresolved', async () => {
   const b = bridge({ historyCount: 12 });
   await b.redeem({ uid: 'firebase-user' });
   assert.equal(b.ocrCalls(), 10);
   assert.equal(b.writes.length, 12);
   assert.equal(b.writes.filter(row => row.p_metadata.payment.source === 'unresolved').length, 2);
+});
+
+test('pairing backfill includes vehicle expenses with the same bounded OCR budget', async () => {
+  const b = bridge({ method: 'เงินสด', historyCount: 1, expenseCount: 2, expenseMethod: 'เงินสด' });
+  await b.redeem({ uid: 'firebase-user' });
+  assert.equal(b.writes.length, 3);
+  assert.equal(b.writes.filter(row => row.p_source_id.startsWith('expense:')).length, 2);
+  assert.equal(b.ocrCalls(), 0);
 });
 
 test('pairing still requires authentication and vehicle membership before importing', async () => {

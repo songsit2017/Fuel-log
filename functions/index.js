@@ -140,7 +140,22 @@ function entryNote(entry, vehicle) {
   return `เติมน้ำมัน • ${details.join(' • ')}`;
 }
 
-async function prepareEntry(vehicleId, entryId, entry, sourceUpdatedAt, ocrBudget = { remaining: 6 }) {
+function expenseSourceId(expenseId) {
+  const value = String(expenseId || '');
+  if (!value || value.length > 190 || value.includes(':')) throw new Error('Invalid Fuel Log expense identity');
+  return `expense:${value}`;
+}
+
+function expenseNote(expense, vehicle) {
+  const details = [
+    vehicle?.name || vehicle?.registration || 'Fuel Log',
+    String(expense.category || '').trim() || 'อื่นๆ',
+    String(expense.title || expense.description || '').trim() || null,
+  ].filter(Boolean);
+  return `${expense.income === true ? 'รายรับรถ' : 'ค่าใช้จ่ายรถ'} • ${details.join(' • ')}`;
+}
+
+async function prepareEntry(vehicleId, entryId, entry, sourceUpdatedAt, ocrBudget = { remaining: 6 }, cacheIdentity = entryId) {
   const bucket = getStorage().bucket();
   const attachments = [];
   for (const url of receiptUrls(entry)) {
@@ -159,7 +174,7 @@ async function prepareEntry(vehicleId, entryId, entry, sourceUpdatedAt, ocrBudge
     }
   }
   const payment = await resolvePayment(entry, attachments, async attachment => {
-    const fingerprint = sha256(`${vehicleId}/${entryId}/v2/${sha256(attachment.bytes)}`);
+    const fingerprint = sha256(`${vehicleId}/${cacheIdentity}/v2/${sha256(attachment.bytes)}`);
     const ref = getFirestore().collection('pupu_payment_receipt_cache').doc(fingerprint);
     const cached = await ref.get();
     if (cached.exists) return cached.data().evidence;
@@ -236,6 +251,41 @@ async function upsertEntryForLink(link, vehicle, entryId, entry, prepared) {
   });
 }
 
+async function upsertExpenseForLink(link, vehicle, expenseId, expense, prepared) {
+  const sourceId = expenseSourceId(expenseId);
+  const receiptPaths = await copyReceiptUrls(link, `expenses/${expenseId}`, prepared.attachments);
+  const amount = Number(expense.amount || 0);
+  if (!Number.isFinite(amount)) throw new Error('Fuel Log expense has no valid amount');
+  const metadata = {
+    recordType: 'vehicle_expense',
+    sourceCategory: String(expense.category || ''),
+    income: expense.income === true,
+    vehicleId: link.vehicle_id,
+    vehicleName: vehicle?.name || null,
+    registration: vehicle?.registration || null,
+    odometerKm: Number(expense.odometer || 0),
+    recurrence: expense.recurrence || null,
+    reminderDate: expense.reminderDate || null,
+    receiptPaths,
+    payment: prepared.payment,
+    sourceUpdatedAt: prepared.sourceUpdatedAt,
+    importedAt: new Date().toISOString(),
+  };
+  await supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_link_id: link.id,
+      p_source_id: sourceId,
+      p_amount_minor: Math.round(Math.abs(amount) * 100),
+      p_transaction_date: transactionDate(expense),
+      p_note: expenseNote(expense, vehicle),
+      p_receipt_url: receiptPaths[0] || null,
+      p_metadata: metadata,
+      p_deleted: false,
+    }),
+  });
+}
+
 async function activeLinksForVehicle(vehicleId) {
   return supabase(`/rest/v1/fuel_log_import_links?select=*&vehicle_id=eq.${encodeURIComponent(vehicleId)}&active=eq.true`);
 }
@@ -277,6 +327,35 @@ async function syncEntry(vehicleId, entryId, eventTime) {
   }
 }
 
+async function syncExpense(vehicleId, expenseId, eventTime) {
+  const links = await activeLinksForVehicle(vehicleId);
+  if (!links.length) return;
+  const vehicle = (await getFirestore().collection('vehicles').doc(vehicleId).get()).data() || null;
+  const live = await getFirestore().collection('vehicles').doc(vehicleId).collection('expenses').doc(expenseId).get();
+  const after = live.exists ? live.data() : null;
+  const sourceId = expenseSourceId(expenseId);
+  if (after) {
+    const prepared = await prepareEntry(vehicleId, expenseId, after,
+      live.updateTime.toDate().toISOString(), { remaining: 6 }, sourceId);
+    await Promise.all(links.map(link => upsertExpenseForLink(link, vehicle, expenseId, after, prepared)));
+  } else {
+    await Promise.all(links.map(link => supabase('/rest/v1/rpc/upsert_fuel_log_transaction', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_link_id: link.id,
+        p_source_id: sourceId,
+        p_amount_minor: 0,
+        p_transaction_date: new Date().toISOString(),
+        p_note: null,
+        p_receipt_url: null,
+        p_metadata: { recordType: 'vehicle_expense', vehicleId, sourceUpdatedAt: eventTime,
+          deletedFromFuelLogAt: new Date().toISOString() },
+        p_deleted: true,
+      }),
+    })));
+  }
+}
+
 exports.syncFuelEntryToPupu = onDocumentWritten({
   region: BRIDGE_REGION,
   document: 'vehicles/{vehicleId}/entries/{entryId}',
@@ -285,6 +364,16 @@ exports.syncFuelEntryToPupu = onDocumentWritten({
   maxInstances: 5,
 }, async event => {
   await syncEntry(event.params.vehicleId, event.params.entryId, event.time);
+});
+
+exports.syncVehicleExpenseToPupu = onDocumentWritten({
+  region: BRIDGE_REGION,
+  document: 'vehicles/{vehicleId}/expenses/{expenseId}',
+  secrets: [supabaseUrl, supabaseServiceRoleKey, anthropicApiKey],
+  timeoutSeconds: 300,
+  maxInstances: 5,
+}, async event => {
+  await syncExpense(event.params.vehicleId, event.params.expenseId, event.time);
 });
 
 exports.redeemPupuLink = onCall({
@@ -303,8 +392,8 @@ exports.redeemPupuLink = onCall({
     method: 'POST',
     body: JSON.stringify({ p_code_hash: sha256(code), p_firebase_uid: request.auth.uid, p_vehicle_ids: vehicleIds }),
   });
-  // Import existing fill-ups immediately. New/updated items continue through
-  // the Firestore trigger above.
+  // Import existing fill-ups and vehicle expenses immediately. New/updated
+  // records continue through their collection-specific Firestore triggers.
   const ocrBudget = { remaining: 10 };
   for (const link of links) {
     const vehicle = (await getFirestore().collection('vehicles').doc(link.vehicle_id).get()).data() || null;
@@ -312,6 +401,13 @@ exports.redeemPupuLink = onCall({
     for (const entry of entries.docs) {
       const prepared = await prepareEntry(link.vehicle_id, entry.id, entry.data(), entry.updateTime.toDate().toISOString(), ocrBudget);
       await upsertEntryForLink(link, vehicle, entry.id, entry.data(), prepared);
+    }
+    const expenses = await getFirestore().collection('vehicles').doc(link.vehicle_id).collection('expenses').get();
+    for (const expense of expenses.docs) {
+      const sourceId = expenseSourceId(expense.id);
+      const prepared = await prepareEntry(link.vehicle_id, expense.id, expense.data(),
+        expense.updateTime.toDate().toISOString(), ocrBudget, sourceId);
+      await upsertExpenseForLink(link, vehicle, expense.id, expense.data(), prepared);
     }
   }
   return { importedVehicles: links.map(link => link.vehicle_id) };

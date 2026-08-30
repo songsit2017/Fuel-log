@@ -17,6 +17,11 @@ Methods are CASH, BANK, CREDIT_CARD, E_WALLET, or UNKNOWN. Sources are fuel_log,
 receipt, no_receipt, or unresolved. Existing IDs, baht-to-minor-unit rounding,
 Thailand dates, receipts, and sharing ownership do not change.
 
+Vehicle expenses use the same payment resolution and private-receipt pipeline.
+They are distinguished additively with `recordType = vehicle_expense`, retain
+their Fuel Log `sourceCategory` and `income` flag, and use the namespaced source
+identity `expense:<expenseId>`. Fill-up IDs and behavior remain unchanged.
+
 Resolution order:
 1. A nonblank Fuel Log payment method wins, including custom labels.
 2. Without it, inspect attached images using the existing server-side OCR
@@ -72,9 +77,10 @@ The native pairing timeout is 540 seconds, matching the callable's upper bound.
 ## Affected components
 
 Fuel Log: Firestore encoder/decoder and payment-only legacy-field enrichment,
-bridge payment resolver, private receipt loading, OCR fallback and tests.
-Existing Room/domain payment fields stay unchanged. Firestore membership rules
-remain unchanged; backend OCR cache is outside client-readable vehicle paths.
+immediate fill-up/expense pushes, collection-specific bridge triggers, private
+receipt loading, OCR fallback, pairing backfill, and tests. Existing Room/domain
+payment fields stay unchanged. Firestore membership rules remain unchanged;
+backend OCR cache is outside client-readable vehicle paths.
 
 PU Pocket: new migration/RPC/pending table and RLS, pending-import reader/retry
 UI, protocol tests, both architecture records. Existing Room schema and external
@@ -100,6 +106,51 @@ watermark tables/data. If returning to the unversioned bridge, deploy a reviewed
 new RPC rollback migration as well; simply reverting the bridge would leave
 watermarked entries protected from its writes. Never hard-delete finance history.
 Companion PRs: linked in the draft PR descriptions.
+
+## Vehicle-expense extension (2026-08-29)
+
+Before: the bridge watched only `vehicles/{vehicleId}/entries/{entryId}`. Records
+saved by Fuel Log's “เพิ่มค่าใช้จ่าย” screen lived under `expenses` and never
+reached PU Pocket. Its Room `paymentMethod` also was not encoded into that
+Firestore document.
+
+After: Fuel Log immediately pushes saved/edited expenses, including optional
+`paymentMethod`, and `syncVehicleExpenseToPupu` projects writes and tombstones.
+Pairing backfill reads both collections using the existing shared OCR cap. PU
+Pocket migration `202608290004_fuel_log_vehicle_expense_categories.sql` is the
+backward-compatible consumer and was deployed before the producer. Fill-ups
+without `recordType` continue to route to the canonical fuel category even if an
+older link points at a different category.
+
+The nine built-in Fuel Log categories map to bounded owner categories; income
+records become PU Pocket income transactions. Source ID prefixing prevents a
+same-text fill-up and expense UUID from colliding while preserving retry/update/
+delete idempotency. Companion consumer PR: `songsit2017/PUPU-Pocket#30`.
+
+Rollback the producer by removing the expense trigger and immediate expense
+push in a new commit. Keep the additive PU Pocket migration and already imported
+rows; never rewrite the deployed migration or hard-delete finance history.
+
+Verification on 2026-08-29: all 34 Firebase Function tests passed, including
+expense create/income/delete/backfill and receipt/payment behavior. Native
+`testDebugUnitTest assembleDebug --no-daemon` passed, and the dev APK updated in
+place beside the production package on VOG-L29 (`10.10.99.155`).
+
+Production consumer-first rollout on the same date deployed
+`syncVehicleExpenseToPupu` and the updated `redeemPupuLink` as Gen 2 functions in
+`asia-southeast1`. A read-only post-deploy check still showed 220 Fuel Log rows,
+zero `expense:` rows, and zero pending rows, confirming that deployment did not
+replay or mutate historical vehicle expenses. Historical replay requires a
+separately reviewed selection and authorization.
+
+The physical-device E2E gate completed on 2026-08-31. A ฿1.23 `ทางด่วน`
+expense explicitly paid by `บัตรเครดิต KTC` produced exactly one namespaced
+transaction (123 minor units) in the active KTC `CREDIT_CARD` account and active
+`ทางด่วน` expense category. Editing it to ฿2.34 and `ล้างรถ` updated the same
+transaction/source identity and category instead of inserting a duplicate.
+Deleting it removed the source record and set the same PU Pocket row's
+`deleted_at`; the test is no longer visible in Fuel Log, active vehicle-expense
+count returned to zero, and pending count remained zero.
 
 ## Verification performed (2026-08-27)
 

@@ -38,10 +38,10 @@ Worktrees are not the default workflow. Use one only when the user explicitly re
 
 ## Ownership and integration contract
 
-- Fuel Log owns vehicles, fill-ups, vehicle-family sharing, and their Firebase records.
+- Fuel Log owns vehicles, fill-ups, vehicle expenses, vehicle-family sharing, and their Firebase records.
 - PU Pocket owns finance accounts, categories, budgets, transactions, finance-family sharing, and Supabase records.
 - The financial bridge is one-way: Fuel Log produces saved fuel expenses; PU Pocket consumes them.
-- PU Pocket identifies imported records with `externalSource = "fuel_log"` and `externalSourceId = <Fuel Log entry UUID>`.
+- PU Pocket identifies imported records with `externalSource = "fuel_log"`; fill-ups retain `<entry UUID>` and vehicle expenses use `expense:<expense UUID>`.
 - Upserts must stay idempotent on `(user_id, external_source, external_source_id)`.
 - Receipt metadata and images remain private and must follow the existing authenticated storage policies.
 - Do not move or remove either app's family-sharing UI or change ownership rules without an explicit request and migration plan.
@@ -77,6 +77,7 @@ Before a coordinated stable release, verify:
 - PU Pocket account/family sharing
 - pairing/re-pairing without duplicate transactions
 - add and edit a fill-up update the same PU Pocket transaction
+- add, edit, and delete a vehicle expense preserve its category/type and update the same namespaced PU Pocket transaction
 - receipt images remain accessible only to authorized users
 - update install succeeds without uninstalling or replacing the signing key
 

@@ -82,6 +82,7 @@ class NativeAppViewModel(
     private val context: Context,
     private val onReminderDataChanged: () -> Unit,
     private val onFuelEntrySaved: (String) -> Unit,
+    private val onExpenseSaved: (String) -> Unit,
 ) : ViewModel() {
     private fun getString(resId: Int) = context.getString(resId)
     private val notificationPreferences = NotificationPreferences(context)
@@ -329,8 +330,8 @@ class NativeAppViewModel(
                     photoUri,
                     paymentMethod,
                 )
-            }.onSuccess {
-                onReminderDataChanged()
+            }.onSuccess { expenseId ->
+                onExpenseSaved(expenseId)
                 onSaved()
             }
                 .onFailure { error.value = it.message ?: getString(R.string.error_save_expense_failed) }
@@ -369,7 +370,7 @@ class NativeAppViewModel(
             runCatching {
                 expenseRepository.update(id, vehicleId, date, time, category, description, amount, odometerKm, income, recurring, reminderDate, photoUri, paymentMethod)
             }.onSuccess {
-                onReminderDataChanged()
+                onExpenseSaved(id)
                 onSaved()
             }.onFailure { error.value = it.message ?: getString(R.string.error_update_expense_failed) }
             saving.value = false
@@ -585,6 +586,7 @@ class NativeAppViewModelFactory(
     private val context: Context,
     private val onReminderDataChanged: () -> Unit,
     private val onFuelEntrySaved: (String) -> Unit,
+    private val onExpenseSaved: (String) -> Unit,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -597,5 +599,6 @@ class NativeAppViewModelFactory(
             context,
             onReminderDataChanged,
             onFuelEntrySaved,
+            onExpenseSaved,
         ) as T
 }

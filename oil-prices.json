@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-23T22:14:40.504316+00:00",
+  "fetchedAt": "2026-09-24T00:51:38.685017+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -23,20 +23,20 @@
   "comparison": {
     "ptt": {
       "source": "https://orapiweb.pttor.com/oilservice/OilPrice.asmx",
-      "updatedAt": "09/15/2026 5:00:00 AM",
+      "updatedAt": "09/24/2026 5:00:00 AM",
       "grades": {
         "gasohol_95": 39.94,
         "gasohol_91": 39.57,
         "e20": 34.94,
         "e85": null,
-        "diesel_b7": 40.69,
-        "diesel_b20": 35.69,
+        "diesel_b7": 41.44,
+        "diesel_b20": 36.44,
         "premium_95": 47.79
       }
     },
     "shell": {
       "source": "https://www.pcauto.com/th/fuel-price/shell",
-      "updatedAt": "2026-09-23T22:14:40.441091+00:00",
+      "updatedAt": "2026-09-24T00:51:38.588935+00:00",
       "grades": {
         "gasohol_95": 37.95,
         "gasohol_91": 37.58,

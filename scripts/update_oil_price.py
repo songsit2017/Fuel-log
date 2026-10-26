@@ -2,7 +2,9 @@
 """Build a same-origin oil-price file from official Bangchak, PTT, Shell, PT, and Caltex sources."""
 from __future__ import annotations
 
+import copy
 import html
+import os
 import json
 import re
 import sys
@@ -177,16 +179,37 @@ def fetch_caltex():
     }
 
 
-def old_comparison():
+def old_payload():
     try:
         previous = json.loads(OUT.read_text(encoding="utf-8"))
-        return previous.get("comparison") or {}
+        return previous
     except Exception:
         return {}
 
 
+def comparable(payload):
+    """Ignore only locally generated check times, not source effective dates."""
+    result = copy.deepcopy(payload)
+    result.pop("fetchedAt", None)
+    for key in ("shell", "pt", "caltex"):
+        brand = result.get("comparison", {}).get(key)
+        if isinstance(brand, dict):
+            brand.pop("updatedAt", None)
+    return result
+
+
+def report(message):
+    print(message)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as stream:
+            stream.write(message + "\n\n")
+
+
 def main():
-    previous = old_comparison()
+    previous_payload = old_payload()
+    previous = previous_payload.get("comparison") or {}
+    report(f"Checked at {datetime.now(timezone.utc).isoformat()}")
     bangchak = fetch_bangchak()
     comparison = {}
     fetchers = [
@@ -198,18 +221,30 @@ def main():
     for key, fetcher in fetchers:
         try:
             comparison[key] = fetcher()
-            print(f"updated {key} official prices")
+            # These sources have no effective date; keep the observation time
+            # when their content is unchanged, even if another brand changes.
+            if key in ("shell", "pt", "caltex") and key in previous:
+                before = {k: v for k, v in previous[key].items() if k != "updatedAt"}
+                after = {k: v for k, v in comparison[key].items() if k != "updatedAt"}
+                if before == after:
+                    comparison[key] = previous[key]
+            report(f"{key}: fetch succeeded")
         except Exception as exc:
             print(f"{key} price update failed: {exc}", file=sys.stderr)
             if previous.get(key):
                 comparison[key] = previous[key]
-                print(f"keeping previous {key} prices")
+                report(f"{key}: fetch failed; keeping previous prices")
+            else:
+                report(f"{key}: fetch failed; no previous prices available")
     payload = {
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "source": BANGCHAK_URL,
         "data": bangchak,
         "comparison": comparison,
     }
+    if comparable(previous_payload) == comparable(payload):
+        report("No price or source-data change; file left unchanged")
+        return
     OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"updated {OUT}")
 
@@ -222,7 +257,7 @@ if __name__ == "__main__":
         if OUT.exists():
             try:
                 if json.loads(OUT.read_text(encoding="utf-8")).get("data"):
-                    print("keeping previous oil-prices.json")
+                    report("Primary source failed; keeping previous oil-prices.json")
                     sys.exit(0)
             except Exception:
                 pass

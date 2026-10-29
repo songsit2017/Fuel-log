@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-29T02:49:18.310433+00:00",
+  "fetchedAt": "2026-10-29T21:45:45.274516+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -8,7 +8,7 @@
       "BannerUrl": "",
       "BannerPoint": "https://webbcpopaprd001.azurewebsites.net/ApiGetImages?FileName=133786018442015734.png",
       "BannerUrlPoint": "https://www.bcpgreenmiles.com/th/privilege?#privilegeTab-5",
-      "OilDateNow": "29/10/2569",
+      "OilDateNow": "30/10/2569",
       "OilPriceDate": "28/10/2569",
       "OilPriceTime": "21:35",
       "OilMessageDate": "28/10/2569",

@@ -167,10 +167,10 @@ fun ProAppShell(
     driveAutoSyncEnabled: Boolean,
     onDriveAutoSyncChange: ((Boolean) -> Unit)?,
     // Photo(s) shared in from another app (Gallery/Camera/LINE/etc. via Android's share sheet —
-    // dev build only, see MainActivity's ACTION_SEND/SEND_MULTIPLE handling and
-    // src/debug/AndroidManifest.xml) already copied into app storage. Non-empty triggers the
-    // "save as" chooser below; onSharedPhotoConsumed clears it in MainActivity once handled (or
-    // dismissed) so it doesn't reappear on the next recomposition.
+    // see MainActivity's ACTION_SEND/SEND_MULTIPLE handling and AndroidManifest.xml) already
+    // copied into app storage. Non-empty triggers the "save as" chooser below;
+    // onSharedPhotoConsumed clears it in MainActivity once handled (or dismissed) so it doesn't
+    // reappear on the next recomposition.
     sharedPhotoPaths: List<String> = emptyList(),
     onSharedPhotoConsumed: () -> Unit = {},
 ) {

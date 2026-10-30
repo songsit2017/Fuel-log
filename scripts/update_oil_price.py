@@ -10,7 +10,7 @@ import re
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 BANGCHAK_URL = "https://oil-price.bangchak.co.th/ApiOilPrice2/th"
@@ -50,7 +50,7 @@ def fetch_bangchak():
 
 
 def fetch_ptt():
-    now = datetime.now()
+    now = datetime.now(timezone(timedelta(hours=7)))
     envelope = f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -191,6 +191,11 @@ def comparable(payload):
     """Ignore only locally generated check times, not source effective dates."""
     result = copy.deepcopy(payload)
     result.pop("fetchedAt", None)
+    # Calendar day is not the effective date of the published prices.
+    data = result.get("data")
+    for record in data if isinstance(data, list) else [data]:
+        if isinstance(record, dict):
+            record.pop("OilDateNow", None)
     for key in ("shell", "pt", "caltex"):
         brand = result.get("comparison", {}).get(key)
         if isinstance(brand, dict):

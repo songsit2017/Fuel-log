@@ -74,6 +74,29 @@ class UpdatePricesTest(unittest.TestCase):
         self.assertIn("caltex", result["comparison"])
         self.assertIsNone(result["comparison"]["shell"]["grades"]["e20"])
 
+    def test_calendar_day_does_not_rewrite_file(self):
+        self.next["data"][0]["OilDateNow"] = "30/10/2569"
+        self.run_update()
+        self.assertEqual(self.before, self.output.read_bytes())
+
+    def test_bangchak_price_and_effective_date_are_significant(self):
+        for field in ("OilList", "OilPriceDate", "OilPriceTime"):
+            with self.subTest(field=field):
+                self.setUp()
+                self.next["data"][0][field] = "changed"
+                self.assertEqual("changed", self.run_update()["data"][0][field])
+
+    def test_ptt_requests_thai_date(self):
+        from datetime import datetime, timezone
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 10, 29, 21, 45, tzinfo=timezone.utc).astimezone(tz)
+        with patch.object(updater, "datetime", Clock), patch.object(updater, "read_url", return_value=b"<root/>") as read:
+            with self.assertRaises(ValueError):
+                updater.fetch_ptt()
+        self.assertIn(b"<DD>30</DD><MM>10</MM><YYYY>2026</YYYY>", read.call_args.kwargs["data"])
+
     def test_missing_file_is_created(self):
         self.output.unlink()
         self.assertEqual(self.next["comparison"]["ptt"], self.run_update()["comparison"]["ptt"])

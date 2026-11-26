@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-11-25T23:16:52.578359+00:00",
+  "fetchedAt": "2026-11-26T05:25:29.929913+00:00",
   "source": "https://oil-price.bangchak.co.th/ApiOilPrice2/th",
   "data": [
     {
@@ -23,11 +23,11 @@
   "comparison": {
     "ptt": {
       "source": "https://orapiweb.pttor.com/oilservice/OilPrice.asmx",
-      "updatedAt": "11/25/2026 5:00:00 AM",
+      "updatedAt": "11/26/2026 5:00:00 AM",
       "grades": {
-        "gasohol_95": 38.14,
-        "gasohol_91": 37.77,
-        "e20": 30.1,
+        "gasohol_95": 37.44,
+        "gasohol_91": 37.07,
+        "e20": 29.6,
         "e85": null,
         "diesel_b7": 39.34,
         "diesel_b20": 32.9,
